@@ -1,15 +1,26 @@
 import React from 'react';
-import { StatusBar, useColorScheme } from 'react-native';
+import { StatusBar } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { HomeScreen } from './src/screens/HomeScreen';
+import { SessionListScreen } from './src/screens/SessionListScreen';
+import { ChatScreen } from './src/screens/ChatScreen';
+import { HostConfigScreen } from './src/screens/HostConfigScreen';
+import type { RootStackParamList } from './src/types/navigation';
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <HomeScreen />
+      <NavigationContainer>
+        <StatusBar barStyle="dark-content" />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SessionList" component={SessionListScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="HostConfig" component={HostConfigScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }

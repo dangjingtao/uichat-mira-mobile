@@ -17,7 +17,7 @@ Mira 官方移动端工程，基于 React Native 构建。
 
 ## 环境要求
 
-- Node.js >= 22.11.0
+- Node.js 22.x (>= 22.11.0)
 - Android SDK 36+ / API 24+
 - JDK 17+
 - iOS 15.0+
@@ -69,7 +69,7 @@ src/
 feature/* -> dev -> test -> prod
 ```
 
-当前环境分支尚未完成共同基线初始化，该流程需由维护者初始化并宣布启用。过渡期规则详见 [AGENT.md](./AGENT.md)。
+当前环境分支尚未完成共同基线初始化，该流程需由维护者初始化并宣布启用。过渡期规则详见 [AGENTS.md](./AGENTS.md)。
 
 ## Android 构建与签名
 
@@ -83,6 +83,19 @@ MIRA_RELEASE_STORE_PASSWORD=<store-password>
 MIRA_RELEASE_KEY_ALIAS=<key-alias>
 MIRA_RELEASE_KEY_PASSWORD=<key-password>
 ```
+
+GitHub Actions 构建签名 release APK 时，还需要在仓库 Secrets 中配置：
+
+```text
+MIRA_RELEASE_KEYSTORE_BASE64
+MIRA_RELEASE_STORE_PASSWORD
+MIRA_RELEASE_KEY_ALIAS
+MIRA_RELEASE_KEY_PASSWORD
+```
+
+`MIRA_RELEASE_KEYSTORE_BASE64` 是 release keystore 的单行 Base64 内容。`prod` 分支推送或手动运行
+`Mobile CI` 时，工作流会构建签名 APK，验证内置 JavaScript bundle、SVG 原生库和 APK 签名，并上传
+`uichat-mira-mobile-android-release` artifact。
 
 任何一项缺失时，release 任务会明确失败。签名文件和真实密码不得提交到仓库。
 
