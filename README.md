@@ -99,8 +99,9 @@ keytool -genkeypair -v -keystore release.keystore -alias <alias> -keyalg RSA -ke
 - TypeScript 类型检查、ESLint 和 Jest。
 - Android `assembleDebug` 干净环境构建。
 - iOS CocoaPods 安装与无签名 Simulator Debug 构建。
+- `dev` 推送通过全部检查后，更新 `dev-latest` 预发布，并同步到 Cloudflare R2 的 `mira/mobile/dev/latest/`。
 
-CI 只验证可编译性，不生成可发布的已签名 Android/iOS 安装包。
+当前 `dev` 产物包括可安装的 Android Debug APK、iOS Simulator ZIP 和 SHA-256 校验文件。它们是开发测试产物，不是正式签名发行包。
 
 ## 说明
 
