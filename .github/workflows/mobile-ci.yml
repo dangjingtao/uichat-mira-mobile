@@ -187,8 +187,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           short_sha=${GITHUB_SHA::7}
-          git tag -f dev-latest "$GITHUB_SHA"
-          git push origin refs/tags/dev-latest --force
 
           cat > release-notes.md <<EOF
           Automated development build from branch \`dev\`.
@@ -206,10 +204,13 @@ jobs:
               --prerelease
           else
             gh release create dev-latest \
-              --verify-tag \
+              --target "$GITHUB_SHA" \
               --title "Mira Mobile Dev $short_sha" \
               --notes-file release-notes.md \
               --prerelease
           fi
 
           gh release upload dev-latest release-assets/* --clobber
+
+          git tag -f dev-latest "$GITHUB_SHA"
+          git push origin refs/tags/dev-latest --force
