@@ -13,7 +13,7 @@ $deviceId = $devices[0]
 $metroListener = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 
 if (-not $metroListener) {
-  Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', "cd /d `"$projectRoot`" && npx --yes node@22 node_modules/react-native/cli.js start" -WorkingDirectory $projectRoot
+  Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', "cd /d `"$projectRoot`" && npx --yes node@22 node_modules/react-native/cli.js start --max-workers 2" -WorkingDirectory $projectRoot
   Write-Host 'Starting Metro with Node.js 22 in a separate terminal...'
   Start-Sleep -Seconds 5
 }
