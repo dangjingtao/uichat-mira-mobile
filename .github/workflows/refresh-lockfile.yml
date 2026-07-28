@@ -1,0 +1,62 @@
+name: Refresh package lock
+
+on:
+  push:
+    branches:
+      - fix/pr-5-review-blockers
+    paths:
+      - .github/workflows/refresh-lockfile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Regenerate package-lock.json
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/pr-5-review-blockers
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+          cache: npm
+
+      - name: Refresh lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Validate lockfile metadata
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const root = lock.packages?.[''];
+          if (lock.name !== 'uichat-mira-mobile' || lock.version !== '0.1.0') {
+            throw new Error('Top-level lockfile metadata is not synchronized');
+          }
+          if (root?.name !== 'uichat-mira-mobile' || root?.version !== '0.1.0') {
+            throw new Error('Root package metadata is not synchronized');
+          }
+          if (root?.dependencies?.['@react-native/new-app-screen']) {
+            throw new Error('@react-native/new-app-screen remains a root dependency');
+          }
+          if (lock.packages?.['node_modules/@react-native/new-app-screen']) {
+            throw new Error('@react-native/new-app-screen remains in the installed package tree');
+          }
+          NODE
+
+      - name: Commit refreshed lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json is already synchronized.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'chore: synchronize npm lockfile'
+          git push origin HEAD:fix/pr-5-review-blockers
