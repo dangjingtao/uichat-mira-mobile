@@ -271,14 +271,14 @@ jobs:
         run: |
           short_sha=${GITHUB_SHA::7}
 
-          cat > release-notes.md <<EOF_NOTES
+          cat > release-notes.md <<EOF
           Automated development build from branch \`dev\`.
 
           - Commit: \`$GITHUB_SHA\`
           - CI run: \`$GITHUB_RUN_ID\`
           - Android: debug APK, installable for testing
           - iOS: unsigned Simulator app archive, not an IPA
-          EOF_NOTES
+          EOF
 
           if gh release view dev-latest >/dev/null 2>&1; then
             gh release edit dev-latest \
