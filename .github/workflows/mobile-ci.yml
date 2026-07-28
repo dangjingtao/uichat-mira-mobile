@@ -93,6 +93,15 @@ jobs:
         run: |
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/uichat-mira-mobile-dev.apk
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: uichat-mira-mobile-android-debug
+          path: android/app/build/outputs/apk/debug/uichat-mira-mobile-dev.apk
+          if-no-files-found: error
+          retention-days: 14
 
   ios:
     name: iOS simulator build
@@ -131,5 +140,76 @@ jobs:
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             build
+          app_path=$(find ios/build/DerivedData/Build/Products -type d -name '*.app' | head -n 1)
+          test -n "$app_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" ios/build/uichat-mira-mobile-ios-simulator.zip
+
+      - name: Upload iOS simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: uichat-mira-mobile-ios-simulator
+          path: ios/build/uichat-mira-mobile-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-dev-release:
+    name: Publish dev prerelease
+    needs:
+      - quality
+      - android
+      - ios
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+
+      - name: Publish rolling dev release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short_sha=${GITHUB_SHA::7}
+          git tag -f dev-latest "$GITHUB_SHA"
+          git push origin refs/tags/dev-latest --force
+
+          cat > release-notes.md <<EOF
+          Automated development build from branch \`dev\`.
+
+          - Commit: \`$GITHUB_SHA\`
+          - CI run: \`$GITHUB_RUN_ID\`
+          - Android: debug APK, installable for testing
+          - iOS: unsigned Simulator app archive, not an IPA
+          EOF
+
+          if gh release view dev-latest >/dev/null 2>&1; then
+            gh release edit dev-latest \
+              --title "Mira Mobile Dev $short_sha" \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create dev-latest \
+              --verify-tag \
+              --title "Mira Mobile Dev $short_sha" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
+
+          gh release upload dev-latest release-assets/* --clobber
