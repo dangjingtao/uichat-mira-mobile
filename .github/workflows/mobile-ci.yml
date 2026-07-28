@@ -103,6 +103,84 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  android-release:
+    name: Android signed release APK
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/prod')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.11.0
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare release signing
+        env:
+          MIRA_RELEASE_KEYSTORE_BASE64: ${{ secrets.MIRA_RELEASE_KEYSTORE_BASE64 }}
+          MIRA_RELEASE_STORE_PASSWORD: ${{ secrets.MIRA_RELEASE_STORE_PASSWORD }}
+          MIRA_RELEASE_KEY_ALIAS: ${{ secrets.MIRA_RELEASE_KEY_ALIAS }}
+          MIRA_RELEASE_KEY_PASSWORD: ${{ secrets.MIRA_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$MIRA_RELEASE_KEYSTORE_BASE64"
+          test -n "$MIRA_RELEASE_STORE_PASSWORD"
+          test -n "$MIRA_RELEASE_KEY_ALIAS"
+          test -n "$MIRA_RELEASE_KEY_PASSWORD"
+          printf '%s' "$MIRA_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mira-release.keystore"
+
+      - name: Build signed release APK
+        env:
+          MIRA_RELEASE_STORE_FILE: ${{ runner.temp }}/mira-release.keystore
+          MIRA_RELEASE_STORE_PASSWORD: ${{ secrets.MIRA_RELEASE_STORE_PASSWORD }}
+          MIRA_RELEASE_KEY_ALIAS: ${{ secrets.MIRA_RELEASE_KEY_ALIAS }}
+          MIRA_RELEASE_KEY_PASSWORD: ${{ secrets.MIRA_RELEASE_KEY_PASSWORD }}
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify release APK
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          entries="$RUNNER_TEMP/release-apk-entries.txt"
+          test -f "$apk"
+          unzip -tq "$apk"
+          unzip -Z1 "$apk" > "$entries"
+          grep -Fxq 'assets/index.android.bundle' "$entries"
+          grep -Fxq 'lib/arm64-v8a/libreact_codegen_rnsvg.so' "$entries"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          cp "$apk" android/app/build/outputs/apk/release/uichat-mira-mobile-release.apk
+          sha256sum android/app/build/outputs/apk/release/uichat-mira-mobile-release.apk \
+            > android/app/build/outputs/apk/release/uichat-mira-mobile-release.apk.sha256
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: uichat-mira-mobile-android-release
+          path: |
+            android/app/build/outputs/apk/release/uichat-mira-mobile-release.apk
+            android/app/build/outputs/apk/release/uichat-mira-mobile-release.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
+
   ios:
     name: iOS simulator build
     runs-on: macos-latest
