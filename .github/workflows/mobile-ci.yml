@@ -74,9 +74,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Android debug APK
+      - name: Verify unsigned release is rejected
         run: |
           chmod +x android/gradlew
+          cd android
+          set +e
+          output=$(./gradlew assembleRelease --no-daemon 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -eq 0 ]; then
+            echo 'Release unexpectedly built without signing credentials.' >&2
+            exit 1
+          fi
+          echo "$output" | grep -q 'Release signing is not configured'
+
+      - name: Build Android debug APK
+        run: |
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
