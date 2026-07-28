@@ -265,60 +265,6 @@ jobs:
           cd release-assets
           sha256sum * > SHA256SUMS.txt
 
-      - name: Upload dev artifacts to Cloudflare R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_RETRY_MODE: standard
-          AWS_MAX_ATTEMPTS: 5
-          AWS_EC2_METADATA_DISABLED: 'true'
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
-        run: |
-          for name in \
-            AWS_ACCESS_KEY_ID \
-            AWS_SECRET_ACCESS_KEY \
-            R2_ACCOUNT_ID \
-            R2_BUCKET \
-            R2_PUBLIC_BASE_URL
-          do
-            if [ -z "${!name:-}" ]; then
-              echo "Required GitHub Actions secret is missing: ${name}" >&2
-              exit 1
-            fi
-          done
-
-          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          latest_prefix="mira/mobile/dev/latest"
-
-          upload() {
-            aws s3 sync release-assets/ "s3://${R2_BUCKET}/${latest_prefix}/" \
-              --delete \
-              --endpoint-url "$endpoint" \
-              --cache-control 'public, max-age=300, must-revalidate' \
-              --only-show-errors
-          }
-
-          for attempt in 1 2 3; do
-            if upload; then
-              break
-            fi
-
-            if [ "$attempt" -eq 3 ]; then
-              echo "R2 upload failed after ${attempt} attempts." >&2
-              exit 1
-            fi
-
-            sleep $((attempt * 10))
-          done
-
-          public_base="${R2_PUBLIC_BASE_URL%/}"
-          {
-            echo "### Cloudflare R2"
-            echo "Latest: ${public_base}/${latest_prefix}/"
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Publish rolling dev release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -332,7 +278,6 @@ jobs:
           - CI run: \`$GITHUB_RUN_ID\`
           - Android: debug APK, installable for testing
           - iOS: unsigned Simulator app archive, not an IPA
-          - R2 mirror: \`${{ secrets.R2_PUBLIC_BASE_URL }}/mira/mobile/dev/latest/\`
           EOF_NOTES
 
           if gh release view dev-latest >/dev/null 2>&1; then
