@@ -3,29 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mira Mobile UI Preview</title>
+<title>Mira Mobile — Design System Preview</title>
 <style>
+  /* ===== Mira Design System Tokens (from tokens.ts) ===== */
+  :root {
+    --primary: #cc785c;
+    --primary-active: #a9583e;
+    --primary-disabled: #e6dfd8;
+    --on-primary: #ffffff;
+
+    --ink: #141413;
+    --body: #3d3d3a;
+    --body-strong: #252523;
+    --muted: #6c6a64;
+    --muted-soft: #8e8b82;
+
+    --canvas: #faf9f5;
+    --surface-soft: #f5f0e8;
+    --surface-card: #efe9de;
+    --surface-cream-strong: #e8e0d2;
+    --hairline: #e6dfd8;
+    --hairline-soft: #ebe6df;
+
+    --surface-dark: #181715;
+    --surface-dark-elevated: #252320;
+    --surface-dark-soft: #1f1e1b;
+    --on-dark: #faf9f5;
+    --on-dark-soft: #a09d96;
+
+    --accent-teal: #5db8a6;
+    --accent-amber: #e8a55a;
+    --success: #5db872;
+    --warning: #d4a017;
+    --error: #c64545;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #f0f0f0;
+    font-family: 'Public Sans', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--canvas);
     display: flex;
     gap: 40px;
-    padding: 40px;
+    padding: 60px 40px;
     flex-wrap: wrap;
     justify-content: center;
   }
-  h1 { width: 100%; text-align: center; font-size: 24px; color: #333; margin-bottom: 10px; }
-  .label { width: 100%; text-align: center; font-size: 14px; color: #888; margin-bottom: 20px; }
+  h1 { width: 100%; text-align: center; font-size: 28px; color: var(--ink); margin-bottom: 4px; font-weight: 600; }
+  .subtitle { width: 100%; text-align: center; font-size: 14px; color: var(--muted); margin-bottom: 30px; }
 
   /* Phone frame */
   .phone {
     width: 375px;
     height: 760px;
-    background: #fff;
+    background: var(--canvas);
     border-radius: 40px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
     border: 8px solid #1a1a1a;
     position: relative;
     display: flex;
@@ -33,266 +66,187 @@
   }
   .phone-title {
     position: absolute;
-    top: -30px;
+    top: -28px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 13px;
-    color: #666;
+    color: var(--muted);
     white-space: nowrap;
     font-weight: 600;
   }
-
-  /* Notch */
   .notch {
-    width: 120px;
-    height: 24px;
+    width: 120px; height: 24px;
     background: #1a1a1a;
     border-radius: 0 0 16px 16px;
     margin: 0 auto;
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
+    position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%); z-index: 100;
   }
-
-  /* ===== Shared styles (from tokens.ts & StyleSheet) ===== */
   .safe-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding-top: 44px; /* safe area top */
+    padding-top: 44px;
   }
 
-  /* ===== SessionList Screen ===== */
+  /* ===== SessionList ===== */
   .sl-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--hairline);
   }
-  .sl-status-badge {
-    display: flex;
-    align-items: center;
-    min-width: 70px;
-  }
-  .sl-status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #22c55e;
-    margin-right: 6px;
-  }
-  .sl-status-text { font-size: 13px; color: #666; }
-  .sl-header-title { font-size: 20px; font-weight: 700; color: #111; }
-  .sl-settings-btn { color: #6366f1; font-size: 22px; }
-
-  .sl-banner {
-    background: #fef3c7;
-    padding: 12px 16px;
-    text-align: center;
-    color: #92400e;
-    font-size: 14px;
-  }
+  .sl-status-badge { display: flex; align-items: center; min-width: 70px; }
+  .sl-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 6px; }
+  .sl-status-text { font-size: 13px; color: var(--muted); }
+  .sl-header-title { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.3px; }
+  .sl-settings-btn { color: var(--primary); font-size: 22px; }
 
   .sl-list { flex: 1; overflow-y: auto; }
   .sl-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: #fff;
+    display: flex; align-items: center;
+    padding: 12px 16px; background: var(--canvas);
     cursor: pointer;
   }
-  .sl-item:hover { background: #f5f5f5; }
+  .sl-item:hover { background: var(--surface-soft); }
   .sl-avatar {
-    width: 48px; height: 48px;
-    border-radius: 8px;
-    background: #6366f1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 12px;
-    color: #fff;
-    font-size: 20px;
-    font-weight: 600;
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 12px; color: var(--primary); font-size: 18px; font-weight: 600;
   }
   .sl-content { flex: 1; }
-  .sl-top-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .sl-title { font-size: 16px; font-weight: 600; color: #111; flex: 1; }
-  .sl-time { font-size: 12px; color: #999; }
-  .sl-preview { font-size: 14px; color: #888; }
-  .sl-separator { height: 1px; background: #e8e8e8; margin-left: 76px; }
+  .sl-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .sl-title { font-size: 16px; font-weight: 600; color: var(--ink); flex: 1; }
+  .sl-time { font-size: 12px; color: var(--muted-soft); }
+  .sl-preview { font-size: 14px; color: var(--muted); }
+  .sl-separator { height: 1px; background: var(--hairline-soft); margin-left: 72px; }
 
   .sl-fab {
-    position: absolute;
-    right: 20px;
-    bottom: 24px;
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: #6366f1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(99,102,241,0.4);
-    cursor: pointer;
-    color: #fff;
-    font-size: 24px;
-    font-weight: bold;
+    position: absolute; right: 16px; bottom: 24px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(204,120,92,0.15);
+    cursor: pointer; color: var(--on-primary); font-size: 24px; font-weight: bold;
   }
 
-  /* ===== Chat Screen ===== */
+  /* ===== Chat ===== */
   .chat-header {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     padding: 10px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--hairline);
   }
-  .chat-back { color: #6366f1; font-size: 24px; cursor: pointer; min-width: 36px; }
+  .chat-back { color: var(--primary); font-size: 24px; cursor: pointer; min-width: 36px; }
   .chat-title {
-    flex: 1; font-size: 17px; font-weight: 600; color: #111;
+    flex: 1; font-size: 17px; font-weight: 600; color: var(--ink);
     text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
   .chat-spacer { min-width: 36px; }
-
-  .chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 12px;
-  }
-  .msg-row {
-    margin: 4px 0;
-    display: flex;
-  }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 8px 12px; }
+  .msg-row { margin: 4px 0; display: flex; }
   .msg-row-left { justify-content: flex-start; }
   .msg-row-right { justify-content: flex-end; }
   .bubble {
-    max-width: 78%;
-    padding: 10px 14px;
-    border-radius: 16px;
-    font-size: 15px;
-    line-height: 22px;
+    max-width: 78%; padding: 10px 14px; border-radius: 16px;
+    font-size: 15px; line-height: 1.6;
   }
-  .bubble-user {
-    background: #6366f1;
-    border-bottom-right-radius: 4px;
-    color: #fff;
-  }
-  .bubble-assistant {
-    background: #f0f0f0;
-    border-bottom-left-radius: 4px;
-    color: #111;
-  }
-
+  .bubble-user { background: var(--primary); border-bottom-right-radius: 4px; color: var(--on-primary); }
+  .bubble-assistant { background: var(--surface-card); border-bottom-left-radius: 4px; color: var(--body); }
   .chat-input-bar {
-    display: flex;
-    align-items: flex-end;
+    display: flex; align-items: flex-end;
     padding: 8px 12px;
-    border-top: 1px solid #e0e0e0;
-    background: #fff;
+    border-top: 1px solid var(--hairline);
+    background: var(--canvas);
   }
   .chat-input {
-    flex: 1;
-    min-height: 40px;
-    max-height: 120px;
-    padding: 10px 14px;
-    border-radius: 20px;
-    background: #f5f5f5;
-    font-size: 15px;
-    color: #111;
-    border: none;
-    margin-right: 8px;
-    outline: none;
+    flex: 1; min-height: 40px; max-height: 120px;
+    padding: 10px 14px; border-radius: 20px;
+    background: var(--surface-soft);
+    border: 1px solid var(--hairline-soft);
+    font-size: 15px; color: var(--ink);
+    margin-right: 8px; outline: none;
   }
+  .chat-input::placeholder { color: var(--muted-soft); }
   .chat-send {
-    padding: 10px 16px;
-    border-radius: 20px;
-    background: #6366f1;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
+    padding: 10px 16px; border-radius: 8px;
+    background: var(--primary); color: var(--on-primary);
+    font-size: 14px; font-weight: 500; cursor: pointer; border: none;
+    height: 40px;
   }
 
-  /* ===== HostConfig Screen ===== */
+  /* ===== HostConfig ===== */
   .hc-header {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     padding: 10px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--hairline);
   }
-  .hc-back { color: #6366f1; font-size: 24px; cursor: pointer; min-width: 36px; }
-  .hc-title { flex: 1; font-size: 17px; font-weight: 600; color: #111; text-align: center; }
+  .hc-back { color: var(--primary); font-size: 24px; cursor: pointer; min-width: 36px; }
+  .hc-title { flex: 1; font-size: 17px; font-weight: 600; color: var(--ink); text-align: center; }
   .hc-spacer { min-width: 36px; }
-
   .hc-form { padding: 20px; overflow-y: auto; flex: 1; }
   .hc-card {
-    background: #f9f9f9;
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
     border-radius: 16px;
-    padding: 20px;
+    padding: 24px;
     margin-bottom: 20px;
   }
-  .hc-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+  .hc-label { font-size: 14px; font-weight: 500; color: var(--muted); margin-bottom: 8px; }
   .hc-input {
-    width: 100%;
-    height: 48px;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 0 14px;
-    font-size: 15px;
-    color: #111;
-    background: #fff;
-    margin-bottom: 20px;
-    outline: none;
+    width: 100%; height: 40px;
+    border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 0 14px;
+    font-size: 15px; color: var(--ink);
+    background: var(--canvas);
+    margin-bottom: 16px; outline: none;
   }
+  .hc-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(204,120,92,0.1); }
+  .hc-input::placeholder { color: var(--muted-soft); }
   .hc-hint {
-    background: #eef2ff;
-    border-radius: 10px;
-    padding: 12px;
-    font-size: 13px;
-    color: #4f46e5;
-    line-height: 20px;
+    background: var(--surface-soft);
+    border-radius: 8px; padding: 12px;
+    font-size: 13px; color: var(--primary-active); line-height: 1.6;
   }
   .hc-connect-btn {
-    width: 100%;
-    height: 50px;
-    border-radius: 14px;
-    background: #6366f1;
-    color: #fff;
-    font-size: 16px;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-    margin-bottom: 16px;
+    width: 100%; height: 40px;
+    border-radius: 8px; background: var(--primary);
+    color: var(--on-primary); font-size: 14px; font-weight: 500;
+    border: none; cursor: pointer; margin-bottom: 12px;
   }
+  .hc-connect-btn:hover { background: var(--primary-active); }
   .hc-disconnect-btn {
-    width: 100%;
-    height: 50px;
-    border-radius: 14px;
-    border: 1px solid #fca5a5;
-    background: transparent;
-    color: #ef4444;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
+    width: 100%; height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--error);
+    background: transparent; color: var(--error);
+    font-size: 14px; font-weight: 500; cursor: pointer;
   }
 
-  /* Scrollbar */
+  /* ===== Color palette reference ===== */
+  .palette-section {
+    width: 100%; max-width: 1200px;
+    margin-top: 40px; padding: 32px;
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+  }
+  .palette-title { font-size: 17px; font-weight: 600; color: var(--ink); margin-bottom: 20px; }
+  .palette-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .swatch-color { width: 60px; height: 60px; border-radius: 12px; border: 1px solid var(--hairline); }
+  .swatch-name { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .swatch-hex { font-size: 11px; color: var(--muted-soft); font-family: monospace; }
+
   ::-webkit-scrollbar { width: 0; }
 </style>
 </head>
 <body>
 
-<h1>Mira Mobile — UI Preview</h1>
-<p class="label">当前上游代码的浅色主题设计（SessionList / Chat / HostConfig）</p>
+<h1>Mira Mobile — Design System</h1>
+<p class="subtitle">基于 Claude/Anthropic 视觉语言 · 珊瑚陶土色 + 暖调米白画布 · 色块对比而非阴影</p>
 
-<!-- ===== Screen 1: SessionList ===== -->
+<!-- ===== SessionList ===== -->
 <div class="phone">
   <div class="phone-title">会话列表 — SessionListScreen</div>
   <div class="notch"></div>
@@ -305,7 +259,6 @@
       <div class="sl-header-title">Mira Chat</div>
       <div class="sl-settings-btn">⚙</div>
     </div>
-
     <div class="sl-list">
       <div class="sl-item">
         <div class="sl-avatar">通</div>
@@ -318,7 +271,6 @@
         </div>
       </div>
       <div class="sl-separator"></div>
-
       <div class="sl-item">
         <div class="sl-avatar">代</div>
         <div class="sl-content">
@@ -330,7 +282,6 @@
         </div>
       </div>
       <div class="sl-separator"></div>
-
       <div class="sl-item">
         <div class="sl-avatar">前</div>
         <div class="sl-content">
@@ -342,12 +293,11 @@
         </div>
       </div>
     </div>
-
     <div class="sl-fab">+</div>
   </div>
 </div>
 
-<!-- ===== Screen 2: Chat ===== -->
+<!-- ===== Chat ===== -->
 <div class="phone">
   <div class="phone-title">聊天 — ChatScreen</div>
   <div class="notch"></div>
@@ -357,19 +307,17 @@
       <div class="chat-title">通用助手</div>
       <div class="chat-spacer"></div>
     </div>
-
     <div class="chat-messages">
       <div class="msg-row msg-row-right">
         <div class="bubble bubble-user">你好，帮我写一段 React Native 的 FlatList 示例</div>
       </div>
       <div class="msg-row msg-row-left">
-        <div class="bubble bubble-assistant">好的，这是一个简单的 FlatList 示例：<br><br>&lt;FlatList<br>&nbsp;&nbsp;data={items}<br>&nbsp;&nbsp;keyExtractor={(item) =&gt; item.id}<br>&nbsp;&nbsp;renderItem={({ item }) =&gt; (&lt;View&gt;&lt;Text&gt;{item.title}&lt;/Text&gt;&lt;/View&gt;)}<br>/&gt;<br><br>需要更复杂的功能比如下拉刷新、上拉加载吗？</div>
+        <div class="bubble bubble-assistant">好的，这是一个简单的 FlatList 示例：<br><br>&lt;FlatList<br>&nbsp;&nbsp;data={items}<br>&nbsp;&nbsp;keyExtractor={(item) =&gt; item.id}<br>&nbsp;&nbsp;renderItem={({ item }) =&gt; (&lt;View&gt;&lt;Text&gt;{item.title}&lt;/Text&gt;&lt;/View&gt;)}<br>/&gt;<br><br>需要更复杂的功能吗？</div>
       </div>
       <div class="msg-row msg-row-right">
         <div class="bubble bubble-user">够了，谢谢！</div>
       </div>
     </div>
-
     <div class="chat-input-bar">
       <input class="chat-input" placeholder="输入消息..." />
       <button class="chat-send">发送</button>
@@ -377,7 +325,7 @@
   </div>
 </div>
 
-<!-- ===== Screen 3: HostConfig ===== -->
+<!-- ===== HostConfig ===== -->
 <div class="phone">
   <div class="phone-title">主机配置 — HostConfigScreen</div>
   <div class="notch"></div>
@@ -387,50 +335,42 @@
       <div class="hc-title">主机配置</div>
       <div class="hc-spacer"></div>
     </div>
-
     <div class="hc-form">
       <div class="hc-card">
         <div class="hc-label">主机地址</div>
         <input class="hc-input" value="http://100.64.0.1:8080" readonly />
-
         <div class="hc-label">Token / 密码</div>
         <input class="hc-input" type="password" value="sk-xxxxxxxxxxxx" readonly />
-
-        <div class="hc-hint">
-          💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。
-        </div>
+        <div class="hc-hint">💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。</div>
       </div>
-
       <button class="hc-connect-btn">连接主机</button>
       <button class="hc-disconnect-btn">断开连接并清除配置</button>
     </div>
   </div>
 </div>
 
-<!-- ===== Screen 4: SessionList (empty + no config) ===== -->
-<div class="phone">
-  <div class="phone-title">会话列表 — 未配置 Host + 空状态</div>
-  <div class="notch"></div>
-  <div class="safe-area">
-    <div class="sl-header">
-      <div class="sl-status-badge">
-        <div class="sl-status-dot" style="background:#9ca3af"></div>
-        <span class="sl-status-text">未连接</span>
-      </div>
-      <div class="sl-header-title">Mira Chat</div>
-      <div class="sl-settings-btn">⚙</div>
-    </div>
-
-    <div class="sl-banner">⚠️ 尚未配置 Mira Host，点击配置</div>
-
-    <div class="sl-list" style="display:flex;align-items:center;justify-content:center;">
-      <div style="text-align:center;">
-        <div style="font-size:18px;font-weight:600;color:#666;margin-bottom:8px;">暂无会话</div>
-        <div style="font-size:14px;color:#999;">点击下方按钮开始新对话</div>
-      </div>
-    </div>
-
-    <div class="sl-fab">+</div>
+<!-- ===== Color Palette ===== -->
+<div class="palette-section">
+  <div class="palette-title">色板参考</div>
+  <div class="palette-grid">
+    <div class="swatch"><div class="swatch-color" style="background:#cc785c"></div><div class="swatch-name">primary</div><div class="swatch-hex">#cc785c</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#a9583e"></div><div class="swatch-name">primary-active</div><div class="swatch-hex">#a9583e</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#141413"></div><div class="swatch-name">ink</div><div class="swatch-hex">#141413</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#3d3d3a"></div><div class="swatch-name">body</div><div class="swatch-hex">#3d3d3a</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#6c6a64"></div><div class="swatch-name">muted</div><div class="swatch-hex">#6c6a64</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#8e8b82"></div><div class="swatch-name">muted-soft</div><div class="swatch-hex">#8e8b82</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#faf9f5;border:1px solid #e6dfd8"></div><div class="swatch-name">canvas</div><div class="swatch-hex">#faf9f5</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#f5f0e8"></div><div class="swatch-name">surface-soft</div><div class="swatch-hex">#f5f0e8</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#efe9de"></div><div class="swatch-name">surface-card</div><div class="swatch-hex">#efe9de</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#e8e0d2"></div><div class="swatch-name">cream-strong</div><div class="swatch-hex">#e8e0d2</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#e6dfd8"></div><div class="swatch-name">hairline</div><div class="swatch-hex">#e6dfd8</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#181715"></div><div class="swatch-name">surface-dark</div><div class="swatch-hex">#181715</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#252320"></div><div class="swatch-name">dark-elevated</div><div class="swatch-hex">#252320</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#5db8a6"></div><div class="swatch-name">accent-teal</div><div class="swatch-hex">#5db8a6</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#e8a55a"></div><div class="swatch-name">accent-amber</div><div class="swatch-hex">#e8a55a</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#5db872"></div><div class="swatch-name">success</div><div class="swatch-hex">#5db872</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#d4a017"></div><div class="swatch-name">warning</div><div class="swatch-hex">#d4a017</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#c64545"></div><div class="swatch-name">error</div><div class="swatch-hex">#c64545</div></div>
   </div>
 </div>
 
