@@ -28,19 +28,6 @@ function formatTime(date: Date): string {
   return `${days}天前`;
 }
 
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'connected':
-      return '已连接';
-    case 'connecting':
-      return '连接中...';
-    case 'reconnecting':
-      return '重连中...';
-    default:
-      return '未连接';
-  }
-}
-
 function getStatusColor(status: string): string {
   switch (status) {
     case 'connected':
@@ -94,23 +81,21 @@ export function SessionListScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <View style={styles.statusBadge}>
+        <View style={styles.headerSpacer} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Mira Chat</Text>
           <View
             style={[
               styles.statusDot,
               { backgroundColor: getStatusColor(connectionStatus) },
             ]}
           />
-          <Text style={styles.statusText}>
-            {getStatusLabel(connectionStatus)}
-          </Text>
         </View>
-        <Text style={styles.headerTitle}>Mira Chat</Text>
         <Pressable
           onPress={() => navigation.navigate('HostConfig')}
           style={styles.settingsBtn}
         >
-          <Settings size={22} color="#6366f1" />
+          <Settings size={22} color="#cc785c" />
         </Pressable>
       </View>
 
@@ -199,25 +184,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',
   },
-  statusBadge: {
+  headerSpacer: {
+    minWidth: 36,
+  },
+  headerCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 70,
+    justifyContent: 'center',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 13,
-    color: '#666',
+    marginLeft: 6,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111',
+    color: '#141413',
   },
   settingsBtn: {
     padding: 4,
