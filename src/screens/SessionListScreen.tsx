@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Settings, Plus } from 'lucide-react-native';
@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
 import { miraHostClient } from '../api/mockMiraHost';
+import { colors } from '../theme/tokens';
 
 function formatTime(date: Date): string {
   const now = new Date();
@@ -28,34 +29,22 @@ function formatTime(date: Date): string {
   return `${days}天前`;
 }
 
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'connected':
-      return '已连接';
-    case 'connecting':
-      return '连接中...';
-    case 'reconnecting':
-      return '重连中...';
-    default:
-      return '未连接';
-  }
-}
-
 function getStatusColor(status: string): string {
   switch (status) {
     case 'connected':
-      return '#22c55e';
+      return colors.status.success;
     case 'connecting':
     case 'reconnecting':
-      return '#f59e0b';
+      return colors.status.warning;
     default:
-      return '#9ca3af';
+      return colors.text.soft;
   }
 }
 
 export function SessionListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { config, connectionStatus } = useHostStore();
+  const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -92,25 +81,24 @@ export function SessionListScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.statusBadge}>
+        <View style={styles.headerSpacer} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Mira</Text>
           <View
             style={[
               styles.statusDot,
               { backgroundColor: getStatusColor(connectionStatus) },
             ]}
           />
-          <Text style={styles.statusText}>
-            {getStatusLabel(connectionStatus)}
-          </Text>
         </View>
-        <Text style={styles.headerTitle}>Mira Chat</Text>
         <Pressable
           onPress={() => navigation.navigate('HostConfig')}
           style={styles.settingsBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Settings size={22} color="#6366f1" />
+          <Settings size={22} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -120,7 +108,7 @@ export function SessionListScreen() {
           onPress={() => navigation.navigate('HostConfig')}
         >
           <Text style={styles.noConfigText}>
-            ⚠️ 尚未配置 Mira Host，点击配置
+            尚未配置 Mira Host，点击配置
           </Text>
         </Pressable>
       )}
@@ -128,7 +116,11 @@ export function SessionListScreen() {
       <FlatList
         data={sessions}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={sessions.length === 0 ? { flexGrow: 1 } : undefined}
+        contentContainerStyle={[
+          styles.listContent,
+          sessions.length === 0 && { flexGrow: 1 },
+          { paddingBottom: insets.bottom + 80 },
+        ]}
         renderItem={({ item }) => (
           <Pressable
             style={({ pressed }) => [
@@ -174,12 +166,13 @@ export function SessionListScreen() {
       <Pressable
         style={({ pressed }) => [
           styles.fab,
+          { bottom: insets.bottom + 20 },
           (isCreating || pressed) && styles.fabDisabled,
         ]}
         onPress={handleNewChat}
         disabled={isCreating}
       >
-        <Plus size={24} color="#fff" strokeWidth={2.5} />
+        <Plus size={24} color={colors.onPrimary} strokeWidth={2.5} />
       </Pressable>
     </SafeAreaView>
   );
@@ -188,7 +181,7 @@ export function SessionListScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg.canvas,
   },
   header: {
     flexDirection: 'row',
@@ -196,28 +189,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
   },
-  statusBadge: {
+  headerSpacer: {
+    minWidth: 36,
+  },
+  headerCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 70,
+    justifyContent: 'center',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 13,
-    color: '#666',
+    marginLeft: 6,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111',
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.text.ink,
   },
   settingsBtn: {
     padding: 4,
@@ -225,38 +216,43 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   noConfigBanner: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.bg.creamStrong,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 4,
   },
   noConfigText: {
-    color: '#92400e',
+    color: colors.text.muted,
     fontSize: 14,
     textAlign: 'center',
+  },
+  listContent: {
+    paddingHorizontal: 16,
   },
   sessionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
   },
   sessionItemPressed: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.bg.soft,
+    borderRadius: 12,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#6366f1',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.bg.soft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.primary,
   },
   sessionContent: {
     flex: 1,
@@ -270,22 +266,22 @@ const styles = StyleSheet.create({
   sessionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
+    color: colors.text.ink,
     flex: 1,
     marginRight: 8,
   },
   sessionTime: {
     fontSize: 12,
-    color: '#999',
+    color: colors.text.soft,
   },
   sessionPreview: {
     fontSize: 14,
-    color: '#888',
+    color: colors.text.muted,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e8e8e8',
-    marginLeft: 76,
+    backgroundColor: colors.border.soft,
+    marginLeft: 56,
   },
   emptyState: {
     alignItems: 'center',
@@ -294,31 +290,30 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: colors.text.muted,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#999',
+    color: colors.text.soft,
   },
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366f1',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   fabDisabled: {
-    backgroundColor: '#a5b4fc',
+    backgroundColor: colors.primaryDisabled,
     elevation: 0,
   },
 });

@@ -26,7 +26,7 @@
 
 ```tsx
 <Text className="text-mira-3xl font-bold text-mira-text-base">
-  Mira Chat
+  Mira
 </Text>
 
 <Text className="text-mira-md text-mira-text-muted">
