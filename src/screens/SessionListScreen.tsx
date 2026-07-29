@@ -85,7 +85,7 @@ export function SessionListScreen() {
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Mira Chat</Text>
+          <Text style={styles.headerTitle}>Mira</Text>
           <View
             style={[
               styles.statusDot,
