@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mira Mobile UI Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f0f0;
+    display: flex;
+    gap: 40px;
+    padding: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  h1 { width: 100%; text-align: center; font-size: 24px; color: #333; margin-bottom: 10px; }
+  .label { width: 100%; text-align: center; font-size: 14px; color: #888; margin-bottom: 20px; }
+
+  /* Phone frame */
+  .phone {
+    width: 375px;
+    height: 760px;
+    background: #fff;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    border: 8px solid #1a1a1a;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-title {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  /* Notch */
+  .notch {
+    width: 120px;
+    height: 24px;
+    background: #1a1a1a;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+  }
+
+  /* ===== Shared styles (from tokens.ts & StyleSheet) ===== */
+  .safe-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-top: 44px; /* safe area top */
+  }
+
+  /* ===== SessionList Screen ===== */
+  .sl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .sl-status-badge {
+    display: flex;
+    align-items: center;
+    min-width: 70px;
+  }
+  .sl-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    margin-right: 6px;
+  }
+  .sl-status-text { font-size: 13px; color: #666; }
+  .sl-header-title { font-size: 20px; font-weight: 700; color: #111; }
+  .sl-settings-btn { color: #6366f1; font-size: 22px; }
+
+  .sl-banner {
+    background: #fef3c7;
+    padding: 12px 16px;
+    text-align: center;
+    color: #92400e;
+    font-size: 14px;
+  }
+
+  .sl-list { flex: 1; overflow-y: auto; }
+  .sl-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .sl-item:hover { background: #f5f5f5; }
+  .sl-avatar {
+    width: 48px; height: 48px;
+    border-radius: 8px;
+    background: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .sl-content { flex: 1; }
+  .sl-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .sl-title { font-size: 16px; font-weight: 600; color: #111; flex: 1; }
+  .sl-time { font-size: 12px; color: #999; }
+  .sl-preview { font-size: 14px; color: #888; }
+  .sl-separator { height: 1px; background: #e8e8e8; margin-left: 76px; }
+
+  .sl-fab {
+    position: absolute;
+    right: 20px;
+    bottom: 24px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+    cursor: pointer;
+    color: #fff;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
+  /* ===== Chat Screen ===== */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .chat-back { color: #6366f1; font-size: 24px; cursor: pointer; min-width: 36px; }
+  .chat-title {
+    flex: 1; font-size: 17px; font-weight: 600; color: #111;
+    text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .chat-spacer { min-width: 36px; }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+  .msg-row {
+    margin: 4px 0;
+    display: flex;
+  }
+  .msg-row-left { justify-content: flex-start; }
+  .msg-row-right { justify-content: flex-end; }
+  .bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .bubble-user {
+    background: #6366f1;
+    border-bottom-right-radius: 4px;
+    color: #fff;
+  }
+  .bubble-assistant {
+    background: #f0f0f0;
+    border-bottom-left-radius: 4px;
+    color: #111;
+  }
+
+  .chat-input-bar {
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 12px;
+    border-top: 1px solid #e0e0e0;
+    background: #fff;
+  }
+  .chat-input {
+    flex: 1;
+    min-height: 40px;
+    max-height: 120px;
+    padding: 10px 14px;
+    border-radius: 20px;
+    background: #f5f5f5;
+    font-size: 15px;
+    color: #111;
+    border: none;
+    margin-right: 8px;
+    outline: none;
+  }
+  .chat-send {
+    padding: 10px 16px;
+    border-radius: 20px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+
+  /* ===== HostConfig Screen ===== */
+  .hc-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .hc-back { color: #6366f1; font-size: 24px; cursor: pointer; min-width: 36px; }
+  .hc-title { flex: 1; font-size: 17px; font-weight: 600; color: #111; text-align: center; }
+  .hc-spacer { min-width: 36px; }
+
+  .hc-form { padding: 20px; overflow-y: auto; flex: 1; }
+  .hc-card {
+    background: #f9f9f9;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .hc-label { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+  .hc-input {
+    width: 100%;
+    height: 48px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 0 14px;
+    font-size: 15px;
+    color: #111;
+    background: #fff;
+    margin-bottom: 20px;
+    outline: none;
+  }
+  .hc-hint {
+    background: #eef2ff;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 13px;
+    color: #4f46e5;
+    line-height: 20px;
+  }
+  .hc-connect-btn {
+    width: 100%;
+    height: 50px;
+    border-radius: 14px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 16px;
+  }
+  .hc-disconnect-btn {
+    width: 100%;
+    height: 50px;
+    border-radius: 14px;
+    border: 1px solid #fca5a5;
+    background: transparent;
+    color: #ef4444;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<h1>Mira Mobile — UI Preview</h1>
+<p class="label">当前上游代码的浅色主题设计（SessionList / Chat / HostConfig）</p>
+
+<!-- ===== Screen 1: SessionList ===== -->
+<div class="phone">
+  <div class="phone-title">会话列表 — SessionListScreen</div>
+  <div class="notch"></div>
+  <div class="safe-area">
+    <div class="sl-header">
+      <div class="sl-status-badge">
+        <div class="sl-status-dot"></div>
+        <span class="sl-status-text">已连接</span>
+      </div>
+      <div class="sl-header-title">Mira Chat</div>
+      <div class="sl-settings-btn">⚙</div>
+    </div>
+
+    <div class="sl-list">
+      <div class="sl-item">
+        <div class="sl-avatar">通</div>
+        <div class="sl-content">
+          <div class="sl-top-row">
+            <div class="sl-title">通用助手</div>
+            <div class="sl-time">5分钟前</div>
+          </div>
+          <div class="sl-preview">点击开始聊天...</div>
+        </div>
+      </div>
+      <div class="sl-separator"></div>
+
+      <div class="sl-item">
+        <div class="sl-avatar">代</div>
+        <div class="sl-content">
+          <div class="sl-top-row">
+            <div class="sl-title">代码审查</div>
+            <div class="sl-time">2小时前</div>
+          </div>
+          <div class="sl-preview">点击开始聊天...</div>
+        </div>
+      </div>
+      <div class="sl-separator"></div>
+
+      <div class="sl-item">
+        <div class="sl-avatar">前</div>
+        <div class="sl-content">
+          <div class="sl-top-row">
+            <div class="sl-title">前端架构讨论</div>
+            <div class="sl-time">1天前</div>
+          </div>
+          <div class="sl-preview">点击开始聊天...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sl-fab">+</div>
+  </div>
+</div>
+
+<!-- ===== Screen 2: Chat ===== -->
+<div class="phone">
+  <div class="phone-title">聊天 — ChatScreen</div>
+  <div class="notch"></div>
+  <div class="safe-area">
+    <div class="chat-header">
+      <div class="chat-back">‹</div>
+      <div class="chat-title">通用助手</div>
+      <div class="chat-spacer"></div>
+    </div>
+
+    <div class="chat-messages">
+      <div class="msg-row msg-row-right">
+        <div class="bubble bubble-user">你好，帮我写一段 React Native 的 FlatList 示例</div>
+      </div>
+      <div class="msg-row msg-row-left">
+        <div class="bubble bubble-assistant">好的，这是一个简单的 FlatList 示例：<br><br>&lt;FlatList<br>&nbsp;&nbsp;data={items}<br>&nbsp;&nbsp;keyExtractor={(item) =&gt; item.id}<br>&nbsp;&nbsp;renderItem={({ item }) =&gt; (&lt;View&gt;&lt;Text&gt;{item.title}&lt;/Text&gt;&lt;/View&gt;)}<br>/&gt;<br><br>需要更复杂的功能比如下拉刷新、上拉加载吗？</div>
+      </div>
+      <div class="msg-row msg-row-right">
+        <div class="bubble bubble-user">够了，谢谢！</div>
+      </div>
+    </div>
+
+    <div class="chat-input-bar">
+      <input class="chat-input" placeholder="输入消息..." />
+      <button class="chat-send">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Screen 3: HostConfig ===== -->
+<div class="phone">
+  <div class="phone-title">主机配置 — HostConfigScreen</div>
+  <div class="notch"></div>
+  <div class="safe-area">
+    <div class="hc-header">
+      <div class="hc-back">‹</div>
+      <div class="hc-title">主机配置</div>
+      <div class="hc-spacer"></div>
+    </div>
+
+    <div class="hc-form">
+      <div class="hc-card">
+        <div class="hc-label">主机地址</div>
+        <input class="hc-input" value="http://100.64.0.1:8080" readonly />
+
+        <div class="hc-label">Token / 密码</div>
+        <input class="hc-input" type="password" value="sk-xxxxxxxxxxxx" readonly />
+
+        <div class="hc-hint">
+          💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。
+        </div>
+      </div>
+
+      <button class="hc-connect-btn">连接主机</button>
+      <button class="hc-disconnect-btn">断开连接并清除配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Screen 4: SessionList (empty + no config) ===== -->
+<div class="phone">
+  <div class="phone-title">会话列表 — 未配置 Host + 空状态</div>
+  <div class="notch"></div>
+  <div class="safe-area">
+    <div class="sl-header">
+      <div class="sl-status-badge">
+        <div class="sl-status-dot" style="background:#9ca3af"></div>
+        <span class="sl-status-text">未连接</span>
+      </div>
+      <div class="sl-header-title">Mira Chat</div>
+      <div class="sl-settings-btn">⚙</div>
+    </div>
+
+    <div class="sl-banner">⚠️ 尚未配置 Mira Host，点击配置</div>
+
+    <div class="sl-list" style="display:flex;align-items:center;justify-content:center;">
+      <div style="text-align:center;">
+        <div style="font-size:18px;font-weight:600;color:#666;margin-bottom:8px;">暂无会话</div>
+        <div style="font-size:14px;color:#999;">点击下方按钮开始新对话</div>
+      </div>
+    </div>
+
+    <div class="sl-fab">+</div>
+  </div>
+</div>
+
+</body>
+</html>
