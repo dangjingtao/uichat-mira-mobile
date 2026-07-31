@@ -38,84 +38,84 @@ export interface ThemeColors {
   divider: string;
 }
 
-// ─── Light Theme — Mira Warm-Toned ───
+// ─── Light Theme — Clean White (ChatGPT style) ───
 export const lightColors: ThemeColors = {
-  primary: '#cc785c',
-  primaryActive: '#a9583e',
-  primaryDisabled: '#e6dfd8',
+  primary: '#3B82F6',
+  primaryActive: '#2563EB',
+  primaryDisabled: '#E5E7EB',
 
   text: {
-    ink: '#141413',
-    base: '#3d3d3a',
-    strong: '#252523',
-    muted: '#6c6a64',
-    soft: '#8e8b82',
-    placeholder: '#8e8b82',
+    ink: '#111111',
+    base: '#333333',
+    strong: '#1A1A1C',
+    muted: '#666666',
+    soft: '#888888',
+    placeholder: '#999999',
   },
 
   bg: {
-    canvas: '#faf9f5',
-    card: '#efe9de',
-    soft: '#f5f0e8',
-    input: '#f5f0e8',
-    bubble: '#efe9de',
-    elevated: '#ffffff',
+    canvas: '#FFFFFF',
+    card: '#F5F5F7',
+    soft: '#F7F7F8',
+    input: '#F5F5F7',
+    bubble: '#F2F2F4',
+    elevated: '#FFFFFF',
   },
 
   border: {
-    default: '#e6dfd8',
-    soft: '#ebe6df',
+    default: '#E0E0E0',
+    soft: '#E8E8E8',
   },
 
   status: {
-    success: '#5db872',
-    warning: '#d4a017',
-    error: '#c64545',
-    errorBg: '#fce8e8',
+    success: '#22C55E',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    errorBg: '#FEE2E2',
   },
 
-  onPrimary: '#ffffff',
+  onPrimary: '#FFFFFF',
   overlay: 'rgba(0,0,0,0.4)',
-  divider: '#e6dfd8',
+  divider: '#E8E8E8',
 };
 
-// ─── Dark Theme — Mira Dark ───
+// ─── Dark Theme (ChatGPT style) ───
 export const darkColors: ThemeColors = {
-  primary: '#d49478',
-  primaryActive: '#cc785c',
-  primaryDisabled: '#2a2520',
+  primary: '#60A5FA',
+  primaryActive: '#3B82F6',
+  primaryDisabled: '#374151',
 
   text: {
-    ink: '#faf9f5',
-    base: '#e8e0d2',
-    strong: '#f5f0e8',
-    muted: '#a09d96',
-    soft: '#7a7770',
-    placeholder: '#7a7770',
+    ink: '#F5F5F7',
+    base: '#E5E5EA',
+    strong: '#FFFFFF',
+    muted: '#9CA3AF',
+    soft: '#636366',
+    placeholder: '#636366',
   },
 
   bg: {
-    canvas: '#181715',
-    card: '#252320',
-    soft: '#1f1e1b',
-    input: '#252320',
-    bubble: '#252320',
-    elevated: '#252320',
+    canvas: '#0F0F10',
+    card: '#1C1C1E',
+    soft: '#1C1C1E',
+    input: '#1C1C1E',
+    bubble: '#2C2C2E',
+    elevated: '#1C1C1E',
   },
 
   border: {
-    default: '#3a3530',
-    soft: '#2a2520',
+    default: '#2C2C2E',
+    soft: '#1C1C1E',
   },
 
   status: {
-    success: '#5db872',
-    warning: '#d4a017',
-    error: '#e07070',
-    errorBg: '#452020',
+    success: '#34D399',
+    warning: '#FBBF24',
+    error: '#F87171',
+    errorBg: '#450A0A',
   },
 
-  onPrimary: '#181715',
+  onPrimary: '#0F0F10',
   overlay: 'rgba(0,0,0,0.6)',
-  divider: '#3a3530',
+  divider: '#2C2C2E',
 };

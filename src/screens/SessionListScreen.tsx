@@ -13,7 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Menu, Plus } from 'lucide-react-native';
+import { Menu, Plus, Settings as SettingsIcon } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
@@ -152,10 +152,14 @@ export function SessionListScreen() {
       <View style={styles.header}>
         <Pressable
           onPress={openDrawer}
-          style={styles.drawerBtn}
+          style={({ pressed }) => [
+            styles.drawerBtn,
+            { backgroundColor: colors.bg.card },
+            pressed && { opacity: 0.7 },
+          ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Menu size={24} color={colors.text.ink} />
+          <Menu size={20} color={colors.text.ink} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text.ink }]}>Mira</Text>
@@ -163,10 +167,14 @@ export function SessionListScreen() {
         </View>
         <Pressable
           onPress={() => navigation.navigate('Settings')}
-          style={styles.settingsBtn}
+          style={({ pressed }) => [
+            styles.settingsBtn,
+            { backgroundColor: colors.bg.card },
+            pressed && { opacity: 0.7 },
+          ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={[styles.settingsIcon, { color: colors.text.muted }]}>⚙</Text>
+          <SettingsIcon size={20} color={colors.text.ink} />
         </Pressable>
       </View>
 
@@ -368,9 +376,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   drawerBtn: {
-    padding: 4,
-    minWidth: 44,
-    alignItems: 'flex-start',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerCenter: {
     flex: 1,
@@ -380,8 +390,13 @@ const styles = StyleSheet.create({
   },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 6 },
   headerTitle: { fontSize: 17, fontWeight: '600' },
-  settingsBtn: { padding: 4, minWidth: 44, alignItems: 'flex-end' },
-  settingsIcon: { fontSize: 22 },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noConfigBanner: {
     paddingHorizontal: 16,
     paddingVertical: 12,
