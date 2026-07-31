@@ -103,6 +103,8 @@ export const colors = {
     warning: '#d4a017',
     /** 错误状态 */
     error: '#c64545',
+    /** 错误状态浅色背景（失败气泡 / 按下态） */
+    errorBg: '#fce8e8',
   },
 
   // ─── Deprecated aliases (backwards compat) ─────────────
