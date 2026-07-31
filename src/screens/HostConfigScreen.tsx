@@ -16,10 +16,11 @@ import { ChevronLeft } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useHostStore } from '../store/hostStore';
 import { miraHostClient } from '../api/mockMiraHost';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 export function HostConfigScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors } = useTheme();
   const { config, setConfig, clearConfig, setConnectionStatus } = useHostStore();
 
   const [hostUrl, setHostUrl] = useState(config?.hostUrl ?? '');
@@ -30,13 +31,9 @@ export function HostConfigScreen() {
     const url = hostUrl.trim();
     const tk = token.trim();
     if (!url || !tk) return;
-
     setIsConnecting(true);
     setConnectionStatus('connecting');
-
-    // Mock connection delay
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
-
     setConfig({ hostUrl: url, token: tk });
     miraHostClient.configure({ hostUrl: url, token: tk });
     setConnectionStatus('connected');
@@ -53,46 +50,49 @@ export function HostConfigScreen() {
   const isFormValid = hostUrl.trim().length > 0 && token.trim().length > 0;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]} edges={['top', 'bottom']}>
+      <View style={[styles.header, { borderBottomColor: colors.border.soft }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color={colors.primary} />
+          <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
-        <Text style={styles.headerTitle}>主机配置</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.ink }]}>主机配置</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form}>
-          <View style={styles.card}>
-            <Text style={styles.label}>主机地址</Text>
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+            <Text style={[styles.label, { color: colors.text.muted }]}>主机地址</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { borderColor: colors.border.default, backgroundColor: colors.bg.input, color: colors.text.ink },
+              ]}
               value={hostUrl}
               onChangeText={setHostUrl}
               placeholder="例如: http://100.64.0.1:8080"
-              placeholderTextColor={colors.text.soft}
+              placeholderTextColor={colors.text.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
             />
 
-            <Text style={styles.label}>Token / 密码</Text>
+            <Text style={[styles.label, { color: colors.text.muted }]}>Token / 密码</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                { borderColor: colors.border.default, backgroundColor: colors.bg.input, color: colors.text.ink },
+              ]}
               value={token}
               onChangeText={setToken}
               placeholder="输入访问令牌"
-              placeholderTextColor={colors.text.soft}
+              placeholderTextColor={colors.text.placeholder}
               secureTextEntry
               autoCapitalize="none"
             />
 
-            <View style={styles.hintBox}>
-              <Text style={styles.hintText}>
+            <View style={[styles.hintBox, { backgroundColor: colors.bg.soft }]}>
+              <Text style={[styles.hintText, { color: colors.text.muted }]}>
                 💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。
               </Text>
             </View>
@@ -101,19 +101,25 @@ export function HostConfigScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.connectBtn,
-              (!isFormValid || isConnecting || pressed) && styles.connectBtnDisabled,
+              { backgroundColor: colors.primary },
+              (!isFormValid || isConnecting || pressed) && { backgroundColor: colors.primaryDisabled },
             ]}
             onPress={handleConnect}
             disabled={!isFormValid || isConnecting}
           >
-            <Text style={styles.connectBtnText}>
+            <Text style={[styles.connectBtnText, { color: colors.onPrimary }]}>
               {isConnecting ? '连接中...' : '连接主机'}
             </Text>
           </Pressable>
 
           {config && (
-            <Pressable style={styles.disconnectBtn} onPress={handleDisconnect}>
-              <Text style={styles.disconnectBtnText}>断开连接并清除配置</Text>
+            <Pressable
+              style={[styles.disconnectBtn, { borderColor: colors.status.errorBg }]}
+              onPress={handleDisconnect}
+            >
+              <Text style={[styles.disconnectBtnText, { color: colors.status.error }]}>
+                断开连接并清除配置
+              </Text>
             </Pressable>
           )}
         </ScrollView>
@@ -123,99 +129,49 @@ export function HostConfigScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.bg.canvas,
-  },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border.default,
   },
-  backBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    minWidth: 36,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.text.ink,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    minWidth: 36,
-  },
-  container: {
-    flex: 1,
-  },
-  form: {
-    padding: 20,
-  },
+  backBtn: { paddingHorizontal: 4, paddingVertical: 4, minWidth: 36 },
+  headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  headerSpacer: { minWidth: 36 },
+  container: { flex: 1 },
+  form: { padding: 20 },
   card: {
-    backgroundColor: colors.bg.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.strong,
-    marginBottom: 8,
-  },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: colors.border.default,
     borderRadius: 12,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: colors.text.ink,
-    backgroundColor: colors.bg.input,
     marginBottom: 20,
   },
-  hintBox: {
-    backgroundColor: colors.hint.bg,
-    borderRadius: 10,
-    padding: 12,
-  },
-  hintText: {
-    fontSize: 13,
-    color: colors.hint.text,
-    lineHeight: 20,
-  },
+  hintBox: { borderRadius: 10, padding: 12 },
+  hintText: { fontSize: 13, lineHeight: 20 },
   connectBtn: {
     height: 50,
     borderRadius: 14,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  connectBtnDisabled: {
-    backgroundColor: colors.primaryDisabled,
-  },
-  connectBtnText: {
-    color: colors.onPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  connectBtnText: { fontSize: 16, fontWeight: '700' },
   disconnectBtn: {
     marginTop: 16,
     height: 50,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.status.errorBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  disconnectBtnText: {
-    color: colors.status.error,
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  disconnectBtnText: { fontSize: 15, fontWeight: '600' },
 });

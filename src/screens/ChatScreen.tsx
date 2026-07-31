@@ -17,12 +17,13 @@ import { ChevronLeft } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/mockMiraHost';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 export function ChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { sessionId, title } = route.params;
+  const { colors } = useTheme();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -30,18 +31,10 @@ export function ChatScreen() {
   const [streamingText, setStreamingText] = useState('');
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const flatListRef = useRef<FlatList>(null);
-  // 中断流式接收的标志位
   const abortRef = useRef(false);
 
   useEffect(() => {
-    miraHostClient
-      .getMessages(sessionId)
-      .then((msgs) => {
-        setMessages(msgs);
-      })
-      .catch(() => {
-        // ignore load error
-      });
+    miraHostClient.getMessages(sessionId).then((msgs) => setMessages(msgs)).catch(() => {});
   }, [sessionId]);
 
   const scrollToBottom = useCallback(() => {
@@ -52,13 +45,11 @@ export function ChatScreen() {
     async (text?: string) => {
       const content = (text ?? inputText).trim();
       if (!content || isLoading) return;
-
       setInputText('');
       setIsLoading(true);
       setStreamingText('');
       abortRef.current = false;
 
-      // Optimistically add user message
       const userMsg: ChatMessage = {
         id: `local-${Date.now()}`,
         role: 'user',
@@ -70,16 +61,12 @@ export function ChatScreen() {
       try {
         const stream = await miraHostClient.sendMessage(sessionId, content);
         let fullReply = '';
-
         for await (const chunk of stream) {
           if (abortRef.current) break;
           fullReply += chunk;
           setStreamingText(fullReply);
           scrollToBottom();
         }
-
-        // Append assistant message locally instead of full refresh
-        // (mock store already persisted it for next page load)
         const assistantMsg: ChatMessage = {
           id: `local-assistant-${Date.now()}`,
           role: 'assistant',
@@ -89,7 +76,6 @@ export function ChatScreen() {
         setMessages((prev) => [...prev, assistantMsg]);
         setStreamingText('');
       } catch {
-        // 标记该用户消息发送失败，支持重试
         setFailedIds((prev) => new Set(prev).add(userMsg.id));
       } finally {
         setIsLoading(false);
@@ -104,7 +90,6 @@ export function ChatScreen() {
 
   const handleRetry = useCallback(
     (msg: ChatMessage) => {
-      // 移除失败标记和旧消息，重新发送
       setFailedIds((prev) => {
         const next = new Set(prev);
         next.delete(msg.id);
@@ -120,7 +105,6 @@ export function ChatScreen() {
     ({ item }: { item: ChatMessage }) => {
       const isUser = item.role === 'user';
       const isFailed = isUser && failedIds.has(item.id);
-
       return (
         <View
           style={[
@@ -132,14 +116,16 @@ export function ChatScreen() {
             <View
               style={[
                 styles.bubble,
-                isUser ? styles.bubbleUser : styles.bubbleAssistant,
-                isFailed && styles.bubbleFailed,
+                { backgroundColor: isUser ? colors.primary : colors.bg.bubble },
+                isUser && { borderBottomRightRadius: 4 },
+                !isUser && { borderBottomLeftRadius: 4 },
+                isFailed && { backgroundColor: colors.status.errorBg },
               ]}
             >
               <Text
                 style={[
                   styles.bubbleText,
-                  isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant,
+                  { color: isUser ? colors.onPrimary : colors.text.ink },
                 ]}
               >
                 {item.content}
@@ -147,50 +133,44 @@ export function ChatScreen() {
             </View>
             {isFailed && (
               <Pressable
-                style={({ pressed }) => [
-                  styles.retryBtn,
-                  pressed && styles.retryBtnPressed,
-                ]}
+                style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.6 }]}
                 onPress={() => handleRetry(item)}
               >
-                <Text style={styles.retryText}>发送失败 · 点击重试</Text>
+                <Text style={[styles.retryText, { color: colors.status.error }]}>
+                  发送失败 · 点击重试
+                </Text>
               </Pressable>
             )}
           </View>
         </View>
       );
     },
-    [failedIds, handleRetry],
+    [failedIds, handleRetry, colors],
   );
 
   const renderFooter = useCallback(() => {
     if (!streamingText && !isLoading) return null;
-
     return (
       <View style={[styles.messageRow, styles.messageRowLeft]}>
-        <View style={[styles.bubble, styles.bubbleAssistant]}>
-          <Text style={[styles.bubbleText, styles.bubbleTextAssistant]}>
+        <View style={[styles.bubble, { backgroundColor: colors.bg.bubble, borderBottomLeftRadius: 4 }]}>
+          <Text style={[styles.bubbleText, { color: colors.text.ink }]}>
             {streamingText || ''}
             {isLoading && !streamingText && (
-              <ActivityIndicator
-                size="small"
-                color={colors.text.soft}
-                style={styles.loadingDot}
-              />
+              <ActivityIndicator size="small" color={colors.text.soft} style={styles.loadingDot} />
             )}
           </Text>
         </View>
       </View>
     );
-  }, [streamingText, isLoading]);
+  }, [streamingText, isLoading, colors]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]} edges={['top', 'bottom']}>
+      <View style={[styles.header, { borderBottomColor: colors.border.soft }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color={colors.primary} />
+          <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>
           {title}
         </Text>
         <View style={styles.headerSpacer} />
@@ -211,13 +191,13 @@ export function ChatScreen() {
           ListFooterComponent={renderFooter}
         />
 
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { borderTopColor: colors.border.soft, backgroundColor: colors.bg.canvas }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.bg.input, color: colors.text.ink }]}
             value={inputText}
             onChangeText={setInputText}
             placeholder="输入消息..."
-            placeholderTextColor={colors.text.soft}
+            placeholderTextColor={colors.text.placeholder}
             multiline
             maxLength={500}
             editable={!isLoading}
@@ -228,22 +208,24 @@ export function ChatScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.stopBtn,
-                pressed && styles.stopBtnPressed,
+                { borderColor: colors.status.error, backgroundColor: colors.bg.canvas },
+                pressed && { backgroundColor: colors.status.errorBg },
               ]}
               onPress={handleStop}
             >
-              <Text style={styles.stopBtnText}>停止</Text>
+              <Text style={[styles.stopBtnText, { color: colors.status.error }]}>停止</Text>
             </Pressable>
           ) : (
             <Pressable
               style={({ pressed }) => [
                 styles.sendBtn,
-                (!inputText.trim() || pressed) && styles.sendBtnDisabled,
+                { backgroundColor: colors.primary },
+                (!inputText.trim() || pressed) && { backgroundColor: colors.primaryDisabled },
               ]}
               onPress={() => sendMessage()}
               disabled={!inputText.trim()}
             >
-              <Text style={styles.sendBtnText}>发送</Text>
+              <Text style={[styles.sendBtnText, { color: colors.onPrimary }]}>发送</Text>
             </Pressable>
           )}
         </View>
@@ -253,102 +235,33 @@ export function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.bg.canvas,
-  },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border.default,
   },
-  backBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    minWidth: 36,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.text.ink,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    minWidth: 36,
-  },
-  container: {
-    flex: 1,
-  },
-  messageList: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  messageRow: {
-    marginVertical: 4,
-    flexDirection: 'row',
-  },
-  messageRowLeft: {
-    justifyContent: 'flex-start',
-  },
-  messageRowRight: {
-    justifyContent: 'flex-end',
-  },
-  bubble: {
-    maxWidth: '78%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-  },
-  bubbleUser: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  bubbleAssistant: {
-    backgroundColor: colors.bg.bubble,
-    borderBottomLeftRadius: 4,
-  },
-  bubbleFailed: {
-    backgroundColor: colors.status.errorBg,
-    borderBottomRightRadius: 4,
-  },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  bubbleTextUser: {
-    color: colors.onPrimary,
-  },
-  bubbleTextAssistant: {
-    color: colors.text.ink,
-  },
-  loadingDot: {
-    marginLeft: 4,
-  },
-  retryBtn: {
-    marginTop: 4,
-    alignSelf: 'flex-end',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  retryBtnPressed: {
-    opacity: 0.6,
-  },
-  retryText: {
-    fontSize: 12,
-    color: colors.status.error,
-  },
+  backBtn: { paddingHorizontal: 4, paddingVertical: 4, minWidth: 36 },
+  headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  headerSpacer: { minWidth: 36 },
+  container: { flex: 1 },
+  messageList: { paddingHorizontal: 12, paddingVertical: 8 },
+  messageRow: { marginVertical: 4, flexDirection: 'row' },
+  messageRowLeft: { justifyContent: 'flex-start' },
+  messageRowRight: { justifyContent: 'flex-end' },
+  bubble: { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  loadingDot: { marginLeft: 4 },
+  retryBtn: { marginTop: 4, alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 8 },
+  retryText: { fontSize: 12 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.default,
-    backgroundColor: colors.bg.canvas,
   },
   input: {
     flex: 1,
@@ -357,41 +270,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: colors.bg.input,
     fontSize: 15,
-    color: colors.text.ink,
     marginRight: 8,
   },
-  sendBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    backgroundColor: colors.primaryDisabled,
-  },
-  sendBtnText: {
-    color: colors.onPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  sendBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, justifyContent: 'center' },
+  sendBtnText: { fontSize: 15, fontWeight: '600' },
   stopBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.status.error,
-    backgroundColor: colors.bg.canvas,
     justifyContent: 'center',
   },
-  stopBtnPressed: {
-    backgroundColor: colors.status.errorBg,
-  },
-  stopBtnText: {
-    color: colors.status.error,
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  stopBtnText: { fontSize: 15, fontWeight: '600' },
 });
