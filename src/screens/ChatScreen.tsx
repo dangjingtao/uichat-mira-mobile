@@ -27,7 +27,10 @@ export function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const flatListRef = useRef<FlatList>(null);
+  // 中断流式接收的标志位
+  const abortRef = useRef(false);
 
   useEffect(() => {
     miraHostClient
@@ -44,53 +47,78 @@ export function ChatScreen() {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, []);
 
-  const sendMessage = useCallback(async () => {
-    const text = inputText.trim();
-    if (!text || isLoading) return;
+  const sendMessage = useCallback(
+    async (text?: string) => {
+      const content = (text ?? inputText).trim();
+      if (!content || isLoading) return;
 
-    setInputText('');
-    setIsLoading(true);
-    setStreamingText('');
+      setInputText('');
+      setIsLoading(true);
+      setStreamingText('');
+      abortRef.current = false;
 
-    // Optimistically add user message
-    const userMsg: ChatMessage = {
-      id: `local-${Date.now()}`,
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-
-    try {
-      const stream = await miraHostClient.sendMessage(sessionId, text);
-      let fullReply = '';
-
-      for await (const chunk of stream) {
-        fullReply += chunk;
-        setStreamingText(fullReply);
-        scrollToBottom();
-      }
-
-      // Append assistant message locally instead of full refresh
-      // (mock store already persisted it for next page load)
-      const assistantMsg: ChatMessage = {
-        id: `local-assistant-${Date.now()}`,
-        role: 'assistant',
-        content: fullReply,
+      // Optimistically add user message
+      const userMsg: ChatMessage = {
+        id: `local-${Date.now()}`,
+        role: 'user',
+        content,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, assistantMsg]);
-      setStreamingText('');
-    } catch {
-      // ignore
-    } finally {
-      setIsLoading(false);
-    }
-  }, [inputText, isLoading, sessionId, scrollToBottom]);
+      setMessages((prev) => [...prev, userMsg]);
+
+      try {
+        const stream = await miraHostClient.sendMessage(sessionId, content);
+        let fullReply = '';
+
+        for await (const chunk of stream) {
+          if (abortRef.current) break;
+          fullReply += chunk;
+          setStreamingText(fullReply);
+          scrollToBottom();
+        }
+
+        // Append assistant message locally instead of full refresh
+        // (mock store already persisted it for next page load)
+        const assistantMsg: ChatMessage = {
+          id: `local-assistant-${Date.now()}`,
+          role: 'assistant',
+          content: fullReply,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setStreamingText('');
+      } catch {
+        // 标记该用户消息发送失败，支持重试
+        setFailedIds((prev) => new Set(prev).add(userMsg.id));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [inputText, isLoading, sessionId, scrollToBottom],
+  );
+
+  const handleStop = useCallback(() => {
+    abortRef.current = true;
+  }, []);
+
+  const handleRetry = useCallback(
+    (msg: ChatMessage) => {
+      // 移除失败标记和旧消息，重新发送
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msg.id);
+        return next;
+      });
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      sendMessage(msg.content);
+    },
+    [sendMessage],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: ChatMessage }) => {
       const isUser = item.role === 'user';
+      const isFailed = isUser && failedIds.has(item.id);
 
       return (
         <View
@@ -98,26 +126,40 @@ export function ChatScreen() {
             styles.messageRow,
             isUser ? styles.messageRowRight : styles.messageRowLeft,
           ]}
-          >
-          <View
-            style={[
-              styles.bubble,
-              isUser ? styles.bubbleUser : styles.bubbleAssistant,
-            ]}
-          >
-            <Text
+        >
+          <View>
+            <View
               style={[
-                styles.bubbleText,
-                isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant,
+                styles.bubble,
+                isUser ? styles.bubbleUser : styles.bubbleAssistant,
+                isFailed && styles.bubbleFailed,
               ]}
             >
-              {item.content}
-            </Text>
+              <Text
+                style={[
+                  styles.bubbleText,
+                  isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant,
+                ]}
+              >
+                {item.content}
+              </Text>
+            </View>
+            {isFailed && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.retryBtn,
+                  pressed && styles.retryBtnPressed,
+                ]}
+                onPress={() => handleRetry(item)}
+              >
+                <Text style={styles.retryText}>发送失败 · 点击重试</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       );
     },
-    [],
+    [failedIds, handleRetry],
   );
 
   const renderFooter = useCallback(() => {
@@ -175,18 +217,30 @@ export function ChatScreen() {
             maxLength={500}
             editable={!isLoading}
             blurOnSubmit={false}
-            onSubmitEditing={sendMessage}
+            onSubmitEditing={() => sendMessage()}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.sendBtn,
-              (!inputText.trim() || pressed || isLoading) && styles.sendBtnDisabled,
-            ]}
-            onPress={sendMessage}
-            disabled={!inputText.trim() || isLoading}
-          >
-            <Text style={styles.sendBtnText}>发送</Text>
-          </Pressable>
+          {isLoading ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.stopBtn,
+                pressed && styles.stopBtnPressed,
+              ]}
+              onPress={handleStop}
+            >
+              <Text style={styles.stopBtnText}>停止</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.sendBtn,
+                (!inputText.trim() || pressed) && styles.sendBtnDisabled,
+              ]}
+              onPress={() => sendMessage()}
+              disabled={!inputText.trim()}
+            >
+              <Text style={styles.sendBtnText}>发送</Text>
+            </Pressable>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -252,6 +306,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderBottomLeftRadius: 4,
   },
+  bubbleFailed: {
+    backgroundColor: '#fee2e2',
+    borderBottomRightRadius: 4,
+  },
   bubbleText: {
     fontSize: 15,
     lineHeight: 22,
@@ -264,6 +322,19 @@ const styles = StyleSheet.create({
   },
   loadingDot: {
     marginLeft: 4,
+  },
+  retryBtn: {
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  retryBtnPressed: {
+    opacity: 0.6,
+  },
+  retryText: {
+    fontSize: 12,
+    color: '#ef4444',
   },
   inputBar: {
     flexDirection: 'row',
@@ -298,6 +369,23 @@ const styles = StyleSheet.create({
   },
   sendBtnText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  stopBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+  },
+  stopBtnPressed: {
+    backgroundColor: '#fee2e2',
+  },
+  stopBtnText: {
+    color: '#ef4444',
     fontSize: 15,
     fontWeight: '600',
   },

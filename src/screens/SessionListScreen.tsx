@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +50,14 @@ export function SessionListScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
+  // 长按操作菜单
+  const [menuSession, setMenuSession] = useState<Session | null>(null);
+  // 重命名弹窗
+  const [renameTarget, setRenameTarget] = useState<Session | null>(null);
+  const [renameText, setRenameText] = useState('');
+  // 删除确认弹窗
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+
   const loadSessions = useCallback(async () => {
     try {
       const list = await miraHostClient.listSessions();
@@ -77,6 +87,40 @@ export function SessionListScreen() {
       // ignore
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleStartRename = () => {
+    if (!menuSession) return;
+    setRenameTarget(menuSession);
+    setRenameText(menuSession.title);
+    setMenuSession(null);
+  };
+
+  const handleConfirmRename = async () => {
+    const title = renameText.trim();
+    if (!title || !renameTarget) return;
+    const target = renameTarget;
+    setRenameTarget(null);
+    try {
+      const updated = await miraHostClient.renameSession(target.id, title);
+      setSessions((prev) =>
+        prev.map((s) => (s.id === updated.id ? updated : s)),
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (!target) return;
+    try {
+      await miraHostClient.deleteSession(target.id);
+      setSessions((prev) => prev.filter((s) => s.id !== target.id));
+    } catch {
+      // ignore
     }
   };
 
@@ -133,6 +177,7 @@ export function SessionListScreen() {
                 title: item.title,
               })
             }
+            onLongPress={() => setMenuSession(item)}
           >
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{item.title[0] ?? '?'}</Text>
@@ -174,6 +219,121 @@ export function SessionListScreen() {
       >
         <Plus size={24} color={colors.onPrimary} strokeWidth={2.5} />
       </Pressable>
+
+      {/* 长按操作菜单 */}
+      <Modal
+        visible={menuSession !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuSession(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setMenuSession(null)}>
+          <View style={[styles.actionSheet, { paddingBottom: insets.bottom + 8 }]}>
+            <Text style={styles.menuTitle} numberOfLines={1}>
+              {menuSession?.title}
+            </Text>
+            <Pressable
+              style={({ pressed }) => pressed && styles.menuItemPressed}
+              onPress={handleStartRename}
+            >
+              <Text style={styles.menuItem}>重命名</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => pressed && styles.menuItemPressed}
+              onPress={() => {
+                setDeleteTarget(menuSession);
+                setMenuSession(null);
+              }}
+            >
+              <Text style={[styles.menuItem, styles.menuItemDanger]}>删除会话</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => pressed && styles.menuItemPressed}
+              onPress={() => setMenuSession(null)}
+            >
+              <Text style={styles.menuCancel}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* 重命名弹窗 */}
+      <Modal
+        visible={renameTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenameTarget(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setRenameTarget(null)}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>重命名会话</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="输入新名称"
+              placeholderTextColor={colors.text.soft}
+              autoFocus
+              selectTextOnFocus
+              onSubmitEditing={handleConfirmRename}
+            />
+            <View style={styles.dialogActions}>
+              <Pressable
+                style={styles.dialogBtn}
+                onPress={() => setRenameTarget(null)}
+              >
+                <Text style={styles.dialogBtnText}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.dialogBtn,
+                  styles.dialogBtnPrimary,
+                  pressed && styles.dialogBtnPressed,
+                ]}
+                onPress={handleConfirmRename}
+                disabled={!renameText.trim()}
+              >
+                <Text style={styles.dialogBtnPrimaryText}>保存</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* 删除确认弹窗 */}
+      <Modal
+        visible={deleteTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteTarget(null)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setDeleteTarget(null)}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>删除会话</Text>
+            <Text style={styles.deleteConfirmText}>
+              确定删除「{deleteTarget?.title}」吗？此操作不可撤销。
+            </Text>
+            <View style={styles.dialogActions}>
+              <Pressable
+                style={styles.dialogBtn}
+                onPress={() => setDeleteTarget(null)}
+              >
+                <Text style={styles.dialogBtnText}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.dialogBtn,
+                  styles.dialogBtnDanger,
+                  pressed && styles.dialogBtnPressed,
+                ]}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={styles.dialogBtnPrimaryText}>删除</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -315,5 +475,110 @@ const styles = StyleSheet.create({
   fabDisabled: {
     backgroundColor: colors.primaryDisabled,
     elevation: 0,
+  },
+  // ─── Modal 通用 ────────────────────────────────
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheet: {
+    backgroundColor: colors.bg.canvas,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  menuTitle: {
+    fontSize: 13,
+    color: colors.text.soft,
+    textAlign: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border.soft,
+  },
+  menuItem: {
+    fontSize: 17,
+    color: colors.text.ink,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  menuItemDanger: {
+    color: colors.status.error,
+  },
+  menuItemPressed: {
+    backgroundColor: colors.bg.soft,
+  },
+  menuCancel: {
+    fontSize: 17,
+    color: colors.text.muted,
+    textAlign: 'center',
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border.soft,
+    marginTop: 4,
+  },
+  // ─── 居中弹窗（重命名 / 删除确认） ───────────────
+  dialog: {
+    backgroundColor: colors.bg.canvas,
+    borderRadius: 14,
+    marginHorizontal: 40,
+    padding: 20,
+    alignSelf: 'center',
+    width: '88%',
+  },
+  dialogTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.text.ink,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteConfirmText: {
+    fontSize: 15,
+    color: colors.text.base,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  renameInput: {
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: colors.text.ink,
+    backgroundColor: colors.bg.input,
+    marginBottom: 16,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  dialogBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  dialogBtnPrimary: {
+    backgroundColor: colors.primary,
+  },
+  dialogBtnDanger: {
+    backgroundColor: colors.status.error,
+  },
+  dialogBtnPressed: {
+    opacity: 0.85,
+  },
+  dialogBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text.muted,
+  },
+  dialogBtnPrimaryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.onPrimary,
   },
 });

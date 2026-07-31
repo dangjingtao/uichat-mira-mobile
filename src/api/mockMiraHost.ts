@@ -57,6 +57,16 @@ export class MockMiraHostClient implements MiraHostApi {
     if (idx >= 0) mockSessions.splice(idx, 1);
   }
 
+  async renameSession(sessionId: string, title: string): Promise<Session> {
+    const session = mockSessions.find((s) => s.id === sessionId);
+    if (!session) {
+      throw new MiraHostError('NOT_FOUND', `会话 ${sessionId} 不存在`);
+    }
+    session.title = title;
+    session.updatedAt = new Date();
+    return session;
+  }
+
   async getMessages(sessionId: string): Promise<ChatMessage[]> {
     return mockMessages[sessionId] ?? [];
   }
