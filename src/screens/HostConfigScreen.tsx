@@ -16,6 +16,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useHostStore } from '../store/hostStore';
 import { miraHostClient } from '../api/mockMiraHost';
+import { colors } from '../theme/tokens';
 
 export function HostConfigScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -55,7 +56,7 @@ export function HostConfigScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color="#6366f1" />
+          <ChevronLeft size={24} color={colors.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>主机配置</Text>
         <View style={styles.headerSpacer} />
@@ -73,7 +74,7 @@ export function HostConfigScreen() {
               value={hostUrl}
               onChangeText={setHostUrl}
               placeholder="例如: http://100.64.0.1:8080"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.text.soft}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
@@ -85,7 +86,7 @@ export function HostConfigScreen() {
               value={token}
               onChangeText={setToken}
               placeholder="输入访问令牌"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.text.soft}
               secureTextEntry
               autoCapitalize="none"
             />
@@ -124,7 +125,7 @@ export function HostConfigScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg.canvas,
   },
   header: {
     flexDirection: 'row',
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.default,
   },
   backBtn: {
     paddingHorizontal: 4,
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '600',
-    color: '#111',
+    color: colors.text.ink,
     textAlign: 'center',
   },
   headerSpacer: {
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.bg.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -164,42 +165,42 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text.strong,
     marginBottom: 8,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: colors.border.default,
     borderRadius: 12,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: '#111',
-    backgroundColor: '#fff',
+    color: colors.text.ink,
+    backgroundColor: colors.bg.input,
     marginBottom: 20,
   },
   hintBox: {
-    backgroundColor: '#eef2ff',
+    backgroundColor: colors.hint.bg,
     borderRadius: 10,
     padding: 12,
   },
   hintText: {
     fontSize: 13,
-    color: '#4f46e5',
+    color: colors.hint.text,
     lineHeight: 20,
   },
   connectBtn: {
     height: 50,
     borderRadius: 14,
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   connectBtnDisabled: {
-    backgroundColor: '#c7c7c7',
+    backgroundColor: colors.primaryDisabled,
   },
   connectBtnText: {
-    color: '#fff',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -208,12 +209,12 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: colors.status.errorBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   disconnectBtnText: {
-    color: '#ef4444',
+    color: colors.status.error,
     fontSize: 15,
     fontWeight: '600',
   },

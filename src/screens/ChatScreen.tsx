@@ -17,6 +17,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/mockMiraHost';
+import { colors } from '../theme/tokens';
 
 export function ChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -171,7 +172,11 @@ export function ChatScreen() {
           <Text style={[styles.bubbleText, styles.bubbleTextAssistant]}>
             {streamingText || ''}
             {isLoading && !streamingText && (
-              <ActivityIndicator size="small" color="#999" style={styles.loadingDot} />
+              <ActivityIndicator
+                size="small"
+                color={colors.text.soft}
+                style={styles.loadingDot}
+              />
             )}
           </Text>
         </View>
@@ -183,7 +188,7 @@ export function ChatScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ChevronLeft size={24} color="#6366f1" />
+          <ChevronLeft size={24} color={colors.primary} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {title}
@@ -212,7 +217,7 @@ export function ChatScreen() {
             value={inputText}
             onChangeText={setInputText}
             placeholder="输入消息..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.text.soft}
             multiline
             maxLength={500}
             editable={!isLoading}
@@ -250,7 +255,7 @@ export function ChatScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg.canvas,
   },
   header: {
     flexDirection: 'row',
@@ -258,7 +263,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: colors.border.default,
   },
   backBtn: {
     paddingHorizontal: 4,
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '600',
-    color: '#111',
+    color: colors.text.ink,
     textAlign: 'center',
   },
   headerSpacer: {
@@ -299,15 +304,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   bubbleUser: {
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary,
     borderBottomRightRadius: 4,
   },
   bubbleAssistant: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.bg.bubble,
     borderBottomLeftRadius: 4,
   },
   bubbleFailed: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.status.errorBg,
     borderBottomRightRadius: 4,
   },
   bubbleText: {
@@ -315,10 +320,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   bubbleTextUser: {
-    color: '#fff',
+    color: colors.onPrimary,
   },
   bubbleTextAssistant: {
-    color: '#111',
+    color: colors.text.ink,
   },
   loadingDot: {
     marginLeft: 4,
@@ -334,7 +339,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 12,
-    color: '#ef4444',
+    color: colors.status.error,
   },
   inputBar: {
     flexDirection: 'row',
@@ -342,8 +347,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#fff',
+    borderTopColor: colors.border.default,
+    backgroundColor: colors.bg.canvas,
   },
   input: {
     flex: 1,
@@ -352,23 +357,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.bg.input,
     fontSize: 15,
-    color: '#111',
+    color: colors.text.ink,
     marginRight: 8,
   },
   sendBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
   },
   sendBtnDisabled: {
-    backgroundColor: '#c7c7c7',
+    backgroundColor: colors.primaryDisabled,
   },
   sendBtnText: {
-    color: '#fff',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -377,15 +382,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#ef4444',
-    backgroundColor: '#fff',
+    borderColor: colors.status.error,
+    backgroundColor: colors.bg.canvas,
     justifyContent: 'center',
   },
   stopBtnPressed: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.status.errorBg,
   },
   stopBtnText: {
-    color: '#ef4444',
+    color: colors.status.error,
     fontSize: 15,
     fontWeight: '600',
   },
