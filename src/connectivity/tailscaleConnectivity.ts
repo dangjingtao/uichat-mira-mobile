@@ -1,4 +1,5 @@
 import { normalizeHostUrl } from '../protocol/remoteHostV1';
+import { runNativeTailscaleProbe } from './nativeTailscaleProbe';
 
 export type TailscaleConnectivityState =
   | 'idle'
@@ -116,12 +117,27 @@ const requestWithTimeout = async (
   }
 };
 
+const normalizeProbeHost = (
+  hostInput: string,
+  allowInsecureDevelopment: boolean,
+) => {
+  const normalized = normalizeHostUrl(hostInput, {
+    allowInsecureDevelopment,
+  });
+  const parsed = new URL(normalized);
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('Mira Host address must not contain a path, query, or fragment');
+  }
+  return `${parsed.protocol}//${parsed.host}`;
+};
+
 /**
  * Verify the complete mobile-to-desktop transport path before pairing:
  * system VPN routing -> MagicDNS -> TLS -> Tailscale Serve -> Mira Host.
  *
- * This intentionally probes observable reachability instead of claiming to
- * read private state from the separately installed Tailscale application.
+ * Android prefers a native probe so DNS and TLS failures are not collapsed into
+ * React Native's generic "Network request failed" error. Other platforms and
+ * tests use the fetch implementation with the same result contract.
  */
 export const probeTailscaleMiraHost = async (
   hostInput: string,
@@ -131,9 +147,10 @@ export const probeTailscaleMiraHost = async (
   let hostUrl: string;
 
   try {
-    hostUrl = normalizeHostUrl(hostInput, {
-      allowInsecureDevelopment: options.allowInsecureDevelopment === true,
-    });
+    hostUrl = normalizeProbeHost(
+      hostInput,
+      options.allowInsecureDevelopment === true,
+    );
   } catch (error) {
     return {
       state: 'invalid_host',
@@ -145,8 +162,19 @@ export const probeTailscaleMiraHost = async (
     };
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 8_000;
+
+  if (!options.fetchImpl) {
+    try {
+      const nativeResult = await runNativeTailscaleProbe(hostUrl, timeoutMs);
+      if (nativeResult) return nativeResult;
+    } catch {
+      // Native diagnostics are an optimization for accurate classification.
+      // Fall back to the cross-platform probe rather than losing reachability.
+    }
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch;
   const startedAt = Date.now();
 
   try {
