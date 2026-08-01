@@ -1,19 +1,27 @@
 import React, { useState, useCallback } from 'react';
 import {
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Settings, Plus } from 'lucide-react-native';
+import { Menu, Plus, Settings as SettingsIcon } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
 import { miraHostClient } from '../api/mockMiraHost';
+import { useTheme } from '../theme/ThemeContext';
+import { CustomDrawer } from '../components/CustomDrawer';
+
+const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 
 function formatTime(date: Date): string {
   const now = new Date();
@@ -21,51 +29,76 @@ function formatTime(date: Date): string {
   const minutes = Math.floor(diff / (1000 * 60));
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
   if (minutes < 1) return '刚刚';
   if (minutes < 60) return `${minutes}分钟前`;
   if (hours < 24) return `${hours}小时前`;
   return `${days}天前`;
 }
 
-function getStatusLabel(status: string): string {
+function getStatusColor(status: string, colors: ReturnType<typeof useTheme>['colors']): string {
   switch (status) {
     case 'connected':
-      return '已连接';
-    case 'connecting':
-      return '连接中...';
-    case 'reconnecting':
-      return '重连中...';
-    default:
-      return '未连接';
-  }
-}
-
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'connected':
-      return '#22c55e';
+      return colors.status.success;
     case 'connecting':
     case 'reconnecting':
-      return '#f59e0b';
+      return colors.status.warning;
     default:
-      return '#9ca3af';
+      return colors.text.soft;
   }
 }
 
 export function SessionListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors } = useTheme();
   const { config, connectionStatus } = useHostStore();
+  const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
+  const backdropAnim = useState(new Animated.Value(0))[0];
+
+  const [menuSession, setMenuSession] = useState<Session | null>(null);
+  const [renameTarget, setRenameTarget] = useState<Session | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
+
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.timing(drawerAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        duration: 250,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        duration: 250,
+      }),
+    ]).start();
+  }, [drawerAnim, backdropAnim]);
+
+  const closeDrawer = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(drawerAnim, {
+        toValue: -DRAWER_WIDTH,
+        useNativeDriver: true,
+        duration: 220,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        duration: 220,
+      }),
+    ]).start(() => setDrawerOpen(false));
+  }, [drawerAnim, backdropAnim]);
 
   const loadSessions = useCallback(async () => {
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   useFocusEffect(
@@ -80,47 +113,78 @@ export function SessionListScreen() {
     try {
       const session = await miraHostClient.createSession('新对话');
       setSessions((prev) => [session, ...prev]);
-      navigation.navigate('Chat', {
-        sessionId: session.id,
-        title: session.title,
-      });
-    } catch {
-      // ignore
+      navigation.navigate('Chat', { sessionId: session.id, title: session.title });
     } finally {
       setIsCreating(false);
     }
   };
 
+  const handleStartRename = () => {
+    if (!menuSession) return;
+    setRenameTarget(menuSession);
+    setRenameText(menuSession.title);
+    setMenuSession(null);
+  };
+
+  const handleConfirmRename = async () => {
+    const title = renameText.trim();
+    if (!title || !renameTarget) return;
+    const target = renameTarget;
+    setRenameTarget(null);
+    try {
+      const updated = await miraHostClient.renameSession(target.id, title);
+      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch {}
+  };
+
+  const handleConfirmDelete = async () => {
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (!target) return;
+    try {
+      await miraHostClient.deleteSession(target.id);
+      setSessions((prev) => prev.filter((s) => s.id !== target.id));
+    } catch {}
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]} edges={['top']}>
       <View style={styles.header}>
-        <View style={styles.statusBadge}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: getStatusColor(connectionStatus) },
-            ]}
-          />
-          <Text style={styles.statusText}>
-            {getStatusLabel(connectionStatus)}
-          </Text>
-        </View>
-        <Text style={styles.headerTitle}>Mira Chat</Text>
         <Pressable
-          onPress={() => navigation.navigate('HostConfig')}
-          style={styles.settingsBtn}
+          onPress={openDrawer}
+          style={({ pressed }) => [
+            styles.drawerBtn,
+            { backgroundColor: colors.bg.card },
+            pressed && { opacity: 0.7 },
+          ]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Settings size={22} color="#6366f1" />
+          <Menu size={20} color={colors.text.ink} />
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text.ink }]}>Mira</Text>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(connectionStatus, colors) }]} />
+        </View>
+        <Pressable
+          onPress={() => navigation.navigate('Settings')}
+          style={({ pressed }) => [
+            styles.settingsBtn,
+            { backgroundColor: colors.bg.card },
+            pressed && { opacity: 0.7 },
+          ]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <SettingsIcon size={20} color={colors.text.ink} />
         </Pressable>
       </View>
 
       {!config && (
         <Pressable
-          style={styles.noConfigBanner}
+          style={[styles.noConfigBanner, { backgroundColor: colors.bg.card }]}
           onPress={() => navigation.navigate('HostConfig')}
         >
-          <Text style={styles.noConfigText}>
-            ⚠️ 尚未配置 Mira Host，点击配置
+          <Text style={[styles.noConfigText, { color: colors.text.muted }]}>
+            尚未配置 Mira Host，点击配置
           </Text>
         </Pressable>
       )}
@@ -128,45 +192,49 @@ export function SessionListScreen() {
       <FlatList
         data={sessions}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={sessions.length === 0 ? { flexGrow: 1 } : undefined}
+        contentContainerStyle={[
+          styles.listContent,
+          sessions.length === 0 && { flexGrow: 1 },
+          { paddingBottom: insets.bottom + 100 },
+        ]}
         renderItem={({ item }) => (
           <Pressable
             style={({ pressed }) => [
               styles.sessionItem,
-              pressed && styles.sessionItemPressed,
+              pressed && { backgroundColor: colors.bg.soft, borderRadius: 12 },
             ]}
-            onPress={() =>
-              navigation.navigate('Chat', {
-                sessionId: item.id,
-                title: item.title,
-              })
-            }
+            onPress={() => navigation.navigate('Chat', { sessionId: item.id, title: item.title })}
+            onLongPress={() => setMenuSession(item)}
           >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{item.title[0] ?? '?'}</Text>
+            <View style={[styles.avatar, { backgroundColor: colors.bg.card }]}>
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {item.title[0] ?? '?'}
+              </Text>
             </View>
             <View style={styles.sessionContent}>
               <View style={styles.sessionTopRow}>
-                <Text style={styles.sessionTitle} numberOfLines={1}>
+                <Text style={[styles.sessionTitle, { color: colors.text.ink }]} numberOfLines={1}>
                   {item.title}
                 </Text>
-                <Text style={styles.sessionTime}>
+                <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
                   {formatTime(item.updatedAt)}
                 </Text>
               </View>
-              <Text style={styles.sessionPreview} numberOfLines={1}>
-                {connectionStatus === 'connected'
-                  ? '点击开始聊天...'
-                  : '未连接主机'}
+              <Text style={[styles.sessionPreview, { color: colors.text.muted }]} numberOfLines={1}>
+                {connectionStatus === 'connected' ? '点击开始聊天...' : '未连接主机'}
               </Text>
             </View>
           </Pressable>
         )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: colors.border.soft }]} />
+        )}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>暂无会话</Text>
-            <Text style={styles.emptySubtitle}>点击下方按钮开始新对话</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text.muted }]}>暂无会话</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+              点击下方按钮开始新对话
+            </Text>
           </View>
         )}
       />
@@ -174,151 +242,253 @@ export function SessionListScreen() {
       <Pressable
         style={({ pressed }) => [
           styles.fab,
-          (isCreating || pressed) && styles.fabDisabled,
+          { bottom: insets.bottom + 20, backgroundColor: colors.primary },
+          (isCreating || pressed) && { backgroundColor: colors.primaryDisabled },
         ]}
         onPress={handleNewChat}
         disabled={isCreating}
       >
         <Plus size={24} color="#fff" strokeWidth={2.5} />
       </Pressable>
+
+      {/* ── Drawer Overlay ──────────────────── */}
+      {drawerOpen && (
+        <Modal transparent animationType="none" onRequestClose={closeDrawer}>
+          <View style={StyleSheet.absoluteFill}>
+            <Animated.View
+              style={[
+                styles.drawerBackdrop,
+                { opacity: backdropAnim, backgroundColor: colors.overlay },
+              ]}
+              onTouchStart={closeDrawer}
+            />
+            <Animated.View
+              style={[
+                styles.drawerPanel,
+                { width: DRAWER_WIDTH, transform: [{ translateX: drawerAnim }] },
+              ]}
+            >
+              <CustomDrawer onClose={closeDrawer} />
+            </Animated.View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ── Long-press menu ─────────────────── */}
+      <Modal visible={menuSession !== null} transparent animationType="fade" onRequestClose={() => setMenuSession(null)}>
+        <Pressable style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setMenuSession(null)}>
+          <View style={[styles.actionSheet, { backgroundColor: colors.bg.canvas, paddingBottom: insets.bottom + 8 }]}>
+            <Text style={[styles.menuTitle, { color: colors.text.soft, borderBottomColor: colors.border.soft }]} numberOfLines={1}>
+              {menuSession?.title}
+            </Text>
+            <Pressable style={({ pressed }) => pressed && { backgroundColor: colors.bg.soft }} onPress={handleStartRename}>
+              <Text style={[styles.menuItem, { color: colors.text.ink }]}>重命名</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => pressed && { backgroundColor: colors.bg.soft }}
+              onPress={() => { setDeleteTarget(menuSession); setMenuSession(null); }}
+            >
+              <Text style={[styles.menuItem, { color: colors.status.error }]}>删除会话</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => pressed && { backgroundColor: colors.bg.soft }}
+              onPress={() => setMenuSession(null)}
+            >
+              <Text style={[styles.menuCancel, { color: colors.text.muted, borderTopColor: colors.border.soft }]}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ── Rename dialog ───────────────────── */}
+      <Modal visible={renameTarget !== null} transparent animationType="fade" onRequestClose={() => setRenameTarget(null)}>
+        <Pressable style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setRenameTarget(null)}>
+          <View style={[styles.dialog, { backgroundColor: colors.bg.card }]}>
+            <Text style={[styles.dialogTitle, { color: colors.text.ink }]}>重命名会话</Text>
+            <TextInput
+              style={[styles.renameInput, { borderColor: colors.border.default, backgroundColor: colors.bg.input, color: colors.text.ink }]}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="输入新名称"
+              placeholderTextColor={colors.text.placeholder}
+              autoFocus
+              selectTextOnFocus
+              onSubmitEditing={handleConfirmRename}
+            />
+            <View style={styles.dialogActions}>
+              <Pressable style={styles.dialogBtn} onPress={() => setRenameTarget(null)}>
+                <Text style={[styles.dialogBtnText, { color: colors.text.muted }]}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.dialogBtn,
+                  styles.dialogBtnPrimary,
+                  { backgroundColor: colors.primary },
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={handleConfirmRename}
+                disabled={!renameText.trim()}
+              >
+                <Text style={[styles.dialogBtnPrimaryText, { color: colors.onPrimary }]}>保存</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* ── Delete confirm dialog ───────────── */}
+      <Modal visible={deleteTarget !== null} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
+        <Pressable style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setDeleteTarget(null)}>
+          <View style={[styles.dialog, { backgroundColor: colors.bg.card }]}>
+            <Text style={[styles.dialogTitle, { color: colors.text.ink }]}>删除会话</Text>
+            <Text style={[styles.deleteConfirmText, { color: colors.text.base }]}>
+              确定删除「{deleteTarget?.title}」吗？此操作不可撤销。
+            </Text>
+            <View style={styles.dialogActions}>
+              <Pressable style={styles.dialogBtn} onPress={() => setDeleteTarget(null)}>
+                <Text style={[styles.dialogBtnText, { color: colors.text.muted }]}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.dialogBtn,
+                  { backgroundColor: colors.status.error },
+                  pressed && { opacity: 0.85 },
+                ]}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={[styles.dialogBtnPrimaryText, { color: colors.onPrimary }]}>删除</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
   },
-  statusBadge: {
+  drawerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 70,
+    justifyContent: 'center',
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 13,
-    color: '#666',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111',
-  },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 6 },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
   settingsBtn: {
-    padding: 4,
-    minWidth: 36,
-    alignItems: 'flex-end',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   noConfigBanner: {
-    backgroundColor: '#fef3c7',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 4,
   },
-  noConfigText: {
-    color: '#92400e',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  sessionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-  },
-  sessionItemPressed: {
-    backgroundColor: '#f5f5f5',
-  },
+  noConfigText: { fontSize: 14, textAlign: 'center' },
+  listContent: { paddingHorizontal: 16 },
+  sessionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#6366f1',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  sessionContent: {
-    flex: 1,
-  },
+  avatarText: { fontSize: 18, fontWeight: '600' },
+  sessionContent: { flex: 1 },
   sessionTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111',
-    flex: 1,
-    marginRight: 8,
-  },
-  sessionTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  sessionPreview: {
-    fontSize: 14,
-    color: '#888',
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#e8e8e8',
-    marginLeft: 76,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 80,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-  },
+  sessionTitle: { fontSize: 16, fontWeight: '600', flex: 1, marginRight: 8 },
+  sessionTime: { fontSize: 12 },
+  sessionPreview: { fontSize: 14 },
+  separator: { height: StyleSheet.hairlineWidth, marginLeft: 56 },
+  emptyState: { alignItems: 'center', paddingVertical: 80 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
+  emptySubtitle: { fontSize: 14 },
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366f1',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  fabDisabled: {
-    backgroundColor: '#a5b4fc',
-    elevation: 0,
+  // ── Drawer ────────────────────────────
+  drawerBackdrop: { ...StyleSheet.absoluteFill },
+  drawerPanel: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
   },
+  // ── Modals ────────────────────────────
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end' },
+  actionSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  menuTitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  menuItem: { fontSize: 17, textAlign: 'center', paddingVertical: 16 },
+  menuCancel: {
+    fontSize: 17,
+    textAlign: 'center',
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+  },
+  dialog: {
+    borderRadius: 14,
+    marginHorizontal: 40,
+    padding: 20,
+    alignSelf: 'center',
+    width: '88%',
+  },
+  dialogTitle: { fontSize: 17, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
+  deleteConfirmText: { fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 8 },
+  renameInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 16,
+  },
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  dialogBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  dialogBtnPrimary: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  dialogBtnText: { fontSize: 15, fontWeight: '600' },
+  dialogBtnPrimaryText: { fontSize: 15, fontWeight: '600' },
 });

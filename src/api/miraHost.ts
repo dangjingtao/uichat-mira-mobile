@@ -23,6 +23,8 @@ export interface MiraHostApi {
 
   deleteSession(sessionId: string): Promise<void>;
 
+  renameSession(sessionId: string, title: string): Promise<Session>;
+
   getMessages(sessionId: string): Promise<ChatMessage[]>;
 
   sendMessage(sessionId: string, content: string): Promise<AsyncIterable<string>>;
