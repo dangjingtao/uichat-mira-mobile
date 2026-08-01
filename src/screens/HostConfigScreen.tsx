@@ -11,12 +11,17 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronLeft,
+  KeyRound,
   RefreshCw,
   ShieldCheck,
   Wifi,
@@ -28,6 +33,10 @@ import {
   tailscaleConnectivityMessage,
   type TailscaleConnectivityState,
 } from '../connectivity/tailscaleConnectivity';
+import {
+  parsePairingUri,
+  type PairingDescriptor,
+} from '../protocol/remoteHostV1';
 import { useTheme } from '../theme/ThemeContext';
 
 const connectivityTitle = (state: TailscaleConnectivityState) => {
@@ -43,9 +52,24 @@ const connectivityTitle = (state: TailscaleConnectivityState) => {
   }
 };
 
+const buildPairingUriFromRoute = (
+  params: RootStackParamList['HostConfig'],
+): string | null => {
+  if (!params) return null;
+  const { version, host, challenge, code } = params;
+  if (!version && !host && !challenge && !code) return null;
+  if (!version || !host || !challenge || !code) {
+    throw new Error('配对链接缺少 version、host、challenge 或 code');
+  }
+
+  const query = new URLSearchParams({ version, host, challenge, code });
+  return `mira://pair?${query.toString()}`;
+};
+
 export function HostConfigScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'HostConfig'>>();
   const { colors } = useTheme();
   const { config, setConfig, clearConfig, setConnectionStatus } = useHostStore();
   const connectivityState = useTailscaleConnectivityStore((state) => state.state);
@@ -57,12 +81,53 @@ export function HostConfigScreen() {
   const resetConnectivity = useTailscaleConnectivityStore((state) => state.reset);
 
   const [hostUrl, setHostUrl] = useState(config?.hostUrl ?? '');
+  const [pairingDescriptor, setPairingDescriptor] =
+    useState<PairingDescriptor | null>(null);
+  const [pairingLinkError, setPairingLinkError] = useState<string | null>(null);
+
+  const routeVersion = route.params?.version;
+  const routeHost = route.params?.host;
+  const routeChallenge = route.params?.challenge;
+  const routeCode = route.params?.code;
 
   useEffect(() => {
     if (config?.hostUrl) {
       setConnectivityHostUrl(config.hostUrl);
     }
   }, [config?.hostUrl, setConnectivityHostUrl]);
+
+  useEffect(() => {
+    try {
+      const uri = buildPairingUriFromRoute(route.params);
+      if (!uri) return;
+
+      const descriptor = parsePairingUri(uri);
+      setPairingDescriptor(descriptor);
+      setPairingLinkError(null);
+      setHostUrl(descriptor.hostUrl);
+      setConnectivityHostUrl(descriptor.hostUrl);
+
+      const current = useTailscaleConnectivityStore.getState();
+      if (
+        current.hostUrl !== descriptor.hostUrl ||
+        (current.state !== 'probing' && current.state !== 'ready')
+      ) {
+        void current.probe(descriptor.hostUrl, 'manual');
+      }
+    } catch (error) {
+      setPairingDescriptor(null);
+      setPairingLinkError(
+        error instanceof Error ? error.message : '无法读取桌面配对链接',
+      );
+    }
+  }, [
+    route.params,
+    routeVersion,
+    routeHost,
+    routeChallenge,
+    routeCode,
+    setConnectivityHostUrl,
+  ]);
 
   const isProbing = connectivityState === 'probing';
   const isReady =
@@ -118,6 +183,8 @@ export function HostConfigScreen() {
     clearConfig();
     resetConnectivity();
     setHostUrl('');
+    setPairingDescriptor(null);
+    setPairingLinkError(null);
   };
 
   return (
@@ -138,6 +205,35 @@ export function HostConfigScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.form}>
+          {pairingDescriptor || pairingLinkError ? (
+            <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+              <View style={styles.sectionHeading}>
+                <KeyRound
+                  size={20}
+                  color={pairingLinkError ? colors.status.error : colors.primary}
+                />
+                <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>
+                  桌面配对请求
+                </Text>
+              </View>
+              {pairingDescriptor ? (
+                <>
+                  <Text style={[styles.authorizationTitle, { color: colors.text.ink }]}>
+                    已载入一次性配对信息
+                  </Text>
+                  <Text style={[styles.authorizationText, { color: colors.text.muted }]}>
+                    请求编号 {pairingDescriptor.challengeId.slice(0, 8)}… 已绑定到当前
+                    Tailscale Serve 地址。只有联通状态进入 ready 后，Mobile 才会向桌面提交设备申请。
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.authorizationText, { color: colors.status.error }]}>
+                  {pairingLinkError}
+                </Text>
+              )}
+            </View>
+          ) : null}
+
           <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
             <View style={styles.sectionHeading}>
               <Wifi size={20} color={colors.text.ink} />
@@ -166,7 +262,7 @@ export function HostConfigScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              editable={!isProbing}
+              editable={!isProbing && !pairingDescriptor}
             />
 
             <View
@@ -208,7 +304,10 @@ export function HostConfigScreen() {
                 </Text>
               ) : null}
               {connectivityResult?.detail && connectivityState !== 'ready' ? (
-                <Text style={[styles.detailText, { color: colors.text.soft }]} numberOfLines={3}>
+                <Text
+                  style={[styles.detailText, { color: colors.text.soft }]}
+                  numberOfLines={3}
+                >
                   诊断：{connectivityResult.detail}
                 </Text>
               ) : null}
@@ -230,10 +329,14 @@ export function HostConfigScreen() {
               </Text>
             </View>
             <Text style={[styles.authorizationTitle, { color: colors.text.ink }]}>
-              {isReady ? '等待设备配对' : '等待 Tailscale 联通'}
+              {isReady
+                ? pairingDescriptor
+                  ? '联通已通过，可申请桌面批准'
+                  : '等待设备配对'
+                : '等待 Tailscale 联通'}
             </Text>
             <Text style={[styles.authorizationText, { color: colors.text.muted }]}>
-              Tailscale 可达不等于获得 Mira 权限。联通成功后，移动端还需要使用桌面生成的一次性配对链接，由桌面明确批准设备和权限。
+              Tailscale 可达不等于获得 Mira 权限。Mobile 不会在联通验证完成前消耗一次性配对码，也不会把 ACL、DNS 或 TLS 故障伪装成配对失败。
             </Text>
           </View>
 
