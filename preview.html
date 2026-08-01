@@ -204,23 +204,37 @@
     line-height: var(--lh-body); letter-spacing: var(--ls-body);
   }
 
-  /* Messages — no bubbles, full-width document style */
+  /* Messages — asymmetric layout, user on right, assistant on left */
   .msg-group { margin-bottom: 24px; }
-  .msg-row {
-    padding: 16px 20px;
+
+  .msg-user-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .msg-user {
+    max-width: 82%;
+    padding: 14px 20px 14px 28px;
+    background: var(--user-msg);
+    border-radius: 12px;
     font-size: var(--font-body);
     line-height: var(--lh-body);
     letter-spacing: var(--ls-body);
     color: var(--base);
   }
-  .msg-user {
-    background: var(--user-msg);
-    border-radius: 12px;
-    margin: 0 0 8px 0;
+
+  .msg-assistant-wrap {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 8px;
   }
   .msg-assistant {
-    background: transparent;
-    padding: 8px 20px;
+    max-width: 88%;
+    padding: 6px 28px 6px 20px;
+    font-size: var(--font-body);
+    line-height: var(--lh-body);
+    letter-spacing: var(--ls-body);
+    color: var(--base);
   }
   .msg-assistant p { margin-bottom: 12px; }
   .msg-assistant p:last-child { margin-bottom: 0; }
@@ -429,15 +443,18 @@
     </div>
 
     <div class="chat-scroll">
-      <!-- User message — no bubble, just background -->
-      <div class="msg-row msg-user">
-        你好，帮我写一段 React Native 的 FlatList 示例
+      <!-- User message — right-aligned, left space -->
+      <div class="msg-user-wrap">
+        <div class="msg-user">
+          你好，帮我写一段 React Native 的 FlatList 示例
+        </div>
       </div>
 
-      <!-- Assistant message — plain text, no background -->
-      <div class="msg-row msg-assistant">
-        <p>好的，这是一个简单的 FlatList 示例：</p>
-        <pre>import React from 'react';
+      <!-- Assistant message — left-aligned, plain -->
+      <div class="msg-assistant-wrap">
+        <div class="msg-assistant">
+          <p>好的，这是一个简单的 FlatList 示例：</p>
+          <pre>import React from 'react';
 import { FlatList, View, Text } from 'react-native';
 
 const items = [
@@ -459,17 +476,22 @@ export function MyList() {
     /&gt;
   );
 }</pre>
-        <p>需要更复杂的功能比如下拉刷新、上拉加载吗？</p>
+          <p>需要更复杂的功能比如下拉刷新、上拉加载吗？</p>
+        </div>
       </div>
 
       <!-- Another user message -->
-      <div class="msg-row msg-user">
-        够了，谢谢！
+      <div class="msg-user-wrap">
+        <div class="msg-user">
+          够了，谢谢！
+        </div>
       </div>
 
       <!-- Assistant response -->
-      <div class="msg-row msg-assistant">
-        <p>不客气！如果有其他问题随时来问。</p>
+      <div class="msg-assistant-wrap">
+        <div class="msg-assistant">
+          <p>不客气！如果有其他问题随时来问。</p>
+        </div>
       </div>
     </div>
 
