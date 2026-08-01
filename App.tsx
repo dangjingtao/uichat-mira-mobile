@@ -8,6 +8,7 @@ import { ChatScreen } from './src/screens/ChatScreen';
 import { HostConfigScreen } from './src/screens/HostConfigScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -23,12 +24,15 @@ function StatusBarThemed() {
 
 function AppInner() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="SessionList" component={SessionListScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="HostConfig" component={HostConfigScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-    </Stack.Navigator>
+    <>
+      <TailscaleConnectivityLifecycle />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="SessionList" component={SessionListScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="HostConfig" component={HostConfigScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+      </Stack.Navigator>
+    </>
   );
 }
 
