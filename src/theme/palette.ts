@@ -38,11 +38,11 @@ export interface ThemeColors {
   divider: string;
 }
 
-// ─── Light Theme — Clean White (ChatGPT style) ───
+// ─── Light Theme — Clean White (tomz.io coral clay accent) ───
 export const lightColors: ThemeColors = {
-  primary: '#3B82F6',
-  primaryActive: '#2563EB',
-  primaryDisabled: '#E5E7EB',
+  primary: '#cc785c',
+  primaryActive: '#a9583e',
+  primaryDisabled: '#e6dfd8',
 
   text: {
     ink: '#111111',
@@ -68,10 +68,10 @@ export const lightColors: ThemeColors = {
   },
 
   status: {
-    success: '#22C55E',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    errorBg: '#FEE2E2',
+    success: '#5db872',
+    warning: '#d4a017',
+    error: '#c64545',
+    errorBg: '#fce8e8',
   },
 
   onPrimary: '#FFFFFF',
@@ -79,11 +79,11 @@ export const lightColors: ThemeColors = {
   divider: '#E8E8E8',
 };
 
-// ─── Dark Theme (ChatGPT style) ───
+// ─── Dark Theme (tomz.io coral clay accent) ───
 export const darkColors: ThemeColors = {
-  primary: '#60A5FA',
-  primaryActive: '#3B82F6',
-  primaryDisabled: '#374151',
+  primary: '#e8a07a',
+  primaryActive: '#cc785c',
+  primaryDisabled: '#3d3d3a',
 
   text: {
     ink: '#F5F5F7',
@@ -109,13 +109,13 @@ export const darkColors: ThemeColors = {
   },
 
   status: {
-    success: '#34D399',
-    warning: '#FBBF24',
-    error: '#F87171',
-    errorBg: '#450A0A',
+    success: '#5db872',
+    warning: '#d4a017',
+    error: '#c64545',
+    errorBg: '#3d1a1a',
   },
 
-  onPrimary: '#0F0F10',
+  onPrimary: '#1A1A1C',
   overlay: 'rgba(0,0,0,0.6)',
   divider: '#2C2C2E',
 };
