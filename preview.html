@@ -3,58 +3,84 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mira Mobile — Light Theme Preview</title>
+<title>Mira Mobile — Claude/OpenAI Style Preview</title>
 <style>
-  /* ===== Light Theme Tokens (from palette.ts - tomz.io coral clay) ===== */
+  /* ===== Design Tokens (Claude + OpenAI inspired) ===== */
   :root {
+    /* Brand */
     --primary: #cc785c;
     --primary-active: #a9583e;
     --primary-disabled: #e6dfd8;
     --on-primary: #FFFFFF;
 
-    --ink: #111111;
-    --base: #333333;
-    --strong: #1A1A1C;
-    --muted: #666666;
-    --soft: #888888;
-    --placeholder: #999999;
+    /* Text */
+    --ink: #141413;
+    --base: #3d3d3a;
+    --strong: #252523;
+    --muted: #6c6a64;
+    --soft: #8e8b82;
+    --placeholder: #8e8b82;
 
-    --canvas: #FFFFFF;
-    --card: #F5F5F7;
-    --soft-bg: #F7F7F8;
-    --input: #F5F5F7;
-    --bubble: #F2F2F4;
+    /* Surfaces */
+    --canvas: #faf9f5;
+    --card: #efe9de;
+    --soft-bg: #f5f0e8;
+    --input: #f5f0e8;
+    --user-msg: #f0eeeb;
     --elevated: #FFFFFF;
 
-    --border: #E0E0E0;
-    --border-soft: #E8E8E8;
-    --divider: #E8E8E8;
+    /* Borders */
+    --border: #e6dfd8;
+    --border-soft: #ebe6df;
+    --divider: #ebe6df;
 
+    /* Status */
     --success: #5db872;
     --warning: #d4a017;
     --error: #c64545;
     --error-bg: #fce8e8;
 
+    /* Overlay */
     --overlay: rgba(0,0,0,0.4);
+
+    /* Typography */
+    --font-body: 15px;
+    --font-small: 14px;
+    --font-caption: 13px;
+    --font-title: 17px;
+    --font-heading: 20px;
+    --lh-body: 1.7;
+    --lh-title: 1.4;
+    --ls-body: 0;
+    --ls-small: 0.2px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: #f0f0f2;
+    background: #e8e4de;
     display: flex;
-    gap: 40px;
-    padding: 60px 40px;
+    gap: 32px;
+    padding: 48px 40px;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: flex-start;
   }
-  h1 { width: 100%; text-align: center; font-size: 28px; color: #111; margin-bottom: 4px; font-weight: 700; }
-  .subtitle { width: 100%; text-align: center; font-size: 14px; color: #666; margin-bottom: 30px; }
+  .page-title {
+    width: 100%; text-align: center;
+    font-size: 28px; color: #141413; font-weight: 700;
+    letter-spacing: -0.3px; margin-bottom: 2px;
+  }
+  .page-subtitle {
+    width: 100%; text-align: center;
+    font-size: 14px; color: #6c6a64;
+    letter-spacing: 0.2px; margin-bottom: 24px;
+  }
 
-  /* Phone frame */
+  /* ===== Phone Frame ===== */
   .phone {
     width: 375px;
-    height: 760px;
+    min-height: 760px;
     background: var(--canvas);
     border-radius: 40px;
     overflow: hidden;
@@ -64,15 +90,16 @@
     display: flex;
     flex-direction: column;
   }
-  .phone-title {
+  .phone-tag {
     position: absolute;
-    top: -28px;
+    top: -26px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 13px;
-    color: #666;
+    font-size: 12px;
+    color: #6c6a64;
     white-space: nowrap;
     font-weight: 600;
+    letter-spacing: 0.2px;
   }
   .notch {
     width: 120px; height: 24px;
@@ -104,13 +131,16 @@
   .sl-header-center {
     flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .sl-header-title { font-size: 17px; font-weight: 600; color: var(--ink); }
+  .sl-header-title {
+    font-size: 17px; font-weight: 600; color: var(--ink);
+    letter-spacing: var(--ls-body);
+  }
   .sl-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 
   .sl-list { flex: 1; overflow-y: auto; }
   .sl-item {
     display: flex; align-items: center;
-    padding: 12px 16px; background: var(--canvas);
+    padding: 14px 16px;
     cursor: pointer;
   }
   .sl-item:hover { background: var(--soft-bg); }
@@ -118,14 +148,24 @@
     width: 44px; height: 44px; border-radius: 12px;
     background: var(--card);
     display: flex; align-items: center; justify-content: center;
-    margin-right: 12px; color: var(--primary); font-size: 18px; font-weight: 600;
+    margin-right: 14px;
+    color: var(--primary); font-size: 18px; font-weight: 600;
   }
-  .sl-content { flex: 1; }
+  .sl-content { flex: 1; min-width: 0; }
   .sl-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  .sl-title { font-size: 16px; font-weight: 600; color: var(--ink); flex: 1; }
-  .sl-time { font-size: 12px; color: var(--soft); }
-  .sl-preview { font-size: 14px; color: var(--muted); }
-  .sl-separator { height: 1px; background: var(--border-soft); margin-left: 72px; }
+  .sl-title {
+    font-size: 16px; font-weight: 600; color: var(--ink);
+    flex: 1; margin-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sl-time {
+    font-size: 12px; color: var(--soft);
+    white-space: nowrap;
+  }
+  .sl-preview {
+    font-size: 14px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sl-separator { height: 1px; background: var(--divider); margin-left: 74px; }
 
   .sl-fab {
     position: absolute; right: 20px; bottom: 40px;
@@ -133,74 +173,114 @@
     background: var(--primary);
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 2px 8px rgba(204,120,92,0.3);
-    cursor: pointer; color: var(--on-primary); font-size: 24px; font-weight: bold;
+    cursor: pointer;
+    color: var(--on-primary); font-size: 24px; font-weight: 300;
   }
 
-  /* ===== Chat ===== */
-  .chat-header {
-    display: flex; align-items: center;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border-soft);
+  .sl-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 80px 24px; text-align: center;
+    flex: 1;
   }
-  .chat-back {
-    width: 40px; height: 40px; border-radius: 20px;
-    background: var(--card); display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
+  .sl-empty-title { font-size: 18px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+  .sl-empty-sub { font-size: 14px; color: var(--soft); }
+
+  /* ===== Chat (bubble-less, Claude/OpenAI style) ===== */
+  .chat-scroll {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
   }
-  .chat-title {
-    flex: 1; font-size: 17px; font-weight: 600; color: var(--ink);
-    text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  .chat-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; text-align: center;
+    padding: 0 24px;
   }
-  .chat-spacer { width: 40px; }
-  .chat-messages { flex: 1; overflow-y: auto; padding: 8px 12px; }
-  .msg-row { margin: 4px 0; display: flex; }
-  .msg-row-left { justify-content: flex-start; }
-  .msg-row-right { justify-content: flex-end; }
-  .bubble {
-    max-width: 78%; padding: 10px 14px; border-radius: 16px;
-    font-size: 15px; line-height: 1.6;
+  .chat-empty-title {
+    font-size: 20px; font-weight: 600; color: var(--ink);
+    margin-bottom: 8px; letter-spacing: -0.2px;
   }
-  .bubble-user { background: var(--primary); border-bottom-right-radius: 4px; color: var(--on-primary); }
-  .bubble-assistant { background: var(--bubble); border-bottom-left-radius: 4px; color: var(--ink); }
+  .chat-empty-sub {
+    font-size: 14px; color: var(--muted);
+    line-height: var(--lh-body); letter-spacing: var(--ls-body);
+  }
+
+  /* Messages — no bubbles, full-width document style */
+  .msg-group { margin-bottom: 24px; }
+  .msg-row {
+    padding: 16px 20px;
+    font-size: var(--font-body);
+    line-height: var(--lh-body);
+    letter-spacing: var(--ls-body);
+    color: var(--base);
+  }
+  .msg-user {
+    background: var(--user-msg);
+    border-radius: 12px;
+    margin: 0 0 8px 0;
+  }
+  .msg-assistant {
+    background: transparent;
+    padding: 8px 20px;
+  }
+  .msg-assistant p { margin-bottom: 12px; }
+  .msg-assistant p:last-child { margin-bottom: 0; }
+  .msg-assistant code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    background: var(--soft-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+  .msg-assistant pre {
+    background: #2a2a28;
+    color: #f0eee8;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+
+  /* Input bar */
   .chat-input-bar {
     display: flex; align-items: flex-end;
-    padding: 8px 12px;
+    gap: 8px;
+    padding: 12px 16px;
+    padding-bottom: 16px;
     border-top: 1px solid var(--border-soft);
     background: var(--canvas);
   }
   .chat-input {
-    flex: 1; min-height: 40px; max-height: 120px;
-    padding: 10px 14px; border-radius: 20px;
+    flex: 1; min-height: 44px; max-height: 120px;
+    padding: 12px 16px; border-radius: 12px;
     background: var(--input);
-    border: none;
+    border: 1px solid var(--border);
     font-size: 15px; color: var(--ink);
-    margin-right: 8px; outline: none;
+    outline: none; resize: none;
+    line-height: 1.5;
   }
+  .chat-input:focus { border-color: var(--primary); }
   .chat-input::placeholder { color: var(--placeholder); }
   .chat-send {
-    padding: 10px 16px; border-radius: 20px;
+    padding: 12px 20px; border-radius: 12px;
     background: var(--primary); color: var(--on-primary);
-    font-size: 15px; font-weight: 600; cursor: pointer; border: none;
-    height: 40px;
+    font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+    white-space: nowrap;
   }
+  .chat-send:hover { background: var(--primary-active); }
+  .chat-send:disabled { background: var(--primary-disabled); cursor: not-allowed; }
 
   /* ===== Settings ===== */
-  .st-header {
-    display: flex; align-items: center;
-    padding: 8px 16px;
-  }
-  .st-back {
-    width: 40px; height: 40px; border-radius: 20px;
-    background: var(--card); display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
   .st-scroll {
     flex: 1; overflow-y: auto;
-    padding: 8px 20px 48px;
+    padding: 8px 16px 40px;
   }
   .st-profile {
     display: flex; flex-direction: column; align-items: center;
-    padding: 8px 0 24px;
+    padding: 16px 0 24px;
   }
   .st-avatar-wrap { width: 96px; height: 96px; margin-bottom: 16px; position: relative; }
   .st-avatar {
@@ -209,107 +289,42 @@
     display: flex; align-items: center; justify-content: center;
     color: var(--on-primary); font-size: 34px; font-weight: 700;
   }
-  .st-avatar-edit {
-    position: absolute; right: -2px; bottom: -2px;
-    width: 32px; height: 32px; border-radius: 16px;
-    background: var(--elevated); border: 3px solid var(--canvas);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-  }
-  .st-name { font-size: 22px; font-weight: 700; color: var(--ink); }
+  .st-name { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; }
 
-  .st-section-header {
-    font-size: 14px; font-weight: 500; color: var(--soft);
-    padding: 20px 4px 8px;
+  .st-section {
+    font-size: 13px; font-weight: 600; color: var(--soft);
+    padding: 20px 4px 8px; letter-spacing: 0.5px; text-transform: uppercase;
   }
   .st-group {
-    margin-bottom: 4px; overflow: hidden;
+    background: var(--card);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 4px;
   }
   .st-row {
     display: flex; align-items: center;
-    padding: 14px 16px; min-height: 60px;
-    background: var(--card); position: relative;
+    padding: 14px 16px;
+    min-height: 52px;
     cursor: pointer;
+    position: relative;
   }
   .st-row:hover { background: var(--soft-bg); }
-  .st-row:first-child { border-radius: 16px 16px 0 0; }
-  .st-row:last-child { border-radius: 0 0 16px 16px; }
-  .st-row:only-child { border-radius: 16px; }
-  .st-row-icon { width: 32px; height: 32px; margin-right: 14px; display: flex; align-items: center; justify-content: center; }
-  .st-row-content { flex: 1; }
-  .st-row-title { font-size: 17px; font-weight: 500; color: var(--ink); }
-  .st-row-subtitle { font-size: 15px; color: var(--muted); margin-top: 2px; }
-  .st-row-right { display: flex; align-items: center; gap: 6px; }
-  .st-chevron { color: var(--soft); }
-  .st-separator {
-    position: absolute; bottom: 0; left: 64px; right: 0;
+  .st-row:not(:last-child)::after {
+    content: '';
+    position: absolute; bottom: 0; left: 56px; right: 0;
     height: 1px; background: var(--divider);
   }
-  .st-row:last-child .st-separator { display: none; }
-  .st-destructive { color: var(--error); }
-  .st-accent-dot { width: 18px; height: 18px; border-radius: 9px; background: #9CA3AF; }
+  .st-icon { width: 24px; height: 24px; margin-right: 14px; display: flex; align-items: center; justify-content: center; }
+  .st-icon svg { width: 22px; height: 22px; stroke: var(--ink); stroke-width: 1.5; fill: none; }
+  .st-content { flex: 1; }
+  .st-title { font-size: 16px; font-weight: 500; color: var(--ink); }
+  .st-sub { font-size: 14px; color: var(--muted); margin-top: 1px; }
+  .st-right { display: flex; align-items: center; gap: 6px; }
+  .st-destructive .st-title { color: var(--error); }
+  .st-destructive .st-icon svg { stroke: var(--error); }
 
-  /* iOS Switch */
-  .switch {
-    width: 51px; height: 31px; border-radius: 16px;
-    background: var(--primary); position: relative; cursor: pointer;
-  }
-  .switch-thumb {
-    position: absolute; top: 2px; right: 2px;
-    width: 27px; height: 27px; border-radius: 14px;
-    background: var(--elevated);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  }
-
-  /* ===== HostConfig ===== */
-  .hc-header {
-    display: flex; align-items: center;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  .hc-back {
-    width: 40px; height: 40px; border-radius: 20px;
-    background: var(--card); display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
-  .hc-title { flex: 1; font-size: 17px; font-weight: 600; color: var(--ink); text-align: center; }
-  .hc-spacer { width: 40px; }
-  .hc-form { padding: 20px; overflow-y: auto; flex: 1; }
-  .hc-card {
-    background: var(--card);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .hc-label { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
-  .hc-input {
-    width: 100%; height: 48px;
-    border: 1px solid var(--border);
-    border-radius: 12px; padding: 0 14px;
-    font-size: 15px; color: var(--ink);
-    background: var(--input);
-    margin-bottom: 20px; outline: none;
-  }
-  .hc-input:focus { border-color: var(--primary); }
-  .hc-input::placeholder { color: var(--placeholder); }
-  .hc-hint {
-    background: var(--soft-bg);
-    border-radius: 10px; padding: 12px;
-    font-size: 13px; color: var(--muted); line-height: 1.6;
-  }
-  .hc-connect-btn {
-    width: 100%; height: 50px;
-    border-radius: 14px; background: var(--primary);
-    color: var(--on-primary); font-size: 16px; font-weight: 700;
-    border: none; cursor: pointer;
-  }
-  .hc-connect-btn:hover { background: var(--primary-active); }
-  .hc-disconnect-btn {
-    width: 100%; height: 50px; margin-top: 16px;
-    border-radius: 14px;
-    border: 1px solid var(--error-bg);
-    background: transparent; color: var(--error);
-    font-size: 15px; font-weight: 600; cursor: pointer;
+  .st-logout {
+    margin-top: 8px;
   }
 
   ::-webkit-scrollbar { width: 0; }
@@ -317,33 +332,34 @@
 </head>
 <body>
 
-<h1>Mira Mobile — Light Theme</h1>
-<p class="subtitle">纯白画布 · 珊瑚陶土主色 · tomz.io 风格</p>
+<h1 class="page-title">Mira Mobile</h1>
+<p class="page-subtitle">珊瑚陶土 · 无气泡对话 · Claude/OpenAI 风格</p>
 
 <!-- ===== SessionList ===== -->
 <div class="phone">
-  <div class="phone-title">会话列表 — SessionListScreen</div>
+  <div class="phone-tag">会话列表 — SessionListScreen</div>
   <div class="notch"></div>
   <div class="safe-area">
     <div class="sl-header">
       <div class="sl-icon-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </div>
       <div class="sl-header-center">
-        <div class="sl-header-title">Mira</div>
-        <div class="sl-status-dot"></div>
+        <span class="sl-header-title">Mira</span>
+        <span class="sl-status-dot"></span>
       </div>
       <div class="sl-icon-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
     </div>
+
     <div class="sl-list">
       <div class="sl-item">
         <div class="sl-avatar">通</div>
         <div class="sl-content">
           <div class="sl-top-row">
-            <div class="sl-title">通用助手</div>
-            <div class="sl-time">5分钟前</div>
+            <span class="sl-title">通用助手</span>
+            <span class="sl-time">5分钟前</span>
           </div>
           <div class="sl-preview">点击开始聊天...</div>
         </div>
@@ -353,8 +369,8 @@
         <div class="sl-avatar">代</div>
         <div class="sl-content">
           <div class="sl-top-row">
-            <div class="sl-title">代码审查</div>
-            <div class="sl-time">2小时前</div>
+            <span class="sl-title">代码审查</span>
+            <span class="sl-time">2小时前</span>
           </div>
           <div class="sl-preview">点击开始聊天...</div>
         </div>
@@ -364,8 +380,8 @@
         <div class="sl-avatar">前</div>
         <div class="sl-content">
           <div class="sl-top-row">
-            <div class="sl-title">前端架构讨论</div>
-            <div class="sl-time">1天前</div>
+            <span class="sl-title">前端架构讨论</span>
+            <span class="sl-time">1天前</span>
           </div>
           <div class="sl-preview">点击开始聊天...</div>
         </div>
@@ -375,242 +391,89 @@
         <div class="sl-avatar">项</div>
         <div class="sl-content">
           <div class="sl-top-row">
-            <div class="sl-title">项目规划</div>
-            <div class="sl-time">3天前</div>
+            <span class="sl-title">项目规划</span>
+            <span class="sl-time">3天前</span>
+          </div>
+          <div class="sl-preview">点击开始聊天...</div>
+        </div>
+      </div>
+      <div class="sl-separator"></div>
+      <div class="sl-item">
+        <div class="sl-avatar">深</div>
+        <div class="sl-content">
+          <div class="sl-top-row">
+            <span class="sl-title">深度学习优化</span>
+            <span class="sl-time">5天前</span>
           </div>
           <div class="sl-preview">点击开始聊天...</div>
         </div>
       </div>
     </div>
+
     <div class="sl-fab">+</div>
   </div>
 </div>
 
-<!-- ===== Settings (top part) ===== -->
+<!-- ===== Chat (bubble-less, Claude/OpenAI style) ===== -->
 <div class="phone">
-  <div class="phone-title">设置（上）— SettingsScreen</div>
+  <div class="phone-tag">对话 — ChatScreen（无气泡）</div>
   <div class="notch"></div>
   <div class="safe-area">
-    <div class="st-header">
-      <div class="st-back">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <!-- Minimal header -->
+    <div style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border-soft)">
+      <div style="width:36px;height:36px;border-radius:18px;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </div>
+      <div style="flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-0.1px">通用助手</div>
+      <div style="width:36px"></div>
+    </div>
+
+    <div class="chat-scroll">
+      <!-- User message — no bubble, just background -->
+      <div class="msg-row msg-user">
+        你好，帮我写一段 React Native 的 FlatList 示例
+      </div>
+
+      <!-- Assistant message — plain text, no background -->
+      <div class="msg-row msg-assistant">
+        <p>好的，这是一个简单的 FlatList 示例：</p>
+        <pre>import React from 'react';
+import { FlatList, View, Text } from 'react-native';
+
+const items = [
+  { id: '1', title: 'Item 1' },
+  { id: '2', title: 'Item 2' },
+  { id: '3', title: 'Item 3' },
+];
+
+export function MyList() {
+  return (
+    &lt;FlatList
+      data={items}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+        &lt;View>
+          &lt;Text>{item.title}&lt;/Text>
+        &lt;/View>
+      )}
+    /&gt;
+  );
+}</pre>
+        <p>需要更复杂的功能比如下拉刷新、上拉加载吗？</p>
+      </div>
+
+      <!-- Another user message -->
+      <div class="msg-row msg-user">
+        够了，谢谢！
+      </div>
+
+      <!-- Assistant response -->
+      <div class="msg-row msg-assistant">
+        <p>不客气！如果有其他问题随时来问。</p>
       </div>
     </div>
-    <div class="st-scroll">
-      <!-- Profile -->
-      <div class="st-profile">
-        <div class="st-avatar-wrap">
-          <div class="st-avatar">JD</div>
-          <div class="st-avatar-edit">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </div>
-        </div>
-        <div class="st-name">Jingtao Dang</div>
-      </div>
 
-      <!-- 我的 Mira -->
-      <div class="st-section-header">我的 Mira</div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">个性化</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-      </div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">记忆</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">插件</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-
-      <!-- 账户 -->
-      <div class="st-section-header">账户</div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">工作空间</div><div class="st-row-subtitle">个人</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">升级至 Pro</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">订阅</div><div class="st-row-subtitle">Plus</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">家长控制</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">电子邮件</div><div class="st-row-subtitle">dangjingtao@gmail.com</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">电话号码</div><div class="st-row-subtitle">+37060862989</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-
-      <!-- 外观 -->
-      <div class="st-section-header">外观</div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">重点色</div><div class="st-row-subtitle">默认</div></div>
-          <div class="st-row-right"><div class="st-accent-dot"></div><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">外观 (浅色)</div></div>
-          <div class="st-row-right"><div class="switch"><div class="switch-thumb"></div></div></div>
-        </div>
-      </div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">设备同步</div><div class="st-row-subtitle">所有设备</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-
-      <!-- 主机 -->
-      <div class="st-section-header">主机</div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">Mira Host 配置</div><div class="st-row-subtitle">管理主机连接</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-
-      <!-- 通用 -->
-      <div class="st-section-header">通用</div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">常规</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">通知</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">语音</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">安全</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">安全与登录</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">远程控制</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">云浏览器</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">存储</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">数据控制</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2"/><path d="M5 7l3 2"/><path d="M19 13h-3"/><path d="M5 13h3"/><path d="M19 19l-3-2"/><path d="M5 19l3-2"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">报告错误</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-          <div class="st-separator"></div>
-        </div>
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title">关于</div></div>
-          <div class="st-row-right"><svg class="st-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
-        </div>
-      </div>
-
-      <!-- 退出登录 -->
-      <div style="height:8px"></div>
-      <div class="st-group">
-        <div class="st-row">
-          <div class="st-row-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
-          <div class="st-row-content"><div class="st-row-title st-destructive">退出登录</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== Chat ===== -->
-<div class="phone">
-  <div class="phone-title">聊天 — ChatScreen</div>
-  <div class="notch"></div>
-  <div class="safe-area">
-    <div class="chat-header">
-      <div class="chat-back">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-      </div>
-      <div class="chat-title">通用助手</div>
-      <div class="chat-spacer"></div>
-    </div>
-    <div class="chat-messages">
-      <div class="msg-row msg-row-right">
-        <div class="bubble bubble-user">你好，帮我写一段 React Native 的 FlatList 示例</div>
-      </div>
-      <div class="msg-row msg-row-left">
-        <div class="bubble bubble-assistant">好的，这是一个简单的 FlatList 示例：<br><br>&lt;FlatList<br>&nbsp;&nbsp;data={items}<br>&nbsp;&nbsp;keyExtractor={(item) =&gt; item.id}<br>&nbsp;&nbsp;renderItem={({ item }) =&gt; (&lt;View&gt;&lt;Text&gt;{item.title}&lt;/Text&gt;&lt;/View&gt;)}<br>/&gt;<br><br>需要更复杂的功能吗？</div>
-      </div>
-      <div class="msg-row msg-row-right">
-        <div class="bubble bubble-user">够了，谢谢！</div>
-      </div>
-    </div>
+    <!-- Input bar -->
     <div class="chat-input-bar">
       <input class="chat-input" placeholder="输入消息..." />
       <button class="chat-send">发送</button>
@@ -618,28 +481,131 @@
   </div>
 </div>
 
-<!-- ===== HostConfig ===== -->
+<!-- ===== Settings ===== -->
 <div class="phone">
-  <div class="phone-title">主机配置 — HostConfigScreen</div>
+  <div class="phone-tag">设置 — SettingsScreen</div>
   <div class="notch"></div>
   <div class="safe-area">
-    <div class="hc-header">
-      <div class="hc-back">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <!-- Header with back -->
+    <div style="display:flex;align-items:center;padding:8px 12px">
+      <div style="width:36px;height:36px;border-radius:18px;background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#141413" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
       </div>
-      <div class="hc-title">主机配置</div>
-      <div class="hc-spacer"></div>
+      <div style="flex:1"></div>
     </div>
-    <div class="hc-form">
-      <div class="hc-card">
-        <div class="hc-label">主机地址</div>
-        <input class="hc-input" value="http://100.64.0.1:8080" readonly />
-        <div class="hc-label">Token / 密码</div>
-        <input class="hc-input" type="password" value="sk-xxxxxxxxxxxx" readonly />
-        <div class="hc-hint">💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。</div>
+
+    <div class="st-scroll">
+      <!-- Profile -->
+      <div class="st-profile">
+        <div class="st-avatar-wrap">
+          <div class="st-avatar">JD</div>
+        </div>
+        <div class="st-name">Jingtao Dang</div>
       </div>
-      <button class="hc-connect-btn">连接主机</button>
-      <button class="hc-disconnect-btn">断开连接并清除配置</button>
+
+      <!-- 我的 Mira -->
+      <div class="st-section">我的 Mira</div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>
+          <div class="st-content"><div class="st-title">个性化</div></div>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+          <div class="st-content"><div class="st-title">记忆</div></div>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+          <div class="st-content"><div class="st-title">插件</div></div>
+        </div>
+      </div>
+
+      <!-- 账户 -->
+      <div class="st-section">账户</div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+          <div class="st-content"><div class="st-title">工作空间</div><div class="st-sub">个人</div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+          <div class="st-content"><div class="st-title">升级至 Pro</div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+          <div class="st-content"><div class="st-title">订阅</div><div class="st-sub">Plus</div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="st-content"><div class="st-title">家长控制</div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+          <div class="st-content"><div class="st-title">电子邮件</div><div class="st-sub">dangjingtao@gmail.com</div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+          <div class="st-content"><div class="st-title">电话号码</div><div class="st-sub">+37060862989</div></div>
+        </div>
+      </div>
+
+      <!-- 外观 -->
+      <div class="st-section">外观</div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
+          <div class="st-content"><div class="st-title">重点色</div><div class="st-sub">默认</div></div>
+          <div class="st-right"><div style="width:18px;height:18px;border-radius:9px;background:#8e8b82"></div></div>
+        </div>
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></div>
+          <div class="st-content"><div class="st-title">外观</div><div class="st-sub">浅色</div></div>
+          <div class="st-right"><div style="width:51px;height:31px;border-radius:16px;background:var(--primary);position:relative"><div style="position:absolute;top:2px;right:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,0.2)"></div></div></div>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+          <div class="st-content"><div class="st-title">设备同步</div><div class="st-sub">所有设备</div></div>
+        </div>
+      </div>
+
+      <!-- 主机 -->
+      <div class="st-section">主机</div>
+      <div class="st-group">
+        <div class="st-row">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+          <div class="st-content"><div class="st-title">Mira Host 配置</div><div class="st-sub">管理主机连接</div></div>
+        </div>
+      </div>
+
+      <!-- 通用 -->
+      <div class="st-section">通用</div>
+      <div class="st-group">
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><div class="st-content"><div class="st-title">常规</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><div class="st-content"><div class="st-title">通知</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></div><div class="st-content"><div class="st-title">语音</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="st-content"><div class="st-title">安全</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div><div class="st-content"><div class="st-title">安全与登录</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div><div class="st-content"><div class="st-title">远程控制</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><div class="st-content"><div class="st-title">云浏览器</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></div><div class="st-content"><div class="st-title">存储</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div><div class="st-content"><div class="st-title">数据控制</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2"/><path d="M5 7l3 2"/><path d="M19 13h-3"/><path d="M5 13h3"/><path d="M19 19l-3-2"/><path d="M5 19l3-2"/></svg></div><div class="st-content"><div class="st-title">报告错误</div></div></div>
+        <div class="st-row"><div class="st-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div><div class="st-content"><div class="st-title">关于</div></div></div>
+      </div>
+
+      <!-- 退出登录 -->
+      <div class="st-group st-logout">
+        <div class="st-row st-destructive">
+          <div class="st-icon"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+          <div class="st-content"><div class="st-title">退出登录</div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
