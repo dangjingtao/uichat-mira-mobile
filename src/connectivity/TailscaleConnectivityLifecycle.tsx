@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useHostStore } from '../store/hostStore';
 import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
+import { subscribeToSystemNetworkChanges } from './systemNetworkMonitor';
 
 /**
  * Keeps the observable Mobile -> Tailscale -> Mira Host transport state fresh.
@@ -15,6 +16,7 @@ export function TailscaleConnectivityLifecycle() {
   const connectivityState = useTailscaleConnectivityStore((state) => state.state);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const lastConfiguredHost = useRef('');
+  const networkRecoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const target = configuredHostUrl.trim();
@@ -48,6 +50,31 @@ export function TailscaleConnectivityLifecycle() {
     });
 
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToSystemNetworkChanges(() => {
+      if (networkRecoveryTimer.current) {
+        clearTimeout(networkRecoveryTimer.current);
+      }
+
+      // VPN, Wi-Fi and cellular transitions often emit several callbacks.
+      // Debounce them into one transport verification against the actual Host.
+      networkRecoveryTimer.current = setTimeout(() => {
+        const store = useTailscaleConnectivityStore.getState();
+        const target = store.hostUrl.trim();
+        if (!target || store.state === 'probing') return;
+        void store.probe(target, 'network-recovery');
+      }, 900);
+    });
+
+    return () => {
+      unsubscribe();
+      if (networkRecoveryTimer.current) {
+        clearTimeout(networkRecoveryTimer.current);
+        networkRecoveryTimer.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
