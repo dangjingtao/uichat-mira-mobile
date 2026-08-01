@@ -38,33 +38,33 @@ export interface ThemeColors {
   divider: string;
 }
 
-// ─── Light Theme — Clean White (ChatGPT style) ───
+// ─── Light Theme — Mira warm canvas ───
 export const lightColors: ThemeColors = {
-  primary: '#3B82F6',
-  primaryActive: '#2563EB',
-  primaryDisabled: '#E5E7EB',
+  primary: designColors.primary,
+  primaryActive: designColors.primaryActive,
+  primaryDisabled: designColors.primaryDisabled,
 
   text: {
-    ink: '#111111',
-    base: '#333333',
-    strong: '#1A1A1C',
-    muted: '#666666',
-    soft: '#888888',
-    placeholder: '#999999',
+    ink: designColors.text.ink,
+    base: designColors.text.base,
+    strong: designColors.text.strong,
+    muted: designColors.text.muted,
+    soft: designColors.text.soft,
+    placeholder: designColors.text.placeholder,
   },
 
   bg: {
-    canvas: '#FFFFFF',
-    card: '#F5F5F7',
-    soft: '#F7F7F8',
-    input: '#F5F5F7',
-    bubble: '#F2F2F4',
-    elevated: '#FFFFFF',
+    canvas: designColors.bg.canvas,
+    card: designColors.bg.card,
+    soft: designColors.bg.soft,
+    input: designColors.bg.input,
+    bubble: designColors.bg.bubble,
+    elevated: designColors.bg.card,
   },
 
   border: {
-    default: '#E0E0E0',
-    soft: '#E8E8E8',
+    default: designColors.border.default,
+    soft: designColors.border.soft,
   },
 
   status: {
@@ -74,9 +74,9 @@ export const lightColors: ThemeColors = {
     errorBg: '#FEE2E2',
   },
 
-  onPrimary: '#FFFFFF',
+  onPrimary: designColors.onPrimary,
   overlay: 'rgba(0,0,0,0.4)',
-  divider: '#E8E8E8',
+  divider: designColors.border.soft,
 };
 
 // ─── Dark Theme (ChatGPT style) ───
@@ -119,3 +119,4 @@ export const darkColors: ThemeColors = {
   overlay: 'rgba(0,0,0,0.6)',
   divider: '#2C2C2E',
 };
+import { colors as designColors } from './tokens';

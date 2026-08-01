@@ -14,11 +14,11 @@
 // ─── Brand & Text ──────────────────────────────────────────
 export const colors = {
   /** 唯一品牌强调色 — 按钮 / CTA / 徽标 */
-  primary: '#cc785c',
+  primary: '#c96442',
   /** 按钮按下态 */
-  primaryActive: '#a9583e',
+  primaryActive: '#a95034',
   /** 禁用态背景 */
-  primaryDisabled: '#e6dfd8',
+  primaryDisabled: '#e8e6dc',
 
   // Text color ramp — hierarchy through light/dark, not hue
   text: {
@@ -29,35 +29,35 @@ export const colors = {
     /** 加粗正文 / 强调句 */
     strong: '#252523',
     /** 次要文字 */
-    muted: '#6c6a64',
+    muted: '#5e5d59',
     /** 占位符 / 三级文字 */
-    soft: '#8e8b82',
+    soft: '#87867f',
     /** deprecated alias — maps to muted */
-    secondary: '#6c6a64',
+    secondary: '#5e5d59',
     /** deprecated alias — maps to soft */
-    tertiary: '#8e8b82',
-    placeholder: '#8e8b82',
+    tertiary: '#87867f',
+    placeholder: '#87867f',
   },
 
   // ─── Light Surfaces ─────────────────────────────────────
   // 画布必须是带暖调的米白色
   bg: {
     /** 页面主底色 — 暖调米白 */
-    canvas: '#faf9f5',
+    canvas: '#f5f4ed',
     /** alias for canvas (backwards compat) */
-    base: '#faf9f5',
+    base: '#f5f4ed',
     /** 轻微区隔的分区底色 */
-    soft: '#f5f0e8',
+    soft: '#e8e6dc',
     /** 卡片背景（比画布更深一级） */
-    card: '#efe9de',
+    card: '#faf9f5',
     /** 强调型米色区块 */
-    creamStrong: '#e8e0d2',
+    creamStrong: '#e8e6dc',
     /** 输入框底色 */
-    input: '#f5f0e8',
+    input: '#faf9f5',
     /** AI 消息气泡 */
-    bubble: '#efe9de',
+    bubble: '#e8e6dc',
     /** deprecated alias */
-    subtle: '#f5f0e8',
+    subtle: '#e8e6dc',
   },
 
   // ─── Dark Surfaces ──────────────────────────────────────
@@ -76,16 +76,16 @@ export const colors = {
   },
 
   /** 珊瑚色按钮上的文字 */
-  onPrimary: '#ffffff',
+  onPrimary: '#faf9f5',
 
   // ─── Borders ────────────────────────────────────────────
   border: {
     /** 卡片细边框 */
-    default: '#e6dfd8',
+    default: '#e8e6dc',
     /** 更轻的分隔线 */
-    soft: '#ebe6df',
+    soft: '#f0eee6',
     /** deprecated alias */
-    light: '#ebe6df',
+    light: '#f0eee6',
   },
 
   // ─── Accents & Status ───────────────────────────────────
@@ -108,21 +108,21 @@ export const colors = {
   },
 
   // ─── Deprecated aliases (backwards compat) ─────────────
-  primaryDark: '#a9583e',
+  primaryDark: '#a95034',
   success: '#5db872',
   warning: '#d4a017',
   danger: '#c64545',
   dangerLight: '#e8a55a',
-  muted: '#6c6a64',
+  muted: '#5e5d59',
 
   hint: {
-    bg: '#f5f0e8',
-    text: '#a9583e',
+    bg: '#e8e6dc',
+    text: '#a95034',
   },
 
   banner: {
-    bg: '#e8e0d2',
-    text: '#6c6a64',
+    bg: '#e8e6dc',
+    text: '#5e5d59',
   },
 } as const;
 
@@ -143,18 +143,18 @@ export const radius = {
 // ─── Spacing ───────────────────────────────────────────────
 // 遵循设计系统的间距代币
 export const spacing = {
-  /** 8px — 徽标 / 标签内边距 */
-  xs: 8,
-  /** 16px — 组件内部小间距 */
-  sm: 16,
-  /** 24px — 卡片间距 */
-  md: 24,
-  /** 32px — 卡片内边距 */
-  lg: 32,
-  /** 48px — 板块内左右留白 */
-  xl: 48,
-  /** 96px — 主要板块之间的垂直间距 */
-  section: 96,
+  /** 4px — 图标与文字的紧凑间距 */
+  xs: 4,
+  /** 8px — 控件内部间距 */
+  sm: 8,
+  /** 12px — 标准组件间距 */
+  md: 12,
+  /** 16px — 页面与消息间距 */
+  lg: 16,
+  /** 24px — 大模块间距 */
+  xl: 24,
+  /** 32px — 页面分区间距 */
+  section: 32,
 } as const;
 
 // ─── Typography ────────────────────────────────────────────
@@ -219,7 +219,7 @@ export const sizing = {
   /** 按钮统一高度 */
   buttonHeight: 40,
   /** 圆形图标按钮 */
-  iconButton: 36,
+  iconButton: 44,
   /** 最小触控区域 */
   touchTarget: 44,
 } as const;
@@ -231,10 +231,17 @@ export const sizing = {
 export const shadows = {
   // FAB 保留极轻阴影作为浮动元素的最小深度提示
   fab: {
-    shadowColor: '#cc785c',
+    shadowColor: '#c96442',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 3,
+  },
+  composer: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
   },
 } as const;

@@ -13,7 +13,7 @@ const response = (status: number, body: unknown) =>
 describe('probeTailscaleMiraHost', () => {
   it('verifies health and Mira identity over the supplied tailnet URL', async () => {
     const fetchImpl = jest
-      .fn<typeof fetch>()
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValueOnce(response(200, { ok: true }))
       .mockResolvedValueOnce(
         response(200, {
@@ -52,7 +52,7 @@ describe('probeTailscaleMiraHost', () => {
 
   it('does not treat an arbitrary reachable service as Mira Host', async () => {
     const fetchImpl = jest
-      .fn<typeof fetch>()
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
       .mockResolvedValueOnce(response(200, { ok: true }))
       .mockResolvedValueOnce(
         response(200, {
@@ -73,9 +73,11 @@ describe('probeTailscaleMiraHost', () => {
   });
 
   it('classifies timeout separately from invalid host input', async () => {
-    const timeoutFetch = jest.fn<typeof fetch>().mockRejectedValue(
-      Object.assign(new Error('Aborted'), { name: 'AbortError' }),
-    );
+    const timeoutFetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockRejectedValue(
+        Object.assign(new Error('Aborted'), { name: 'AbortError' }),
+      );
 
     const timeout = await probeTailscaleMiraHost(
       'https://mira-host.example.ts.net',
@@ -89,7 +91,10 @@ describe('probeTailscaleMiraHost', () => {
   });
 
   it('rejects host urls that smuggle an application path or query', async () => {
-    const fetchImpl = jest.fn<typeof fetch>();
+    const fetchImpl = jest.fn<
+      ReturnType<typeof fetch>,
+      Parameters<typeof fetch>
+    >();
 
     const withPath = await probeTailscaleMiraHost(
       'https://mira-host.example.ts.net/not-the-host-root',
