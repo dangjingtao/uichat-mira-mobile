@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  type LinkingOptions,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionListScreen } from './src/screens/SessionListScreen';
@@ -12,6 +15,15 @@ import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConn
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['mira://'],
+  config: {
+    screens: {
+      HostConfig: 'pair',
+    },
+  },
+};
 
 function StatusBarThemed() {
   const { theme, colors } = useTheme();
@@ -40,7 +52,7 @@ function App() {
   return (
     <ThemeProvider>
       <SafeAreaProvider>
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
           <StatusBarThemed />
           <AppInner />
         </NavigationContainer>
