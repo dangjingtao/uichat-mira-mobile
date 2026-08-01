@@ -1,26 +1,23 @@
 /**
  * Mira Mobile Design Tokens
  *
- * Based on the Mira design system (Claude/Anthropic visual language).
- * Reference: https://tomz.io/design-md/视觉/product-design-system
- *
- * Core principles:
- * - Single brand accent: coral clay (#cc785c), used sparingly.
- * - Warm-toned cream canvas, never pure white or cold gray.
- * - Hierarchy through surface color contrast, not shadows.
- * - Serif display fonts with negative letter-spacing.
+ * Claude + OpenAI inspired design language.
+ * - Clean, minimal, document-like chat (no bubbles)
+ * - Coral clay (#cc785c) as single brand accent
+ * - Comfortable typography with generous line-height
+ * - Hierarchy through spacing and color contrast
  */
 
 // ─── Brand & Text ──────────────────────────────────────────
 export const colors = {
-  /** 唯一品牌强调色 — 按钮 / CTA / 徽标 */
+  /** 唯一品牌强调色 — 按钮 / CTA */
   primary: '#cc785c',
   /** 按钮按下态 */
   primaryActive: '#a9583e',
   /** 禁用态背景 */
   primaryDisabled: '#e6dfd8',
 
-  // Text color ramp — hierarchy through light/dark, not hue
+  // Text color ramp
   text: {
     /** 标题 / 高对比正文 */
     ink: '#141413',
@@ -32,31 +29,25 @@ export const colors = {
     muted: '#6c6a64',
     /** 占位符 / 三级文字 */
     soft: '#8e8b82',
-    /** deprecated alias — maps to muted */
     secondary: '#6c6a64',
-    /** deprecated alias — maps to soft */
     tertiary: '#8e8b82',
     placeholder: '#8e8b82',
   },
 
-  // ─── Light Surfaces ─────────────────────────────────────
-  // 画布必须是带暖调的米白色
+  // ─── Surfaces ──────────────────────────────────────────
   bg: {
-    /** 页面主底色 — 暖调米白 */
+    /** 页面主底色 */
     canvas: '#faf9f5',
-    /** alias for canvas (backwards compat) */
     base: '#faf9f5',
-    /** 轻微区隔的分区底色 */
+    /** 用户消息底色 */
+    userMsg: '#f0eeeb',
+    /** 分区底色 */
     soft: '#f5f0e8',
-    /** 卡片背景（比画布更深一级） */
+    /** 卡片背景 */
     card: '#efe9de',
-    /** 强调型米色区块 */
     creamStrong: '#e8e0d2',
     /** 输入框底色 */
     input: '#f5f0e8',
-    /** AI 消息气泡 */
-    bubble: '#efe9de',
-    /** deprecated alias */
     subtle: '#f5f0e8',
   },
 
@@ -141,44 +132,51 @@ export const radius = {
 } as const;
 
 // ─── Spacing ───────────────────────────────────────────────
-// 遵循设计系统的间距代币
+// Claude/OpenAI 风格：宽松间距，呼吸感
 export const spacing = {
-  /** 8px — 徽标 / 标签内边距 */
+  /** 4px — 微间距 */
+  xxs: 4,
+  /** 8px — 内边距 */
   xs: 8,
-  /** 16px — 组件内部小间距 */
-  sm: 16,
-  /** 24px — 卡片间距 */
-  md: 24,
+  /** 12px — 紧凑间距 */
+  sm: 12,
+  /** 16px — 组件间距 */
+  md: 16,
+  /** 20px — 段间距 */
+  lg: 20,
+  /** 24px — 消息间距 */
+  xl: 24,
   /** 32px — 卡片内边距 */
-  lg: 32,
-  /** 48px — 板块内左右留白 */
-  xl: 48,
-  /** 96px — 主要板块之间的垂直间距 */
+  '2xl': 32,
+  /** 48px — 板块间距 */
+  '3xl': 48,
+  /** 96px — 主要板块垂直间距 */
   section: 96,
 } as const;
 
 // ─── Typography ────────────────────────────────────────────
+// Claude/OpenAI 风格：舒适行距、克制字距、清晰层级
 export const fontSize = {
-  /** 展示级 — 64px */
-  displayLg: 64,
-  /** 区块标题 — 40px */
-  displaySm: 40,
-  /** 卡片大标题 — 28px */
-  titleXl: 28,
+  /** 展示级 — 40px */
+  displayLg: 40,
+  /** 区块标题 — 28px */
+  displaySm: 28,
+  /** 卡片大标题 — 24px */
+  titleXl: 24,
   /** 卡片标题 — 20px */
   titleLg: 20,
   /** 组件标题 — 17px */
   titleMd: 17,
-  /** 正文段落 — 16px */
-  bodyMd: 16,
-  /** 导航链接 / 按钮文字 — 14px */
+  /** 正文段落 — 15px */
+  bodyMd: 15,
+  /** 小号正文 — 14px */
+  bodySm: 14,
+  /** 按钮文字 — 14px */
   button: 14,
   /** 小号标签 — 13px */
   caption: 13,
-  /** 大写标签 — 12px */
-  captionUppercase: 12,
-  /** 代码块 — 13px */
-  code: 13,
+  /** 代码块 — 14px */
+  code: 14,
 
   // Backwards-compatible aliases
   xs: 12,
@@ -193,23 +191,27 @@ export const fontSize = {
 } as const;
 
 export const lineHeight = {
-  /** 正文段落行高 */
-  body: 1.6,
+  /** 正文段落 — 舒适阅读 */
+  body: 1.7,
   /** 标题行高 */
-  title: 1.3,
-  /** 紧凑行高 */
-  tight: 1.2,
+  title: 1.4,
+  /** 紧凑行高（代码块、标签） */
+  tight: 1.3,
+  /** 展示级 — 宽松 */
+  display: 1.2,
 } as const;
 
 export const letterSpacing = {
-  /** display-lg */
-  displayLg: -1.5,
-  /** display-sm */
-  displaySm: -1,
-  /** title-xl */
-  titleXl: -0.3,
+  /** 展示级 */
+  display: -0.5,
+  /** 大标题 */
+  title: -0.2,
+  /** 正文 */
+  body: 0,
+  /** 小号文字 */
+  small: 0.2,
   /** 大写标签 */
-  captionUppercase: 1.5,
+  uppercase: 1.0,
   /** 默认 */
   default: 0,
 } as const;

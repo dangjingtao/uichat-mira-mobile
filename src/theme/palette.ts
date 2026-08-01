@@ -17,7 +17,7 @@ export interface ThemeColors {
     card: string;
     soft: string;
     input: string;
-    bubble: string;
+    userMsg: string;
     elevated: string;
   };
 
@@ -38,84 +38,84 @@ export interface ThemeColors {
   divider: string;
 }
 
-// ─── Light Theme — Clean White (ChatGPT style) ───
+// ─── Light Theme — Clean White (tomz.io coral clay accent) ───
 export const lightColors: ThemeColors = {
-  primary: '#3B82F6',
-  primaryActive: '#2563EB',
-  primaryDisabled: '#E5E7EB',
+  primary: '#cc785c',
+  primaryActive: '#a9583e',
+  primaryDisabled: '#e6dfd8',
 
   text: {
-    ink: '#111111',
-    base: '#333333',
-    strong: '#1A1A1C',
-    muted: '#666666',
-    soft: '#888888',
-    placeholder: '#999999',
+    ink: '#141413',
+    base: '#3d3d3a',
+    strong: '#252523',
+    muted: '#6c6a64',
+    soft: '#8e8b82',
+    placeholder: '#8e8b82',
   },
 
   bg: {
-    canvas: '#FFFFFF',
-    card: '#F5F5F7',
-    soft: '#F7F7F8',
-    input: '#F5F5F7',
-    bubble: '#F2F2F4',
+    canvas: '#faf9f5',
+    card: '#efe9de',
+    soft: '#f5f0e8',
+    input: '#f5f0e8',
+    userMsg: '#efe9de',
     elevated: '#FFFFFF',
   },
 
   border: {
-    default: '#E0E0E0',
-    soft: '#E8E8E8',
+    default: '#e6dfd8',
+    soft: '#ebe6df',
   },
 
   status: {
-    success: '#22C55E',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    errorBg: '#FEE2E2',
+    success: '#5db872',
+    warning: '#d4a017',
+    error: '#c64545',
+    errorBg: '#fce8e8',
   },
 
   onPrimary: '#FFFFFF',
   overlay: 'rgba(0,0,0,0.4)',
-  divider: '#E8E8E8',
+  divider: '#ebe6df',
 };
 
-// ─── Dark Theme (ChatGPT style) ───
+// ─── Dark Theme (tomz.io coral clay accent) ───
 export const darkColors: ThemeColors = {
-  primary: '#60A5FA',
-  primaryActive: '#3B82F6',
-  primaryDisabled: '#374151',
+  primary: '#e8a07a',
+  primaryActive: '#cc785c',
+  primaryDisabled: '#3d3d3a',
 
   text: {
-    ink: '#F5F5F7',
-    base: '#E5E5EA',
+    ink: '#faf9f5',
+    base: '#e5e5ea',
     strong: '#FFFFFF',
-    muted: '#9CA3AF',
+    muted: '#a09d96',
     soft: '#636366',
     placeholder: '#636366',
   },
 
   bg: {
-    canvas: '#0F0F10',
-    card: '#1C1C1E',
-    soft: '#1C1C1E',
-    input: '#1C1C1E',
-    bubble: '#2C2C2E',
-    elevated: '#1C1C1E',
+    canvas: '#181715',
+    card: '#252320',
+    soft: '#1f1e1b',
+    input: '#1f1e1b',
+    userMsg: '#252320',
+    elevated: '#252320',
   },
 
   border: {
     default: '#2C2C2E',
-    soft: '#1C1C1E',
+    soft: '#1f1e1b',
   },
 
   status: {
-    success: '#34D399',
-    warning: '#FBBF24',
-    error: '#F87171',
-    errorBg: '#450A0A',
+    success: '#5db872',
+    warning: '#d4a017',
+    error: '#c64545',
+    errorBg: '#3d1a1a',
   },
 
-  onPrimary: '#0F0F10',
+  onPrimary: '#1A1A1C',
   overlay: 'rgba(0,0,0,0.6)',
   divider: '#2C2C2E',
 };

@@ -116,7 +116,7 @@ export function ChatScreen() {
             <View
               style={[
                 styles.bubble,
-                { backgroundColor: isUser ? colors.primary : colors.bg.bubble },
+                { backgroundColor: isUser ? colors.primary : colors.bg.soft },
                 isUser && { borderBottomRightRadius: 4 },
                 !isUser && { borderBottomLeftRadius: 4 },
                 isFailed && { backgroundColor: colors.status.errorBg },
@@ -152,7 +152,7 @@ export function ChatScreen() {
     if (!streamingText && !isLoading) return null;
     return (
       <View style={[styles.messageRow, styles.messageRowLeft]}>
-        <View style={[styles.bubble, { backgroundColor: colors.bg.bubble, borderBottomLeftRadius: 4 }]}>
+        <View style={[styles.bubble, { backgroundColor: colors.bg.soft, borderBottomLeftRadius: 4 }]}>
           <Text style={[styles.bubbleText, { color: colors.text.ink }]}>
             {streamingText || ''}
             {isLoading && !streamingText && (
