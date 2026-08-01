@@ -37,6 +37,8 @@ import {
   parsePairingUri,
   type PairingDescriptor,
 } from '../protocol/remoteHostV1';
+import { remoteMiraHostClient } from '../api/remoteMiraHost';
+import { useRemotePairing } from '../pairing/useRemotePairing';
 import { useTheme } from '../theme/ThemeContext';
 
 const connectivityTitle = (state: TailscaleConnectivityState) => {
@@ -90,6 +92,16 @@ export function HostConfigScreen() {
   const routeChallenge = route.params?.challenge;
   const routeCode = route.params?.code;
 
+  const isProbing = connectivityState === 'probing';
+  const isReady =
+    connectivityState === 'ready' && connectivityResult?.hostUrl != null;
+  const {
+    state: pairingState,
+    start: startPairing,
+    reset: resetPairing,
+    secureStorageAvailable,
+  } = useRemotePairing(pairingDescriptor, isReady);
+
   useEffect(() => {
     if (config?.hostUrl) {
       setConnectivityHostUrl(config.hostUrl);
@@ -129,9 +141,20 @@ export function HostConfigScreen() {
     setConnectivityHostUrl,
   ]);
 
-  const isProbing = connectivityState === 'probing';
-  const isReady =
-    connectivityState === 'ready' && connectivityResult?.hostUrl != null;
+  useEffect(() => {
+    if (pairingState.phase !== 'paired' || !connectivityResult?.hostUrl) return;
+    setConfig({
+      hostUrl: connectivityResult.hostUrl,
+      token: '',
+    });
+    setConnectionStatus('connected');
+  }, [
+    connectivityResult?.hostUrl,
+    pairingState.phase,
+    setConfig,
+    setConnectionStatus,
+  ]);
+
   const statusColor =
     connectivityState === 'ready'
       ? colors.status.success
@@ -149,6 +172,47 @@ export function HostConfigScreen() {
     return tailscaleConnectivityMessage(connectivityState);
   }, [connectivityState]);
 
+  const pairingBusy =
+    pairingState.phase === 'claiming' ||
+    pairingState.phase === 'waiting_approval';
+  const pairingCompleted = pairingState.phase === 'paired';
+  const pairingActionDisabled =
+    !pairingDescriptor ||
+    !isReady ||
+    !secureStorageAvailable ||
+    pairingBusy ||
+    pairingCompleted;
+
+  const pairingTitle = (() => {
+    switch (pairingState.phase) {
+      case 'claiming':
+        return '正在提交设备申请';
+      case 'waiting_approval':
+        return '等待桌面确认';
+      case 'paired':
+        return '设备已配对';
+      case 'rejected':
+        return '桌面已拒绝';
+      case 'expired':
+        return '配对请求已过期';
+      case 'error':
+      case 'blocked':
+        return '设备配对未完成';
+      default:
+        return isReady
+          ? pairingDescriptor
+            ? '联通已通过，可申请桌面批准'
+            : '等待设备配对'
+          : '等待 Tailscale 联通';
+    }
+  })();
+
+  const pairingMessage =
+    pairingState.message ??
+    (!secureStorageAvailable
+      ? '当前构建尚无可用的系统安全存储，因此不会领取一次性设备凭证。'
+      : 'Tailscale 可达不等于获得 Mira 权限。联通验证通过后仍需由桌面明确批准设备和权限。');
+
   const handleCheck = async () => {
     const target = hostUrl.trim();
     setConnectivityHostUrl(target);
@@ -164,9 +228,10 @@ export function HostConfigScreen() {
         });
       }
     } finally {
-      // Transport reachability is not Mira authorization. Do not mark the
-      // application connection as authenticated until pairing succeeds.
-      setConnectionStatus('disconnected');
+      if (pairingState.phase !== 'paired') {
+        // Transport reachability is not Mira authorization.
+        setConnectionStatus('disconnected');
+      }
     }
   };
 
@@ -174,14 +239,18 @@ export function HostConfigScreen() {
     if (!connectivityResult?.hostUrl || connectivityState !== 'ready') return;
     setConfig({
       hostUrl: connectivityResult.hostUrl,
-      token: config?.token ?? '',
+      token: '',
     });
     navigation.goBack();
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    if (secureStorageAvailable) {
+      await remoteMiraHostClient.disconnect();
+    }
     clearConfig();
     resetConnectivity();
+    resetPairing();
     setHostUrl('');
     setPairingDescriptor(null);
     setPairingLinkError(null);
@@ -329,15 +398,45 @@ export function HostConfigScreen() {
               </Text>
             </View>
             <Text style={[styles.authorizationTitle, { color: colors.text.ink }]}>
-              {isReady
-                ? pairingDescriptor
-                  ? '联通已通过，可申请桌面批准'
-                  : '等待设备配对'
-                : '等待 Tailscale 联通'}
+              {pairingTitle}
             </Text>
             <Text style={[styles.authorizationText, { color: colors.text.muted }]}>
-              Tailscale 可达不等于获得 Mira 权限。Mobile 不会在联通验证完成前消耗一次性配对码，也不会把 ACL、DNS 或 TLS 故障伪装成配对失败。
+              {pairingMessage}
             </Text>
+            {pairingState.scopes.length > 0 ? (
+              <Text style={[styles.detailText, { color: colors.text.soft }]}>
+                已批准权限：{pairingState.scopes.join(' · ')}
+              </Text>
+            ) : null}
+
+            {pairingDescriptor ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.pairBtn,
+                  { backgroundColor: colors.primary },
+                  (pairingActionDisabled || pressed) && {
+                    backgroundColor: colors.primaryDisabled,
+                  },
+                ]}
+                onPress={startPairing}
+                disabled={pairingActionDisabled}
+              >
+                {pairingBusy ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : pairingCompleted ? (
+                  <CheckCircle2 size={18} color={colors.onPrimary} />
+                ) : (
+                  <KeyRound size={18} color={colors.onPrimary} />
+                )}
+                <Text style={[styles.pairBtnText, { color: colors.onPrimary }]}>
+                  {pairingState.phase === 'waiting_approval'
+                    ? '等待桌面确认'
+                    : pairingCompleted
+                      ? '设备已配对'
+                      : '提交设备配对申请'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <Pressable
@@ -381,7 +480,7 @@ export function HostConfigScreen() {
               onPress={handleDisconnect}
             >
               <Text style={[styles.disconnectBtnText, { color: colors.status.error }]}>
-                清除主机与联通状态
+                断开并清除设备授权
               </Text>
             </Pressable>
           ) : null}
@@ -451,6 +550,17 @@ const styles = StyleSheet.create({
   hintText: { fontSize: 13, lineHeight: 20 },
   authorizationTitle: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
   authorizationText: { fontSize: 13, lineHeight: 20 },
+  pairBtn: {
+    minHeight: 46,
+    marginTop: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  pairBtnText: { fontSize: 14, fontWeight: '700' },
   checkBtn: {
     height: 50,
     borderRadius: 14,
