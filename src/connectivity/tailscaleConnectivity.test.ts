@@ -87,4 +87,21 @@ describe('probeTailscaleMiraHost', () => {
     expect(invalid.state).toBe('invalid_host');
     expect(tailscaleConnectivityMessage(timeout.state)).toContain('连接超时');
   });
+
+  it('rejects host urls that smuggle an application path or query', async () => {
+    const fetchImpl = jest.fn<typeof fetch>();
+
+    const withPath = await probeTailscaleMiraHost(
+      'https://mira-host.example.ts.net/not-the-host-root',
+      { fetchImpl },
+    );
+    const withQuery = await probeTailscaleMiraHost(
+      'https://mira-host.example.ts.net?redirect=other',
+      { fetchImpl },
+    );
+
+    expect(withPath.state).toBe('invalid_host');
+    expect(withQuery.state).toBe('invalid_host');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 });
