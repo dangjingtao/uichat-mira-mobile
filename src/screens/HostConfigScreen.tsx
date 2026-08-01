@@ -1,127 +1,287 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ChevronLeft } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  RefreshCw,
+  ShieldCheck,
+  Wifi,
+} from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useHostStore } from '../store/hostStore';
-import { miraHostClient } from '../api/mockMiraHost';
+import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
+import {
+  tailscaleConnectivityMessage,
+  type TailscaleConnectivityState,
+} from '../connectivity/tailscaleConnectivity';
 import { useTheme } from '../theme/ThemeContext';
 
+const connectivityTitle = (state: TailscaleConnectivityState) => {
+  switch (state) {
+    case 'idle':
+      return '尚未检查';
+    case 'probing':
+      return '正在检查完整链路';
+    case 'ready':
+      return '已联通';
+    default:
+      return '联通失败';
+  }
+};
+
 export function HostConfigScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
   const { config, setConfig, clearConfig, setConnectionStatus } = useHostStore();
+  const connectivityState = useTailscaleConnectivityStore((state) => state.state);
+  const connectivityResult = useTailscaleConnectivityStore((state) => state.result);
+  const setConnectivityHostUrl = useTailscaleConnectivityStore(
+    (state) => state.setHostUrl,
+  );
+  const probe = useTailscaleConnectivityStore((state) => state.probe);
+  const resetConnectivity = useTailscaleConnectivityStore((state) => state.reset);
 
   const [hostUrl, setHostUrl] = useState(config?.hostUrl ?? '');
-  const [token, setToken] = useState(config?.token ?? '');
-  const [isConnecting, setIsConnecting] = useState(false);
 
-  const handleConnect = async () => {
-    const url = hostUrl.trim();
-    const tk = token.trim();
-    if (!url || !tk) return;
-    setIsConnecting(true);
+  useEffect(() => {
+    if (config?.hostUrl) {
+      setConnectivityHostUrl(config.hostUrl);
+    }
+  }, [config?.hostUrl, setConnectivityHostUrl]);
+
+  const isProbing = connectivityState === 'probing';
+  const isReady =
+    connectivityState === 'ready' && connectivityResult?.hostUrl != null;
+  const statusColor =
+    connectivityState === 'ready'
+      ? colors.status.success
+      : connectivityState === 'idle' || connectivityState === 'probing'
+        ? colors.status.warning
+        : colors.status.error;
+
+  const statusMessage = useMemo(() => {
+    if (connectivityState === 'idle') {
+      return '输入桌面 Mira 提供的 Tailscale Serve 地址后检查。';
+    }
+    if (connectivityState === 'probing') {
+      return '正在依次检查 Tailnet 路由、MagicDNS、HTTPS Serve 与 Mira Host。';
+    }
+    return tailscaleConnectivityMessage(connectivityState);
+  }, [connectivityState]);
+
+  const handleCheck = async () => {
+    const target = hostUrl.trim();
+    setConnectivityHostUrl(target);
     setConnectionStatus('connecting');
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
-    setConfig({ hostUrl: url, token: tk });
-    miraHostClient.configure({ hostUrl: url, token: tk });
-    setConnectionStatus('connected');
-    setIsConnecting(false);
+
+    try {
+      const result = await probe(target, 'manual');
+      if (result?.state === 'ready' && result.hostUrl) {
+        setHostUrl(result.hostUrl);
+        setConfig({
+          hostUrl: result.hostUrl,
+          token: config?.token ?? '',
+        });
+      }
+    } finally {
+      // Transport reachability is not Mira authorization. Do not mark the
+      // application connection as authenticated until pairing succeeds.
+      setConnectionStatus('disconnected');
+    }
+  };
+
+  const handleSave = () => {
+    if (!connectivityResult?.hostUrl || connectivityState !== 'ready') return;
+    setConfig({
+      hostUrl: connectivityResult.hostUrl,
+      token: config?.token ?? '',
+    });
     navigation.goBack();
   };
 
   const handleDisconnect = () => {
     clearConfig();
+    resetConnectivity();
     setHostUrl('');
-    setToken('');
   };
 
-  const isFormValid = hostUrl.trim().length > 0 && token.trim().length > 0;
-
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
+      edges={['top', 'bottom']}
+    >
       <View style={[styles.header, { borderBottomColor: colors.border.soft }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.ink }]}>主机配置</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.ink }]}>远程连接</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView contentContainerStyle={styles.form}>
           <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
-            <Text style={[styles.label, { color: colors.text.muted }]}>主机地址</Text>
+            <View style={styles.sectionHeading}>
+              <Wifi size={20} color={colors.text.ink} />
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>
+                Tailscale 联通
+              </Text>
+            </View>
+
+            <Text style={[styles.label, { color: colors.text.muted }]}>Mira Host 地址</Text>
             <TextInput
               style={[
                 styles.input,
-                { borderColor: colors.border.default, backgroundColor: colors.bg.input, color: colors.text.ink },
+                {
+                  borderColor: colors.border.default,
+                  backgroundColor: colors.bg.input,
+                  color: colors.text.ink,
+                },
               ]}
               value={hostUrl}
-              onChangeText={setHostUrl}
-              placeholder="例如: http://100.64.0.1:8080"
+              onChangeText={(value) => {
+                setHostUrl(value);
+                setConnectivityHostUrl(value);
+              }}
+              placeholder="https://mira-desktop.tailnet-name.ts.net"
               placeholderTextColor={colors.text.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              editable={!isProbing}
             />
 
-            <Text style={[styles.label, { color: colors.text.muted }]}>Token / 密码</Text>
-            <TextInput
+            <View
               style={[
-                styles.input,
-                { borderColor: colors.border.default, backgroundColor: colors.bg.input, color: colors.text.ink },
+                styles.statusBox,
+                {
+                  backgroundColor:
+                    connectivityState === 'ready'
+                      ? colors.bg.soft
+                      : connectivityState === 'idle' ||
+                          connectivityState === 'probing'
+                        ? colors.bg.soft
+                        : colors.status.errorBg,
+                  borderColor: statusColor,
+                },
               ]}
-              value={token}
-              onChangeText={setToken}
-              placeholder="输入访问令牌"
-              placeholderTextColor={colors.text.placeholder}
-              secureTextEntry
-              autoCapitalize="none"
-            />
+            >
+              <View style={styles.statusHeader}>
+                {isProbing ? (
+                  <ActivityIndicator size="small" color={statusColor} />
+                ) : connectivityState === 'ready' ? (
+                  <CheckCircle2 size={18} color={statusColor} />
+                ) : connectivityState === 'idle' ? (
+                  <Wifi size={18} color={statusColor} />
+                ) : (
+                  <AlertTriangle size={18} color={statusColor} />
+                )}
+                <Text style={[styles.statusTitle, { color: colors.text.ink }]}>
+                  {connectivityTitle(connectivityState)}
+                </Text>
+              </View>
+              <Text style={[styles.statusText, { color: colors.text.muted }]}>
+                {statusMessage}
+              </Text>
+              {connectivityResult?.identity ? (
+                <Text style={[styles.detailText, { color: colors.text.soft }]}>
+                  {connectivityResult.identity.displayName} · v
+                  {connectivityResult.identity.version} · {connectivityResult.latencyMs ?? 0} ms
+                </Text>
+              ) : null}
+              {connectivityResult?.detail && connectivityState !== 'ready' ? (
+                <Text style={[styles.detailText, { color: colors.text.soft }]} numberOfLines={3}>
+                  诊断：{connectivityResult.detail}
+                </Text>
+              ) : null}
+            </View>
 
             <View style={[styles.hintBox, { backgroundColor: colors.bg.soft }]}>
               <Text style={[styles.hintText, { color: colors.text.muted }]}>
-                💡 提示：通过 Tailscale 连接时，主机地址通常是 100.x.x.x 形式的 Magic IP。
+                生产连接应使用桌面 Mira 生成的 HTTPS Serve 地址。100.x IP 与明文 HTTP
+                只保留给明确的开发诊断场景。
               </Text>
             </View>
           </View>
 
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+            <View style={styles.sectionHeading}>
+              <ShieldCheck size={20} color={colors.text.ink} />
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>
+                Mira 授权
+              </Text>
+            </View>
+            <Text style={[styles.authorizationTitle, { color: colors.text.ink }]}>
+              {isReady ? '等待设备配对' : '等待 Tailscale 联通'}
+            </Text>
+            <Text style={[styles.authorizationText, { color: colors.text.muted }]}>
+              Tailscale 可达不等于获得 Mira 权限。联通成功后，移动端还需要使用桌面生成的一次性配对链接，由桌面明确批准设备和权限。
+            </Text>
+          </View>
+
           <Pressable
             style={({ pressed }) => [
-              styles.connectBtn,
-              { backgroundColor: colors.primary },
-              (!isFormValid || isConnecting || pressed) && { backgroundColor: colors.primaryDisabled },
+              styles.checkBtn,
+              { borderColor: colors.primary },
+              pressed && { backgroundColor: colors.bg.soft },
             ]}
-            onPress={handleConnect}
-            disabled={!isFormValid || isConnecting}
+            onPress={handleCheck}
+            disabled={isProbing || !hostUrl.trim()}
           >
-            <Text style={[styles.connectBtnText, { color: colors.onPrimary }]}>
-              {isConnecting ? '连接中...' : '连接主机'}
+            {isProbing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <RefreshCw size={18} color={colors.primary} />
+            )}
+            <Text style={[styles.checkBtnText, { color: colors.primary }]}>
+              {isProbing ? '正在检查' : '检查 Tailscale 联通'}
             </Text>
           </Pressable>
 
-          {config && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.saveBtn,
+              { backgroundColor: colors.primary },
+              (!isReady || pressed) && {
+                backgroundColor: colors.primaryDisabled,
+              },
+            ]}
+            onPress={handleSave}
+            disabled={!isReady}
+          >
+            <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>
+              保存此主机
+            </Text>
+          </Pressable>
+
+          {config ? (
             <Pressable
               style={[styles.disconnectBtn, { borderColor: colors.status.errorBg }]}
               onPress={handleDisconnect}
             >
               <Text style={[styles.disconnectBtnText, { color: colors.status.error }]}>
-                断开连接并清除配置
+                清除主机与联通状态
               </Text>
             </Pressable>
-          )}
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -138,33 +298,74 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { paddingHorizontal: 4, paddingVertical: 4, minWidth: 36 },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  headerTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   headerSpacer: { minWidth: 36 },
   container: { flex: 1 },
-  form: { padding: 20 },
+  form: { padding: 20, paddingBottom: 40 },
   card: {
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 18,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
   input: {
-    height: 48,
+    minHeight: 48,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    fontSize: 15,
-    marginBottom: 20,
+    paddingVertical: 11,
+    fontSize: 14,
+    marginBottom: 14,
   },
+  statusBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  statusTitle: { fontSize: 15, fontWeight: '700' },
+  statusText: { fontSize: 13, lineHeight: 20 },
+  detailText: { fontSize: 12, lineHeight: 18, marginTop: 6 },
   hintBox: { borderRadius: 10, padding: 12 },
   hintText: { fontSize: 13, lineHeight: 20 },
-  connectBtn: {
+  authorizationTitle: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  authorizationText: { fontSize: 13, lineHeight: 20 },
+  checkBtn: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkBtnText: { fontSize: 15, fontWeight: '700' },
+  saveBtn: {
     height: 50,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  connectBtnText: { fontSize: 16, fontWeight: '700' },
+  saveBtnText: { fontSize: 16, fontWeight: '700' },
   disconnectBtn: {
     marginTop: 16,
     height: 50,
