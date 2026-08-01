@@ -8,7 +8,10 @@ import com.facebook.react.uimanager.ViewManager
 class MiraNetworkMonitorPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> = listOf(MiraNetworkMonitorModule(reactContext))
+  ): List<NativeModule> = listOf(
+    MiraNetworkMonitorModule(reactContext),
+    MiraTailscaleProbeModule(reactContext),
+  )
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,
