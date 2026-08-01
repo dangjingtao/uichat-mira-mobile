@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+import { remoteMiraHostClient } from '../api/remoteMiraHost';
 import { useHostStore } from '../store/hostStore';
 import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
 import { subscribeToSystemNetworkChanges } from './systemNetworkMonitor';
@@ -76,6 +77,63 @@ export function TailscaleConnectivityLifecycle() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hostState = useHostStore.getState();
+
+    if (connectivityState === 'probing') {
+      if (hostState.connectionStatus === 'connected') {
+        hostState.setConnectionStatus('reconnecting');
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (connectivityState === 'ready') {
+      if (!remoteMiraHostClient.isSecureStorageAvailable()) {
+        hostState.setConnectionStatus('disconnected');
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      void remoteMiraHostClient
+        .restoreConnection()
+        .then((restored) => {
+          if (cancelled) return;
+          useHostStore
+            .getState()
+            .setConnectionStatus(restored ? 'connected' : 'disconnected');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          useHostStore.getState().setConnectionStatus('disconnected');
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (connectivityState !== 'idle') {
+      const status = hostState.connectionStatus;
+      if (
+        status === 'connected' ||
+        status === 'connecting' ||
+        status === 'reconnecting'
+      ) {
+        // Keep the credential, but report transport recovery instead of a
+        // false authenticated connection while Tailnet is unavailable.
+        hostState.setConnectionStatus('reconnecting');
+      }
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectivityState]);
 
   useEffect(() => {
     if (!configuredHostUrl && connectivityState !== 'idle') {
