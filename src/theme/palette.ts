@@ -17,7 +17,7 @@ export interface ThemeColors {
     card: string;
     soft: string;
     input: string;
-    userMsg: string;
+    bubble: string;
     elevated: string;
   };
 
@@ -38,84 +38,85 @@ export interface ThemeColors {
   divider: string;
 }
 
-// ─── Light Theme — Clean White (tomz.io coral clay accent) ───
+// ─── Light Theme — Mira warm canvas ───
 export const lightColors: ThemeColors = {
-  primary: '#cc785c',
-  primaryActive: '#a9583e',
-  primaryDisabled: '#e6dfd8',
+  primary: designColors.primary,
+  primaryActive: designColors.primaryActive,
+  primaryDisabled: designColors.primaryDisabled,
 
   text: {
-    ink: '#141413',
-    base: '#3d3d3a',
-    strong: '#252523',
-    muted: '#6c6a64',
-    soft: '#8e8b82',
-    placeholder: '#8e8b82',
+    ink: designColors.text.ink,
+    base: designColors.text.base,
+    strong: designColors.text.strong,
+    muted: designColors.text.muted,
+    soft: designColors.text.soft,
+    placeholder: designColors.text.placeholder,
   },
 
   bg: {
-    canvas: '#faf9f5',
-    card: '#efe9de',
-    soft: '#f5f0e8',
-    input: '#f5f0e8',
-    userMsg: '#efe9de',
-    elevated: '#FFFFFF',
+    canvas: designColors.bg.canvas,
+    card: designColors.bg.card,
+    soft: designColors.bg.soft,
+    input: designColors.bg.input,
+    bubble: designColors.bg.bubble,
+    elevated: designColors.bg.card,
   },
 
   border: {
-    default: '#e6dfd8',
-    soft: '#ebe6df',
+    default: designColors.border.default,
+    soft: designColors.border.soft,
   },
 
   status: {
-    success: '#5db872',
-    warning: '#d4a017',
-    error: '#c64545',
-    errorBg: '#fce8e8',
+    success: '#22C55E',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    errorBg: '#FEE2E2',
   },
 
-  onPrimary: '#FFFFFF',
+  onPrimary: designColors.onPrimary,
   overlay: 'rgba(0,0,0,0.4)',
-  divider: '#ebe6df',
+  divider: designColors.border.soft,
 };
 
-// ─── Dark Theme (tomz.io coral clay accent) ───
+// ─── Dark Theme (ChatGPT style) ───
 export const darkColors: ThemeColors = {
-  primary: '#e8a07a',
-  primaryActive: '#cc785c',
-  primaryDisabled: '#3d3d3a',
+  primary: '#60A5FA',
+  primaryActive: '#3B82F6',
+  primaryDisabled: '#374151',
 
   text: {
-    ink: '#faf9f5',
-    base: '#e5e5ea',
+    ink: '#F5F5F7',
+    base: '#E5E5EA',
     strong: '#FFFFFF',
-    muted: '#a09d96',
+    muted: '#9CA3AF',
     soft: '#636366',
     placeholder: '#636366',
   },
 
   bg: {
-    canvas: '#181715',
-    card: '#252320',
-    soft: '#1f1e1b',
-    input: '#1f1e1b',
-    userMsg: '#252320',
-    elevated: '#252320',
+    canvas: '#0F0F10',
+    card: '#1C1C1E',
+    soft: '#1C1C1E',
+    input: '#1C1C1E',
+    bubble: '#2C2C2E',
+    elevated: '#1C1C1E',
   },
 
   border: {
     default: '#2C2C2E',
-    soft: '#1f1e1b',
+    soft: '#1C1C1E',
   },
 
   status: {
-    success: '#5db872',
-    warning: '#d4a017',
-    error: '#c64545',
-    errorBg: '#3d1a1a',
+    success: '#34D399',
+    warning: '#FBBF24',
+    error: '#F87171',
+    errorBg: '#450A0A',
   },
 
-  onPrimary: '#1A1A1C',
+  onPrimary: '#0F0F10',
   overlay: 'rgba(0,0,0,0.6)',
   divider: '#2C2C2E',
 };
+import { colors as designColors } from './tokens';
