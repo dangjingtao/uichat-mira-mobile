@@ -21,11 +21,13 @@
 
 ## 构建产物
 
-GitHub Actions 的 `Mobile CI` 会生成：
+独立工作流 `.github/workflows/ios-unsigned-device.yml` 会生成：
 
 ```text
+Workflow: iOS Unsigned Device Build
 Artifact: uichat-mira-mobile-ios-unsigned-device
 File:     uichat-mira-mobile-ios-unsigned-device.ipa
+Checksum: uichat-mira-mobile-ios-unsigned-device.ipa.sha256
 ```
 
 该 IPA：
@@ -36,7 +38,9 @@ File:     uichat-mira-mobile-ios-unsigned-device.ipa
 - 不能直接点开安装。
 - 需要由 Sideloadly 等工具使用安装者自己的 Apple Account 重新签名。
 
-在功能分支或 Pull Request 上，可从对应 GitHub Actions Run 的 Artifacts 区域下载。合并到 `dev` 后，该文件还会进入开发预发布和 Cloudflare R2 的 `mira/mobile/dev/latest/`。
+工作流在相关功能分支、`dev`、`test` 推送，以及面向 `dev`、`test`、`prod` 的 Pull Request 上运行；也可手动触发。产物保留 14 天。
+
+该 IPA 当前是**独立的 GitHub Actions Artifact**，不会自动进入现有 `dev` Release 或 Cloudflare R2，避免干扰 Android 正式签名与既有发布链。
 
 ## Windows 端准备
 
@@ -55,16 +59,17 @@ Sideloadly 官方说明，在 Windows 上应优先使用 Apple 官网下载的 i
 
 ### 1. 下载 IPA
 
-从以下任一位置下载：
+进入仓库的 Actions 页面，打开对应的 `iOS Unsigned Device Build` Run，在 Artifacts 区域下载：
 
-- GitHub Actions Run → Artifacts → `uichat-mira-mobile-ios-unsigned-device`
-- `dev` 预发布附件
-- Mira Mobile 的 R2 开发产物目录
+```text
+uichat-mira-mobile-ios-unsigned-device
+```
 
 解压 Artifact ZIP，得到：
 
 ```text
 uichat-mira-mobile-ios-unsigned-device.ipa
+uichat-mira-mobile-ios-unsigned-device.ipa.sha256
 ```
 
 不要再次解压 IPA。
@@ -105,7 +110,7 @@ iOS 16 及以上通常还需要：
 设置 → 隐私与安全性 → 开发者模式
 ```
 
-开启后按系统提示重启并确认。然后重新打开 Mira Mobile。
+开启后按系统提示重启并确认，然后重新打开 Mira Mobile。
 
 ## 更新开发构建
 
@@ -117,7 +122,7 @@ iOS 16 及以上通常还需要：
 
 再次通过 Sideloadly 安装即可覆盖旧版本。不要先删除旧 App，否则本地数据可能丢失。
 
-当前 Mira Mobile 应保持稳定的 Bundle ID；若修改 Bundle ID，iOS 会把它视为另一个 App，无法原地覆盖。
+若 Sideloadly 自动改写 Bundle ID，应在后续更新时保持相同设置；Bundle ID 改变后，iOS 会将其视为另一个 App。
 
 ## 7 天刷新
 
@@ -176,17 +181,17 @@ Apple 当前对 Personal Team 的主要限制包括：
 
 ### 提示 IncorrectArchitecture
 
-说明下载的不是 `iphoneos` 真机构建，或 IPA 内不包含设备所需架构。确认文件名为：
+确认下载的是：
 
 ```text
 uichat-mira-mobile-ios-unsigned-device.ipa
 ```
 
-不要使用 `uichat-mira-mobile-ios-simulator.zip`。
+不要使用 `uichat-mira-mobile-ios-simulator.zip`。工作流会在上传前校验真机可执行文件包含 `arm64`。
 
 ### 安装新版本后出现两个 Mira
 
-通常是 Bundle ID 被改写或更换了 Apple Account。继续开发时应固定 Apple Account，并避免在 Sideloadly 中随意修改 Bundle ID。
+通常是 Bundle ID 被改写或更换了 Apple Account。继续开发时应固定 Apple Account，并避免随意修改 Bundle ID。
 
 ## 安全边界
 
