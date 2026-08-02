@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
+  Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +29,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/mockMiraHost';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+const miraLogo = require('../../assets/branding/mira-logo-square.png');
 
 interface CategoryItem {
   id: string;
@@ -106,7 +109,12 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     >
       {/* ── Header: Avatar + Actions ────────────── */}
       <View style={styles.header}>
-        <Text style={[styles.brandTitle, { color: colors.text.ink }]}>Mira</Text>
+        <View style={styles.brandMark}>
+          <Image source={miraLogo} style={styles.brandLogo} />
+          <Text style={[styles.brandTitle, { color: colors.text.ink }]} numberOfLines={1}>
+            UIChat Mira
+          </Text>
+        </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.headerBtn} onPress={() => navigation.navigate('Search')} accessibilityRole="button" accessibilityLabel="搜索会话">
             <Search size={22} color={colors.text.muted} />
@@ -228,13 +236,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    gap: 12,
+  },
+  brandMark: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   brandTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    flexShrink: 1,
+    fontFamily: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0,
   },
   headerActions: {
     flexDirection: 'row',
+    flexShrink: 0,
     gap: 4,
   },
   headerBtn: {

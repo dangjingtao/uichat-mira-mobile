@@ -78,7 +78,7 @@ export function SettingsRow({
         {right}
         {showChevron && !right && !disabled ? <ChevronRight size={20} color={colors.text.soft} /> : null}
       </View>
-      {!isLast && <View style={[styles.separator, { backgroundColor: colors.divider }]} />}
+      {!isLast && <View style={[styles.separator, { backgroundColor: colors.bg.canvas }]} />}
     </Pressable>
   );
 }
@@ -88,12 +88,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.button,
     fontWeight: '500',
     paddingHorizontal: spacing.xs,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.section,
+    paddingBottom: spacing.md,
     letterSpacing: 0,
   },
   group: {
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
     overflow: 'hidden',
   },
   row: {
@@ -135,6 +135,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     left: 64,
-    height: StyleSheet.hairlineWidth,
+    height: 2,
   },
 });

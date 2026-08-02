@@ -303,12 +303,12 @@ export function HostConfigScreen() {
               style={[
                 styles.heroIcon,
                 {
-                  backgroundColor: colors.text.ink,
+                  backgroundColor: colors.bg.card,
                   borderColor: colors.border.default,
                 },
               ]}
             >
-              <Laptop size={42} color={colors.bg.canvas} strokeWidth={1.8} />
+              <Laptop size={38} color={colors.primary} strokeWidth={1.6} />
             </View>
             <Text style={[styles.heroTitle, { color: colors.text.ink }]}>
               连接 Mira Host
@@ -325,12 +325,12 @@ export function HostConfigScreen() {
               onPress={() => setScannerOpen(true)}
               style={({ pressed }) => [
                 styles.scanBtn,
-                { backgroundColor: colors.text.ink },
-                pressed && { opacity: 0.72 },
+                { backgroundColor: colors.primary },
+                pressed && { backgroundColor: colors.primaryActive },
               ]}
             >
-              <ScanLine size={20} color={colors.bg.canvas} />
-              <Text style={[styles.scanBtnText, { color: colors.bg.canvas }]}>
+              <ScanLine size={18} color={colors.onPrimary} />
+              <Text style={[styles.scanBtnText, { color: colors.onPrimary }]}>
                 扫码配对
               </Text>
             </Pressable>
@@ -488,22 +488,22 @@ export function HostConfigScreen() {
               <Pressable
                 style={({ pressed }) => [
                   styles.pairBtn,
-                  { backgroundColor: colors.text.ink },
+                  { backgroundColor: colors.primary },
                   (pairingActionDisabled || pressed) && {
-                    backgroundColor: colors.primaryDisabled,
+                    backgroundColor: pressed && !pairingActionDisabled ? colors.primaryActive : colors.primaryDisabled,
                   },
                 ]}
                 onPress={startPairing}
                 disabled={pairingActionDisabled}
               >
                 {pairingBusy ? (
-                  <ActivityIndicator size="small" color={colors.bg.canvas} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : pairingCompleted ? (
-                  <CheckCircle2 size={18} color={colors.bg.canvas} />
+                  <CheckCircle2 size={18} color={colors.onPrimary} />
                 ) : (
-                  <KeyRound size={18} color={colors.bg.canvas} />
+                  <KeyRound size={18} color={colors.onPrimary} />
                 )}
-                <Text style={[styles.pairBtnText, { color: colors.bg.canvas }]}>
+                <Text style={[styles.pairBtnText, { color: colors.onPrimary }]}>
                   {pairingState.phase === 'waiting_approval'
                     ? '等待桌面确认'
                     : pairingCompleted
@@ -518,12 +518,12 @@ export function HostConfigScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.saveBtn,
-                { backgroundColor: colors.text.ink },
-                pressed && { backgroundColor: colors.primaryDisabled },
+                { backgroundColor: colors.primary },
+                pressed && { backgroundColor: colors.primaryActive },
               ]}
               onPress={handleContinue}
             >
-              <Text style={[styles.saveBtnText, { color: colors.bg.canvas }]}>
+              <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>
                 进入会话
               </Text>
             </Pressable>
@@ -580,8 +580,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     textAlign: 'center',
   },
   headerSpacer: { width: 44 },
@@ -593,15 +593,15 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   heroIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  heroTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center' },
+  heroTitle: { fontSize: 26, fontWeight: '600', textAlign: 'center' },
   heroSubtitle: {
     fontSize: 16,
     lineHeight: 24,
@@ -612,14 +612,15 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   scanBtn: {
-    minHeight: 56,
-    borderRadius: 28,
+    minHeight: 48,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 16,
   },
-  scanBtnText: { fontSize: 17, fontWeight: '700' },
+  scanBtnText: { fontSize: 15, fontWeight: '500' },
   pasteLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -678,14 +679,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
-  pairBtnText: { fontSize: 14, fontWeight: '700' },
+  pairBtnText: { fontSize: 14, fontWeight: '600' },
   saveBtn: {
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  saveBtnText: { fontSize: 17, fontWeight: '700' },
+  saveBtnText: { fontSize: 17, fontWeight: '600' },
   disconnectBtn: {
     marginTop: 16,
     height: 52,

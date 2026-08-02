@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { fontSize, radius, spacing } from '../../theme/tokens';
@@ -20,11 +20,72 @@ interface SettingsChoiceModalProps<T extends string> {
 
 export function SettingsChoiceModal<T extends string>({ visible, value, options, onChange, onClose }: SettingsChoiceModalProps<T>) {
   const { colors } = useTheme();
+  const [mounted, setMounted] = React.useState(visible);
+  const progress = React.useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: 140,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setMounted(false);
+      }
+    });
+  }, [progress, visible]);
+
+  const requestClose = React.useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const menuStyle = {
+    opacity: progress,
+    transform: [
+      {
+        translateY: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [10, 0],
+        }),
+      },
+      {
+        scale: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.98, 1],
+        }),
+      },
+    ],
+  };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={onClose}>
-        <Pressable style={[styles.menu, { backgroundColor: colors.bg.elevated }]} onPress={() => {}}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={requestClose}>
+      <Pressable style={styles.backdrop} onPress={requestClose}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.backdropOverlay,
+            { backgroundColor: colors.overlay, opacity: progress },
+          ]}
+        />
+        <Animated.View
+          style={[styles.menu, { backgroundColor: colors.bg.elevated }, menuStyle]}
+          onStartShouldSetResponder={() => true}
+        >
           {options.map((option) => (
             <Pressable
               key={option.value}
@@ -41,7 +102,7 @@ export function SettingsChoiceModal<T extends string>({ visible, value, options,
               {option.value === value ? <Check size={20} color={colors.text.ink} /> : <View style={styles.checkSpace} />}
             </Pressable>
           ))}
-        </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
@@ -53,6 +114,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+  },
+  backdropOverlay: {
+    opacity: 0,
   },
   menu: {
     width: '78%',

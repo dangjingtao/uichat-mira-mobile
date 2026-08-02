@@ -1,10 +1,9 @@
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { Appearance } from 'react-native';
-import { lightColors, darkColors, type ThemeColors } from './palette';
-import { accentPalette } from './tokens';
+import { themePresets, type ThemeColors, type ThemePresetId } from './palette';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type AccentColor = 'default' | keyof typeof accentPalette;
+export type AccentColor = ThemePresetId;
 
 interface ThemeContextValue {
   mode: ThemeMode;
@@ -32,10 +31,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const theme = resolveEffectiveTheme(mode);
   const colors = useMemo(() => {
-    const baseColors = theme === 'light' ? lightColors : darkColors;
-    if (accentColor === 'default') return baseColors;
-    const accent = accentPalette[accentColor];
-    return { ...baseColors, primary: accent.color, primaryActive: accent.active };
+    const preset = themePresets[accentColor];
+    return theme === 'light' ? preset.light : preset.dark;
   }, [accentColor, theme]);
 
   const setMode = useCallback((next: ThemeMode) => {

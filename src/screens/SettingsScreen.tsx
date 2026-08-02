@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +12,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ChevronLeft,
   ChevronDown,
-  Pencil,
   Smile,
   BookOpen,
   Grid3x3,
@@ -33,7 +32,7 @@ import {
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme, type AccentColor, type ThemeMode } from '../theme/ThemeContext';
-import { accentPalette } from '../theme/tokens';
+import { themePresets } from '../theme/palette';
 import {
   SettingsGroup as RowGroup,
   SettingsRow as Row,
@@ -42,6 +41,7 @@ import {
 import { SettingsChoiceModal, type SettingsChoice } from '../components/settings/SettingsChoiceModal';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+const miraLogo = require('../../assets/branding/mira-logo-square.png');
 
 const appearanceOptions: readonly SettingsChoice<ThemeMode>[] = [
   { value: 'system', label: '系统（默认）' },
@@ -49,14 +49,11 @@ const appearanceOptions: readonly SettingsChoice<ThemeMode>[] = [
   { value: 'dark', label: '深色' },
 ];
 
-const accentOptions: readonly SettingsChoice<AccentColor>[] = [
-  { value: 'default', label: '默认' },
-  { value: 'blue', label: '蓝色', swatch: accentPalette.blue.color },
-  { value: 'green', label: '绿色', swatch: accentPalette.green.color },
-  { value: 'yellow', label: '黄色', swatch: accentPalette.yellow.color },
-  { value: 'pink', label: '粉色', swatch: accentPalette.pink.color },
-  { value: 'orange', label: '橙色', swatch: accentPalette.orange.color },
-  { value: 'purple', label: '紫色', swatch: accentPalette.purple.color },
+const accentOptionDefinitions: readonly SettingsChoice<AccentColor>[] = [
+  { value: 'default', label: themePresets.default.label, swatch: themePresets.default.swatch },
+  { value: 'knowledge-blue', label: themePresets['knowledge-blue'].label, swatch: themePresets['knowledge-blue'].swatch },
+  { value: 'archive-green', label: themePresets['archive-green'].label, swatch: themePresets['archive-green'].swatch },
+  { value: 'slate-ocean', label: themePresets['slate-ocean'].label, swatch: themePresets['slate-ocean'].swatch },
 ];
 
 /* ───────────────────────────────────────────────
@@ -93,7 +90,9 @@ export function SettingsScreen() {
   };
 
   const appearanceLabel = appearanceOptions.find((option) => option.value === mode)?.label ?? '';
-  const accentOption = accentOptions.find((option) => option.value === accentColor) ?? accentOptions[0];
+  const accentOption =
+    accentOptionDefinitions.find((option) => option.value === accentColor) ??
+    accentOptionDefinitions[0];
 
   return (
     <SafeAreaView
@@ -119,47 +118,29 @@ export function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Avatar + Name ───────────────────── */}
+        {/* ── Avatar ──────────────────────────── */}
         <View style={styles.profileSection}>
           <View style={styles.avatarWrap}>
             <View
               style={[
                 styles.avatar,
-                { backgroundColor: colors.primary },
-              ]}
-            >
-              <Text style={[styles.avatarText, { color: colors.onPrimary }]}>
-                JD
-              </Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.avatarEditBtn,
                 {
-                  backgroundColor: colors.bg.elevated,
-                  borderColor: colors.bg.canvas,
+                  backgroundColor: colors.bg.card,
+                  borderColor: colors.border.default,
                 },
-                pressed && { opacity: 0.8 },
               ]}
             >
-              <Pencil size={14} color={colors.text.ink} />
-            </Pressable>
+              <Image source={miraLogo} style={styles.avatarLogo} />
+            </View>
           </View>
-          <Text style={[styles.profileName, { color: colors.text.ink }]}>
-            Jingtao Dang
-          </Text>
         </View>
 
         {/* ── 我的 Mira ─────────────────────── */}
         <SectionHeader>我的 Mira</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
-          <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast />
-        </RowGroup>
-        <RowGroup onAction={handleSettingAction}>
-          <Row icon={BookOpen} title="记忆" isFirst isLast />
-        </RowGroup>
-        <RowGroup onAction={handleSettingAction}>
-          <Row icon={Grid3x3} title="插件" isFirst isLast />
+          <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast={false} />
+          <Row icon={BookOpen} title="记忆" isLast={false} />
+          <Row icon={Grid3x3} title="插件" isLast />
         </RowGroup>
 
         {/* ── 账户 ──────────────────────────── */}
@@ -196,7 +177,7 @@ export function SettingsScreen() {
             title="重点色"
             subtitle={accentOption.label}
             actionId="accent"
-            isLast
+            isLast={false}
             right={
               <View style={styles.accentRow}>
                 <View style={[styles.accentDot, { backgroundColor: accentOption.swatch ?? colors.text.soft }]} />
@@ -205,13 +186,10 @@ export function SettingsScreen() {
             }
             showChevron={false}
           />
-        </RowGroup>
-        <RowGroup onAction={handleSettingAction}>
           <Row
             icon={Monitor}
             title="设备同步"
             subtitle="所有设备"
-            isFirst
             isLast
           />
         </RowGroup>
@@ -256,7 +234,7 @@ export function SettingsScreen() {
         <View style={styles.bottomSpacer} />
       </ScrollView>
       <SettingsChoiceModal visible={appearanceOpen} value={mode} options={appearanceOptions} onChange={setMode} onClose={() => setAppearanceOpen(false)} />
-      <SettingsChoiceModal visible={accentOpen} value={accentColor} options={accentOptions} onChange={setAccentColor} onClose={() => setAccentOpen(false)} />
+      <SettingsChoiceModal visible={accentOpen} value={accentColor} options={accentOptionDefinitions} onChange={setAccentColor} onClose={() => setAccentOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -306,27 +284,16 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
+    borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  avatarText: { fontSize: 34, fontWeight: '700' },
-  avatarEditBtn: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
-    elevation: 1,
+  avatarLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 48,
   },
-  profileName: { fontSize: 22, fontWeight: '700' },
 
   // ── Accent color row ───────────────────
   accentRow: {
@@ -335,9 +302,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   accentDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   logoutSpacer: { height: 8 },
 
