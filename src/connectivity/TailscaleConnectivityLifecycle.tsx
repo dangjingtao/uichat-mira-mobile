@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { remoteMiraHostClient } from '../api/remoteMiraHost';
 import { useHostStore } from '../store/hostStore';
