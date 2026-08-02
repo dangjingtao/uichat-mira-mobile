@@ -141,7 +141,6 @@ jobs:
             exit 1
           fi
 
-          shasum -a 256 "$(basename "$ipa")" > /dev/null 2>&1 || true
           (
             cd "$(dirname "$ipa")"
             shasum -a 256 "$(basename "$ipa")" > "$(basename "$checksum")"
