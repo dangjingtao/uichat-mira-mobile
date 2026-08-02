@@ -1,28 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   Pencil,
   Smile,
   BookOpen,
   Grid3x3,
-  Briefcase,
-  Sparkles,
-  CreditCard,
-  Shield,
   Mail,
-  Phone,
   Monitor,
   Sun,
   Moon,
@@ -30,11 +24,7 @@ import {
   Bell,
   Volume2,
   ShieldCheck,
-  UserCheck,
-  MonitorPlay,
-  Globe,
   HardDrive,
-  Database,
   Bug,
   Info,
   LogOut,
@@ -42,108 +32,32 @@ import {
   Palette,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, type AccentColor, type ThemeMode } from '../theme/ThemeContext';
+import { accentPalette } from '../theme/tokens';
+import {
+  SettingsGroup as RowGroup,
+  SettingsRow as Row,
+  SettingsSectionHeader as SectionHeader,
+} from '../components/settings/SettingsComponents';
+import { SettingsChoiceModal, type SettingsChoice } from '../components/settings/SettingsChoiceModal';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-/* ───────────────────────────────────────────────
-   Sub-components
-   ─────────────────────────────────────────────── */
+const appearanceOptions: readonly SettingsChoice<ThemeMode>[] = [
+  { value: 'system', label: '系统（默认）' },
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+];
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <Text style={[styles.sectionHeader, { color: colors.text.soft }]}>
-      {children}
-    </Text>
-  );
-}
-
-interface RowProps {
-  icon: React.ComponentType<{ size?: number; color?: string; style?: any }>;
-  title: string;
-  subtitle?: string;
-  right?: React.ReactNode;
-  onPress?: () => void;
-  showChevron?: boolean;
-  isFirst?: boolean;
-  isLast?: boolean;
-  destructive?: boolean;
-}
-
-function Row({
-  icon: Icon,
-  title,
-  subtitle,
-  right,
-  onPress,
-  showChevron = true,
-  isFirst = false,
-  isLast = false,
-  destructive = false,
-}: RowProps) {
-  const { colors } = useTheme();
-
-  const borderRadiusStyle: any = {};
-  if (isFirst) {
-    borderRadiusStyle.borderTopLeftRadius = 16;
-    borderRadiusStyle.borderTopRightRadius = 16;
-  }
-  if (isLast) {
-    borderRadiusStyle.borderBottomLeftRadius = 16;
-    borderRadiusStyle.borderBottomRightRadius = 16;
-  }
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        borderRadiusStyle,
-        { backgroundColor: colors.bg.card },
-        pressed && { backgroundColor: colors.bg.soft },
-      ]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <View style={styles.rowIconWrap}>
-        <Icon size={24} color={destructive ? colors.status.error : colors.text.ink} />
-      </View>
-      <View style={styles.rowContent}>
-        <Text
-          style={[
-            styles.rowTitle,
-            { color: destructive ? colors.status.error : colors.text.ink },
-          ]}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={[styles.rowSubtitle, { color: colors.text.muted }]}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.rowRight}>
-        {right}
-        {showChevron && !right ? (
-          <ChevronRight size={20} color={colors.text.soft} />
-        ) : null}
-      </View>
-      {!isLast && (
-        <View
-          style={[
-            styles.rowSeparator,
-            { backgroundColor: colors.divider, left: 64 },
-          ]}
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function RowGroup({ children }: { children: React.ReactNode }) {
-  return <View style={styles.group}>{children}</View>;
-}
+const accentOptions: readonly SettingsChoice<AccentColor>[] = [
+  { value: 'default', label: '默认' },
+  { value: 'blue', label: '蓝色', swatch: accentPalette.blue.color },
+  { value: 'green', label: '绿色', swatch: accentPalette.green.color },
+  { value: 'yellow', label: '黄色', swatch: accentPalette.yellow.color },
+  { value: 'pink', label: '粉色', swatch: accentPalette.pink.color },
+  { value: 'orange', label: '橙色', swatch: accentPalette.orange.color },
+  { value: 'purple', label: '紫色', swatch: accentPalette.purple.color },
+];
 
 /* ───────────────────────────────────────────────
    Main Screen
@@ -151,16 +65,35 @@ function RowGroup({ children }: { children: React.ReactNode }) {
 
 export function SettingsScreen() {
   const navigation = useNavigation<NavProp>();
-  const { colors, theme, setMode } = useTheme();
+  const { colors, theme, mode, accentColor, setMode, setAccentColor } = useTheme();
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [accentOpen, setAccentOpen] = useState(false);
 
-  const handleThemeChange = () => {
-    setMode(theme === 'light' ? 'dark' : 'light');
+  const handleSettingAction = (actionId: string) => {
+    switch (actionId) {
+      case 'personalization':
+        navigation.navigate('Personalization');
+        break;
+      case 'appearance':
+        setAppearanceOpen(true);
+        break;
+      case 'accent':
+        setAccentOpen(true);
+        break;
+      case 'host-config':
+        navigation.navigate('HostConfig');
+        break;
+      case 'report-error':
+        navigation.navigate('ReportError');
+        break;
+      case 'about':
+        navigation.navigate('About');
+        break;
+    }
   };
 
-  const accentColor =
-    theme === 'light'
-      ? { name: '默认', dot: '#9CA3AF' }
-      : { name: '深色', dot: '#60A5FA' };
+  const appearanceLabel = appearanceOptions.find((option) => option.value === mode)?.label ?? '';
+  const accentOption = accentOptions.find((option) => option.value === accentColor) ?? accentOptions[0];
 
   return (
     <SafeAreaView
@@ -219,94 +152,61 @@ export function SettingsScreen() {
 
         {/* ── 我的 Mira ─────────────────────── */}
         <SectionHeader>我的 Mira</SectionHeader>
-        <RowGroup>
-          <Row icon={Smile} title="个性化" isFirst isLast />
+        <RowGroup onAction={handleSettingAction}>
+          <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast />
         </RowGroup>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row icon={BookOpen} title="记忆" isFirst isLast />
         </RowGroup>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row icon={Grid3x3} title="插件" isFirst isLast />
         </RowGroup>
 
         {/* ── 账户 ──────────────────────────── */}
         <SectionHeader>账户</SectionHeader>
-        <RowGroup>
-          <Row
-            icon={Briefcase}
-            title="工作空间"
-            subtitle="个人"
-            isFirst
-            isLast={false}
-          />
-          <Row
-            icon={Sparkles}
-            title="升级至 Pro"
-            isLast={false}
-          />
-          <Row
-            icon={CreditCard}
-            title="订阅"
-            subtitle="Plus"
-            isLast={false}
-          />
-          <Row icon={Shield} title="家长控制" isLast={false} />
+        <RowGroup onAction={handleSettingAction}>
           <Row
             icon={Mail}
             title="电子邮件"
             subtitle="dangjingtao@gmail.com"
-            isLast={false}
-          />
-          <Row
-            icon={Phone}
-            title="电话号码"
-            subtitle="+37060862989"
+            isFirst
             isLast
           />
         </RowGroup>
 
         {/* ── 外观 ──────────────────────────── */}
         <SectionHeader>外观</SectionHeader>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row
-            icon={Palette}
-            title="重点色"
-            subtitle={accentColor.name}
+            icon={theme === 'light' ? Sun : Moon}
+            title="外观"
+            subtitle={appearanceLabel}
+            actionId="appearance"
             isFirst
             isLast={false}
             right={
               <View style={styles.accentRow}>
-                <View
-                  style={[
-                    styles.accentDot,
-                    { backgroundColor: accentColor.dot },
-                  ]}
-                />
-                <ChevronRight size={20} color={colors.text.soft} />
+                <ChevronDown size={20} color={colors.text.soft} />
               </View>
             }
             showChevron={false}
           />
           <Row
-            icon={theme === 'light' ? Sun : Moon}
-            title={`外观 (${theme === 'light' ? '浅色' : '深色'})`}
-            onPress={handleThemeChange}
+            icon={Palette}
+            title="重点色"
+            subtitle={accentOption.label}
+            actionId="accent"
             isLast
             right={
-              <Switch
-                value={theme === 'dark'}
-                onValueChange={handleThemeChange}
-                trackColor={{
-                  false: colors.border.default,
-                  true: colors.primary,
-                }}
-                thumbColor={colors.bg.elevated}
-              />
+              <View style={styles.accentRow}>
+                <View style={[styles.accentDot, { backgroundColor: accentOption.swatch ?? colors.text.soft }]} />
+                <ChevronDown size={20} color={colors.text.soft} />
+              </View>
             }
             showChevron={false}
           />
         </RowGroup>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row
             icon={Monitor}
             title="设备同步"
@@ -318,12 +218,12 @@ export function SettingsScreen() {
 
         {/* ── 主机 ──────────────────────────── */}
         <SectionHeader>主机</SectionHeader>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row
             icon={MessageCircle}
             title="Mira Host 配置"
             subtitle="管理主机连接"
-            onPress={() => navigation.navigate('HostConfig')}
+            actionId="host-config"
             isFirst
             isLast
           />
@@ -331,35 +231,32 @@ export function SettingsScreen() {
 
         {/* ── 通用设置 ─────────────────────── */}
         <SectionHeader>通用</SectionHeader>
-        <RowGroup>
+        <RowGroup onAction={handleSettingAction}>
           <Row icon={GearIcon} title="常规" isFirst isLast={false} />
           <Row icon={Bell} title="通知" isLast={false} />
           <Row icon={Volume2} title="语音" isLast={false} />
           <Row icon={ShieldCheck} title="安全" isLast={false} />
-          <Row icon={UserCheck} title="安全与登录" isLast={false} />
-          <Row icon={MonitorPlay} title="远程控制" isLast={false} />
-          <Row icon={Globe} title="云浏览器" isLast={false} />
           <Row icon={HardDrive} title="存储" isLast={false} />
-          <Row icon={Database} title="数据控制" isLast={false} />
-          <Row icon={Bug} title="报告错误" isLast={false} />
-          <Row icon={Info} title="关于" isLast />
+          <Row icon={Bug} title="报告错误" actionId="report-error" isLast={false} />
+          <Row icon={Info} title="关于" actionId="about" isLast />
         </RowGroup>
 
         {/* ── 退出登录 ─────────────────────── */}
-        <View style={{ height: 8 }} />
-        <RowGroup>
+        <View style={styles.logoutSpacer} />
+        <RowGroup onAction={handleSettingAction}>
           <Row
             icon={LogOut}
             title="退出登录"
             isFirst
             isLast
             destructive
-            onPress={() => {}}
           />
         </RowGroup>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+      <SettingsChoiceModal visible={appearanceOpen} value={mode} options={appearanceOptions} onChange={setMode} onClose={() => setAppearanceOpen(false)} />
+      <SettingsChoiceModal visible={accentOpen} value={accentColor} options={accentOptions} onChange={setAccentColor} onClose={() => setAccentOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -431,51 +328,6 @@ const styles = StyleSheet.create({
   },
   profileName: { fontSize: 22, fontWeight: '700' },
 
-  // ── Section / Group ────────────────────
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '500',
-    paddingHorizontal: 4,
-    paddingTop: 20,
-    paddingBottom: 8,
-    letterSpacing: 0.1,
-  },
-  group: {
-    marginBottom: 4,
-    overflow: 'hidden',
-  },
-
-  // ── Row ────────────────────────────────
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 60,
-    position: 'relative',
-  },
-  rowIconWrap: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  rowContent: { flex: 1, justifyContent: 'center' },
-  rowTitle: { fontSize: 17, fontWeight: '500' },
-  rowSubtitle: { fontSize: 15, marginTop: 2 },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  rowSeparator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
-  },
-
   // ── Accent color row ───────────────────
   accentRow: {
     flexDirection: 'row',
@@ -487,6 +339,7 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
   },
+  logoutSpacer: { height: 8 },
 
   // ── Bottom ─────────────────────────────
   bottomSpacer: { height: 32 },

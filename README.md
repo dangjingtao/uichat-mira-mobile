@@ -1,4 +1,4 @@
-# uiChat Mira Mobile
+# UIChat Mira Mobile
 
 Mira 官方移动端工程，基于 React Native 构建。
 
@@ -93,7 +93,7 @@ MIRA_RELEASE_KEY_ALIAS
 MIRA_RELEASE_KEY_PASSWORD
 ```
 
-`MIRA_RELEASE_KEYSTORE_BASE64` 是 release keystore 的单行 Base64 内容。`prod` 分支推送或手动运行
+`MIRA_RELEASE_KEYSTORE_BASE64` 是 release keystore 的单行 Base64 内容。`dev` 或 `prod` 分支推送，或在这两个分支手动运行
 `Mobile CI` 时，工作流会构建签名 APK，验证内置 JavaScript bundle、SVG 原生库和 APK 签名，并上传
 `uichat-mira-mobile-android-release` artifact。
 
@@ -112,9 +112,9 @@ keytool -genkeypair -v -keystore release.keystore -alias <alias> -keyalg RSA -ke
 - TypeScript 类型检查、ESLint 和 Jest。
 - Android `assembleDebug` 干净环境构建。
 - iOS CocoaPods 安装与无签名 Simulator Debug 构建。
-- `dev` 推送通过全部检查后，更新 `dev-latest` 预发布，并同步到 Cloudflare R2 的 `mira/mobile/dev/latest/`。
+- `dev` 推送通过全部检查及签名 Release 构建后，更新 `dev-latest` 预发布，并同步到 Cloudflare R2 的 `mira/mobile/dev/latest/`。
 
-当前 `dev` 产物包括可安装的 Android Debug APK、iOS Simulator ZIP 和 SHA-256 校验文件。它们是开发测试产物，不是正式签名发行包。
+当前 `dev` 产物包括 Android Debug APK、使用正式 keystore 签名的 Android Release APK、iOS Simulator ZIP 和 SHA-256 校验文件。Release APK 使用 `dev` 分支源码，仅用于开发验证；正式发布仍由 `prod` 分支执行。
 
 ## 说明
 

@@ -126,6 +126,15 @@ export const colors = {
   },
 } as const;
 
+export const accentPalette = {
+  blue: { color: '#3b82f6', active: '#2563eb' },
+  green: { color: '#4caf67', active: '#388e4d' },
+  yellow: { color: '#f4bf3a', active: '#d49a14' },
+  pink: { color: '#e7658c', active: '#c94b73' },
+  orange: { color: '#ef7d42', active: '#cc5f28' },
+  purple: { color: '#9b72df', active: '#7c52bf' },
+} as const;
+
 // ─── Radius ────────────────────────────────────────────────
 export const radius = {
   /** 按钮圆角 */

@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Settings,
   Search,
   Image as ImageIcon,
   FolderKanban,
@@ -47,6 +46,7 @@ const categories: CategoryItem[] = [
 interface CustomDrawerProps {
   onClose: () => void;
 }
+
 
 export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const navigation = useNavigation<NavProp>();
@@ -87,10 +87,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     } catch {}
   };
 
-  const handleOpenSettings = () => {
+  const handleOpenRemoteConnection = () => {
     onClose();
-    navigation.navigate('Settings' as any);
+    navigation.navigate('HostConfig');
   };
+
 
   return (
     <View
@@ -107,15 +108,8 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       <View style={styles.header}>
         <Text style={[styles.brandTitle, { color: colors.text.ink }]}>Mira</Text>
         <View style={styles.headerActions}>
-          <Pressable style={styles.headerBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Pressable style={styles.headerBtn} onPress={() => navigation.navigate('Search')} accessibilityRole="button" accessibilityLabel="搜索会话">
             <Search size={22} color={colors.text.muted} />
-          </Pressable>
-          <Pressable
-            style={styles.headerBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={handleOpenSettings}
-          >
-            <Settings size={22} color={colors.text.muted} />
           </Pressable>
         </View>
       </View>
@@ -124,7 +118,16 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
         {/* ── Categories ──────────────────────── */}
         <View style={styles.categories}>
           {categories.map((cat) => (
-            <Pressable key={cat.id} style={styles.categoryItem}>
+            <Pressable
+              key={cat.id}
+              style={({ pressed }) => [
+                styles.categoryItem,
+                pressed && { backgroundColor: colors.bg.soft },
+              ]}
+              onPress={cat.id === 'remote' ? handleOpenRemoteConnection : undefined}
+              accessibilityRole={cat.id === 'remote' ? 'button' : undefined}
+              accessibilityLabel={cat.id === 'remote' ? 'Remote connection' : undefined}
+            >
               <cat.icon size={22} color={colors.text.muted} />
               <Text style={[styles.categoryLabel, { color: colors.text.base }]}>
                 {cat.label}
@@ -209,12 +212,8 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
           <Plus size={20} color="#fff" strokeWidth={2.5} />
           <Text style={styles.newChatLabel}>聊天</Text>
         </Pressable>
-        <View style={styles.bottomRight}>
-          <View style={[styles.miniAvatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.miniAvatarText}>M</Text>
-          </View>
-        </View>
       </View>
+
     </View>
   );
 }
@@ -324,22 +323,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
-  },
-  bottomRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  miniAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  miniAvatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
   },
 });

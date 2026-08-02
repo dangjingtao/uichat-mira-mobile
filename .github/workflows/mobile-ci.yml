@@ -108,8 +108,8 @@ jobs:
     needs:
       - quality
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/prod') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/prod')
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/prod')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -218,8 +218,8 @@ jobs:
       - name: Build iOS simulator app
         run: |
           xcodebuild \
-            -workspace ios/MyApp.xcworkspace \
-            -scheme MyApp \
+            -workspace ios/UIChatMira.xcworkspace \
+            -scheme UIChatMira \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
@@ -243,6 +243,7 @@ jobs:
     needs:
       - quality
       - android
+      - android-release
       - ios
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
@@ -330,7 +331,7 @@ jobs:
 
           - Commit: \`$GITHUB_SHA\`
           - CI run: \`$GITHUB_RUN_ID\`
-          - Android: debug APK, installable for testing
+          - Android: debug APK and signed release APK
           - iOS: unsigned Simulator app archive, not an IPA
           - R2 mirror: \`${{ secrets.R2_PUBLIC_BASE_URL }}/mira/mobile/dev/latest/\`
           EOF

@@ -20,6 +20,34 @@ export function TailscaleConnectivityLifecycle() {
   const networkRecoveryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    if (configuredHostUrl || !remoteMiraHostClient.isSecureStorageAvailable()) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    remoteMiraHostClient
+      .getStoredHostUrl()
+      .then((storedHostUrl) => {
+        if (cancelled || !storedHostUrl) return;
+        useHostStore.getState().setConfig({
+          hostUrl: storedHostUrl,
+          token: '',
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          useHostStore.getState().setConnectionStatus('disconnected');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [configuredHostUrl]);
+
+  useEffect(() => {
     const target = configuredHostUrl.trim();
     if (!target) return;
 
@@ -136,7 +164,14 @@ export function TailscaleConnectivityLifecycle() {
   }, [connectivityState]);
 
   useEffect(() => {
-    if (!configuredHostUrl && connectivityState !== 'idle') {
+    const transientHostUrl = useTailscaleConnectivityStore
+      .getState()
+      .hostUrl.trim();
+    if (
+      !configuredHostUrl &&
+      !transientHostUrl &&
+      connectivityState !== 'idle'
+    ) {
       useTailscaleConnectivityStore.getState().reset();
       lastConfiguredHost.current = '';
     }
