@@ -255,6 +255,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve package version
+        run: |
+          package_version=$(node -p "require('./package.json').version")
+          test -n "$package_version"
+          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v${package_version}-dev" >> "$GITHUB_ENV"
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -329,6 +336,7 @@ jobs:
           cat > release-notes.md <<EOF
           Automated development build from branch \`dev\`.
 
+          - Version: \`$PACKAGE_VERSION\`
           - Commit: \`$GITHUB_SHA\`
           - CI run: \`$GITHUB_RUN_ID\`
           - Android: debug APK and signed release APK
@@ -336,23 +344,23 @@ jobs:
           - R2 mirror: \`${{ secrets.R2_PUBLIC_BASE_URL }}/mira/mobile/dev/latest/\`
           EOF
 
-          if gh release view dev-latest >/dev/null 2>&1; then
-            gh release edit dev-latest \
-              --title "Mira Mobile Dev $short_sha" \
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "Mira Mobile $PACKAGE_VERSION Dev $short_sha" \
               --notes-file release-notes.md \
               --prerelease
           else
-            gh release create dev-latest \
+            gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
-              --title "Mira Mobile Dev $short_sha" \
+              --title "Mira Mobile $PACKAGE_VERSION Dev $short_sha" \
               --notes-file release-notes.md \
               --prerelease
           fi
 
-          gh release upload dev-latest release-assets/* --clobber
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
 
-          git tag -f dev-latest "$GITHUB_SHA"
-          git push origin refs/tags/dev-latest --force
+          git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_TAG" --force
 
   publish-prod-release:
     name: Publish production release
@@ -370,6 +378,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve package version
+        run: |
+          package_version=$(node -p "require('./package.json').version")
+          test -n "$package_version"
+          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v${package_version}" >> "$GITHUB_ENV"
 
       - name: Download signed Android release
         uses: actions/download-artifact@v4
@@ -442,11 +457,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          short_sha=${GITHUB_SHA::7}
-
           cat > release-notes.md <<EOF_NOTES
           Automated production build from branch \`prod\`.
 
+          - Version: \`$PACKAGE_VERSION\`
           - Commit: \`$GITHUB_SHA\`
           - CI run: \`$GITHUB_RUN_ID\`
           - Android: signed release APK
@@ -454,18 +468,21 @@ jobs:
           - R2 mirror: \`${{ secrets.R2_PUBLIC_BASE_URL }}/mira/mobile/prod/latest/\`
           EOF_NOTES
 
-          if gh release view prod-latest >/dev/null 2>&1; then
-            gh release edit prod-latest \
-              --title "Mira Mobile Prod $short_sha" \
+          remote_tag_sha=$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | awk '{print $1}')
+          if [ -n "$remote_tag_sha" ] && [ "$remote_tag_sha" != "$GITHUB_SHA" ]; then
+            echo "Release tag $RELEASE_TAG already points to $remote_tag_sha; bump package.json before publishing another production commit." >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "Mira Mobile $PACKAGE_VERSION" \
               --notes-file release-notes.md
           else
-            gh release create prod-latest \
+            gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
-              --title "Mira Mobile Prod $short_sha" \
+              --title "Mira Mobile $PACKAGE_VERSION" \
               --notes-file release-notes.md
           fi
 
-          gh release upload prod-latest release-assets/* --clobber
-
-          git tag -f prod-latest "$GITHUB_SHA"
-          git push origin refs/tags/prod-latest --force
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber

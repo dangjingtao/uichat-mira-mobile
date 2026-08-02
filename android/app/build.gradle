@@ -64,6 +64,13 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def packageJsonFile = rootProject.file('../package.json')
+def packageMetadata = new groovy.json.JsonSlurper().parseText(packageJsonFile.getText('UTF-8'))
+if (!(packageMetadata.version instanceof String) || packageMetadata.version.trim().isEmpty()) {
+    throw new GradleException('package.json must define a non-empty version string.')
+}
+def packageVersion = packageMetadata.version
+
 def releaseSigningValues = [
     MIRA_RELEASE_STORE_FILE: project.findProperty('MIRA_RELEASE_STORE_FILE') ?: System.getenv('MIRA_RELEASE_STORE_FILE'),
     MIRA_RELEASE_STORE_PASSWORD: project.findProperty('MIRA_RELEASE_STORE_PASSWORD') ?: System.getenv('MIRA_RELEASE_STORE_PASSWORD'),
@@ -96,7 +103,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName packageVersion
     }
 
     signingConfigs {
