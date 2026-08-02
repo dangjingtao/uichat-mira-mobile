@@ -109,6 +109,8 @@ keytool -genkeypair -v -keystore release.keystore -alias <alias> -keyalg RSA -ke
 
 `.github/workflows/mobile-ci.yml` 在 Pull Request 和目标分支推送时执行：
 
+完整的 Job 依赖、版本 Tag、签名、R2 地址和已知技术债见 [GitHub Actions 构建与发布](docs/github-build-release.md)。
+
 - TypeScript 类型检查、ESLint 和 Jest。
 - Android `assembleDebug` 干净环境构建。
 - iOS CocoaPods 安装与无签名 Simulator Debug 构建。

@@ -1,5 +1,9 @@
 # Mira Mobile 文档
 
+## 工程与发布
+
+- [GitHub Actions 构建与发布](github-build-release.md)
+
 ## 当前工程主线
 
 - [Tailscale Connectivity V1 合同](remote-access/tailscale-connectivity-v1.md)
