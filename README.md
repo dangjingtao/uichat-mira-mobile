@@ -105,6 +105,16 @@ MIRA_RELEASE_KEY_PASSWORD
 keytool -genkeypair -v -keystore release.keystore -alias <alias> -keyalg RSA -keysize 2048 -validity 10000
 ```
 
+## iOS 免费真机侧载
+
+独立工作流 `.github/workflows/ios-unsigned-device.yml` 会生成面向 `iphoneos` 的未签名开发 IPA。没有 Mac、没有付费 Apple Developer Program 的开发者，可以在 Windows 上使用自己的免费 Apple Account 通过 Sideloadly 临时签名并安装到 iPhone。
+
+该方式仅用于开发测试，免费签名有效期为 7 天，不属于正式分发。unsigned device IPA 当前只作为 GitHub Actions Artifact 保留 14 天，不进入既有 `dev` Release 或 R2 发布目录。
+
+完整准备、安装、续签和排错步骤见：
+
+[docs/ios-free-sideload-windows.md](./docs/ios-free-sideload-windows.md)
+
 ## 持续集成
 
 `.github/workflows/mobile-ci.yml` 在 Pull Request 和目标分支推送时执行：
@@ -117,7 +127,16 @@ keytool -genkeypair -v -keystore release.keystore -alias <alias> -keyalg RSA -ke
 - `dev` 推送通过全部检查及签名 Release 构建后，按 `package.json` 的版本更新 `v<version>-dev` 预发布，并同步到 Cloudflare R2 的 `mira/mobile/dev/latest/`。
 - `prod` 推送通过发布检查后，按 `package.json` 的版本创建不可改指向的 `v<version>` 正式 Tag；同一版本不得发布不同提交。
 
-当前 `dev` 产物包括 Android Debug APK、使用正式 keystore 签名的 Android Release APK、iOS Simulator ZIP 和 SHA-256 校验文件。Release APK 使用 `dev` 分支源码，仅用于开发验证；正式发布仍由 `prod` 分支执行。
+`.github/workflows/ios-unsigned-device.yml` 单独负责 iPhone 真机构建：
+
+- 使用 `iphoneos` / Release 构建且明确关闭代码签名。
+- 校验应用包含 Release JavaScript bundle。
+- 校验可执行文件包含 `arm64`。
+- 将 `.app` 封装为标准 `Payload/*.app` IPA。
+- 拒绝包含 provisioning profile 的产物。
+- 上传 IPA 与 SHA-256 校验文件，保留 14 天。
+
+当前 `dev` Release 产物包括 Android Debug APK、使用正式 keystore 签名的 Android Release APK、iOS Simulator ZIP 和 SHA-256 校验文件。Release APK 使用 `dev` 分支源码，仅用于开发验证；正式发布仍由 `prod` 分支执行。
 
 ## 说明
 
