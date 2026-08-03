@@ -19,9 +19,22 @@
 | Typecheck, lint and test | Ubuntu | TypeScript、ESLint、Jest | 无 |
 | Android debug build | Ubuntu | 未签名 Release 必须被拒绝、Debug APK 构建 | `uichat-mira-mobile-dev.apk` |
 | Android signed release APK | Ubuntu | 正式签名、内置 JS Bundle、SVG 原生库、APK 完整性和签名 | `uichat-mira-mobile-release.apk`、SHA-256 |
-| iOS simulator build | macOS | CocoaPods、无签名 Simulator Debug 构建 | Simulator ZIP，不是 IPA |
+| iOS simulator and unsigned device builds | macOS | CocoaPods、无签名 Simulator Debug、无签名 `iphoneos` Release、`arm64`、JS Bundle、IPA 结构与无 provisioning profile | Simulator ZIP、unsigned device IPA、SHA-256 |
 
-签名 Android Release 只在 `dev`、`prod` 推送或对应分支手动运行时执行。发布 Job 必须等待质量检查及各平台构建全部成功。
+iOS 两类构建复用同一个 macOS Job，避免重复安装 Node、Ruby、CocoaPods 和依赖。签名 Android Release 只在 `dev`、`prod` 推送或对应分支手动运行时执行。发布 Job 必须等待质量检查及各平台构建全部成功。
+
+## iOS unsigned device 验证状态
+
+截至 2026-08-03，GitHub macOS Runner 已完成以下验证：
+
+- `iphoneos` / Release 编译成功。
+- 可执行文件包含 `arm64`。
+- `main.jsbundle` 已内置。
+- IPA 使用标准 `Payload/*.app` 结构。
+- IPA 不包含 `embedded.mobileprovision`。
+- SHA-256 生成及 Artifact 上传成功。
+
+尚未完成的验证是：在真实 iPhone 上通过 Sideloadly 等工具完成免费签名、安装、启动及核心功能回归。因此该产物当前定义为“已验证可构建，待真机验证”，不能写成已经完成 iOS 真机交付。
 
 ## 版本与 Tag
 
@@ -42,13 +55,45 @@
 
 GitHub Tag 表示具体版本，R2 的 `latest` 路径表示环境渠道。两者用途不同：Tag 可追溯，R2 地址供客户端或测试人员始终下载该环境最新成功产物。
 
-当前 dev 签名 APK 固定地址：
+当前 dev 固定地址：
 
 ```text
 https://assets.tomz.io/mira/mobile/dev/latest/uichat-mira-mobile-release.apk
+https://assets.tomz.io/mira/mobile/dev/latest/uichat-mira-mobile-ios-unsigned-device.ipa
+https://assets.tomz.io/mira/mobile/dev/latest/uichat-mira-mobile-ios-unsigned-device.ipa.sha256
+https://assets.tomz.io/mira/mobile/dev/latest/SHA256SUMS.txt
 ```
 
-R2 上传使用 `aws s3 sync --delete`。只有全部依赖 Job 成功后才会覆盖 `latest`，失败的构建不会发布半成品。
+unsigned device IPA 不能直接安装。Windows 侧载流程见 [iOS 免费真机侧载](ios-free-sideload-windows.md)。
+
+## dev 发布完整性与 R2 容错
+
+`publish-dev-release` 下载全部依赖 Job 的 Artifact 后，先验证以下固定产物存在且非空：
+
+- Android Debug APK。
+- Android signed Release APK 及 SHA-256。
+- iOS Simulator ZIP。
+- iOS unsigned device IPA 及 SHA-256。
+
+发布前还会执行：
+
+- Android Release SHA-256 校验。
+- iOS unsigned device IPA SHA-256 校验。
+- Simulator ZIP 完整性检查。
+- unsigned device IPA ZIP 结构检查。
+- 重新生成覆盖全部文件的 `SHA256SUMS.txt`。
+
+R2 dev 上传采用以下容错规则：
+
+1. 最多尝试 3 次，失败间隔逐次增加。
+2. 不使用 `--delete`，单次异常不会删除 R2 上最后一次成功发布的文件。
+3. 每次上传后逐文件调用 `head-object`，比较远端与本地字节数。
+4. 只有全部文件上传且尺寸验证成功，发布步骤才视为成功。
+5. 3 次仍失败时，工作流明确失败；GitHub Release 不会继续更新。
+
+不使用 `--delete` 的代价是废弃文件可能暂时留在 `latest` 目录。当前产物文件名固定，这比网络抖动时误删最后一份可下载产物更安全。清理废弃文件应由显式维护任务完成，不和日常发布耦合。
+
+生产 R2 仍沿用原有 Android-only 发布逻辑；本次 unsigned device IPA 只进入 `dev` 渠道。
 
 ## 必需 Secrets
 
@@ -67,7 +112,7 @@ Cloudflare R2：
 - `R2_BUCKET`
 - `R2_PUBLIC_BASE_URL`
 
-工作流只在 Runner 临时目录恢复 keystore，不得将签名文件或真实密码提交到仓库。
+工作流只在 Runner 临时目录恢复 keystore，不得将签名文件或真实密码提交到仓库。iOS unsigned device 构建不需要 Apple Account、证书或 provisioning profile；这些凭据也不得进入 GitHub Secrets。
 
 ## Release JVM 配置
 
@@ -138,8 +183,10 @@ Android 设备安装通用 APK 时只会使用与本机 CPU 匹配的一套原�
 
 1. `package.json.version` 是本次目标版本。
 2. Typecheck、Lint 和 Jest 成功。
-3. Android Debug、签名 Release 和 iOS Simulator Job 成功。
+3. Android Debug、签名 Release、iOS Simulator 和 iOS unsigned device 构建成功。
 4. APK 中存在 `assets/index.android.bundle` 和预期原生库。
-5. `apksigner verify` 与 SHA-256 校验成功。
-6. GitHub Release Tag、目标提交和版本一致。
-7. R2 固定地址返回 HTTP 200，文件大小和校验值与本次产物一致。
+5. `apksigner verify`、Android SHA-256 与 iOS IPA SHA-256 校验成功。
+6. unsigned device IPA 包含 `arm64` 和 `main.jsbundle`，且不包含 provisioning profile。
+7. GitHub Release Tag、目标提交和版本一致。
+8. R2 固定地址可下载，远端文件大小与本次产物一致。
+9. 在宣称真机可用前，必须完成真实 iPhone 的签名、安装、启动和核心功能回归。

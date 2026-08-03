@@ -4,6 +4,19 @@
 
 这是一条开发测试路径，不是正式分发方案。GitHub Actions 只负责生成未签名的真机 IPA，安装者需要在 Windows 上使用自己的免费 Apple Account 完成临时签名。
 
+## 当前验证状态
+
+截至 2026-08-03，`Mobile CI` 已在 GitHub macOS Runner 上完成真实构建验证：
+
+- `iphoneos` / Release 编译成功。
+- 可执行文件包含 `arm64`。
+- `main.jsbundle` 已内置。
+- IPA 使用标准 `Payload/*.app` 结构。
+- IPA 不包含 provisioning profile。
+- SHA-256 生成和 Artifact 上传成功。
+
+尚未验证的是：真实 iPhone 上的 Sideloadly 签名、安装、启动及 Mira 核心功能。因此目前只能确认“真机格式构建成功”，不能确认“真机运行已经通过”。
+
 ## 适用范围
 
 适合：
@@ -21,10 +34,10 @@
 
 ## 构建产物
 
-独立工作流 `.github/workflows/ios-unsigned-device.yml` 会生成：
+主工作流 `.github/workflows/mobile-ci.yml` 的 iOS Job 会同时生成：
 
 ```text
-Workflow: iOS Unsigned Device Build
+Workflow: Mobile CI
 Artifact: uichat-mira-mobile-ios-unsigned-device
 File:     uichat-mira-mobile-ios-unsigned-device.ipa
 Checksum: uichat-mira-mobile-ios-unsigned-device.ipa.sha256
@@ -38,9 +51,16 @@ Checksum: uichat-mira-mobile-ios-unsigned-device.ipa.sha256
 - 不能直接点开安装。
 - 需要由 Sideloadly 等工具使用安装者自己的 Apple Account 重新签名。
 
-工作流在相关功能分支、`dev`、`test` 推送，以及面向 `dev`、`test`、`prod` 的 Pull Request 上运行；也可手动触发。产物保留 14 天。
+在 Pull Request 和功能分支上，产物作为 GitHub Actions Artifact 保留 14 天。`dev` 分支完整发布成功后，IPA 还会进入 `v<version>-dev` 预发布和 Cloudflare R2。
 
-该 IPA 当前是**独立的 GitHub Actions Artifact**，不会自动进入现有 `dev` Release 或 Cloudflare R2，避免干扰 Android 正式签名与既有发布链。
+R2 固定地址：
+
+```text
+https://assets.tomz.io/mira/mobile/dev/latest/uichat-mira-mobile-ios-unsigned-device.ipa
+https://assets.tomz.io/mira/mobile/dev/latest/uichat-mira-mobile-ios-unsigned-device.ipa.sha256
+```
+
+R2 发布前会检查 IPA、校验文件和其他 dev 固定产物。上传最多重试 3 次，并逐文件核对远端字节数；失败时不会使用 `--delete` 删除上一次成功产物。
 
 ## Windows 端准备
 
@@ -59,13 +79,13 @@ Sideloadly 官方说明，在 Windows 上应优先使用 Apple 官网下载的 i
 
 ### 1. 下载 IPA
 
-进入仓库的 Actions 页面，打开对应的 `iOS Unsigned Device Build` Run，在 Artifacts 区域下载：
+可从以下位置获取：
 
-```text
-uichat-mira-mobile-ios-unsigned-device
-```
+- 对应 `Mobile CI` Run 的 Artifacts 区域。
+- `dev` 的 GitHub 预发布附件。
+- R2 固定地址。
 
-解压 Artifact ZIP，得到：
+GitHub Artifact 本身是 ZIP，解压一次后会得到：
 
 ```text
 uichat-mira-mobile-ios-unsigned-device.ipa
@@ -74,14 +94,24 @@ uichat-mira-mobile-ios-unsigned-device.ipa.sha256
 
 不要再次解压 IPA。
 
-### 2. 连接并信任 iPhone
+### 2. 可选：验证 SHA-256
+
+在 PowerShell 中执行：
+
+```powershell
+Get-FileHash .\uichat-mira-mobile-ios-unsigned-device.ipa -Algorithm SHA256
+```
+
+将输出与 `.ipa.sha256` 文件中的值比较。两者不一致时不要继续安装，应重新下载。
+
+### 3. 连接并信任 iPhone
 
 1. 使用数据线连接 iPhone。
 2. 解锁 iPhone。
 3. 出现“要信任此电脑吗”时选择信任，并输入设备密码。
 4. 打开 iTunes，确认设备能够被识别。
 
-### 3. 使用 Sideloadly 签名并安装
+### 4. 使用 Sideloadly 签名并安装
 
 1. 启动 Sideloadly。
 2. 在设备下拉框中选择目标 iPhone。
@@ -92,7 +122,7 @@ uichat-mira-mobile-ios-unsigned-device.ipa.sha256
 
 Sideloadly 会为当前账号和设备申请临时签名，并将 Mira Mobile 安装到 iPhone。
 
-### 4. 在 iPhone 上信任开发者
+### 5. 在 iPhone 上信任开发者
 
 若首次启动提示“未受信任的开发者”：
 
@@ -102,7 +132,7 @@ Sideloadly 会为当前账号和设备申请临时签名，并将 Mira Mobile �
 
 找到本次侧载使用的 Apple Account，选择信任。
 
-### 5. 开启开发者模式
+### 6. 开启开发者模式
 
 iOS 16 及以上通常还需要：
 
@@ -112,13 +142,26 @@ iOS 16 及以上通常还需要：
 
 开启后按系统提示重启并确认，然后重新打开 Mira Mobile。
 
+## 首次真机验收
+
+安装成功后至少验证：
+
+1. App 可以正常启动，不出现闪退或白屏。
+2. 首页和主要导航可以渲染。
+3. 相机、扫码、局域网和系统权限弹窗行为正常。
+4. 能连接 Mira Host，并完成一次最小消息交互。
+5. 退出并重新打开后，必要配置和安全凭据仍然存在。
+6. 覆盖安装新 IPA 后，本地数据没有意外丢失。
+
+只有这些项目完成后，才能把状态从“真机构建成功”更新为“真机验证通过”。
+
 ## 更新开发构建
 
 下载新的 IPA 后，继续使用：
 
-- 同一个 Apple Account
-- 同一台 iPhone
-- 相同的 Bundle ID
+- 同一个 Apple Account。
+- 同一台 iPhone。
+- 相同的 Bundle ID。
 
 再次通过 Sideloadly 安装即可覆盖旧版本。不要先删除旧 App，否则本地数据可能丢失。
 
@@ -193,6 +236,14 @@ uichat-mira-mobile-ios-unsigned-device.ipa
 
 通常是 Bundle ID 被改写或更换了 Apple Account。继续开发时应固定 Apple Account，并避免随意修改 Bundle ID。
 
+### R2 地址仍是旧文件
+
+先查看对应 `Mobile CI` 的 `Publish dev prerelease` Job：
+
+- 如果构建或固定产物校验失败，R2 不会更新。
+- 如果 R2 上传或远端尺寸验证连续 3 次失败，Job 会明确失败并保留旧文件。
+- 如果 Job 成功，可对比 `.ipa.sha256` 和本地 SHA-256，确认缓存是否仍返回旧内容。
+
 ## 安全边界
 
 - 该流程依赖第三方侧载工具，不属于 Apple 官方分发渠道。
@@ -211,4 +262,4 @@ Apple Developer Program
 → TestFlight 或 Ad Hoc 分发
 ```
 
-在此之前，unsigned device IPA + Windows 侧载足以支持少量开发设备进行真机验证。
+在此之前，unsigned device IPA + Windows 侧载可以支撑少量开发设备进行真机验证，但必须保留“待真机验证”的状态边界。
