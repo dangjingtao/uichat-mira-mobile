@@ -193,7 +193,7 @@ jobs:
           retention-days: 30
 
   ios:
-    name: iOS simulator build
+    name: iOS simulator and unsigned device builds
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -222,17 +222,24 @@ jobs:
         run: xcodebuild -version
 
       - name: Build iOS simulator app
+        shell: bash
         run: |
+          set -euo pipefail
+
+          derived_data='ios/build/SimulatorDerivedData'
+          rm -rf "$derived_data"
+
           xcodebuild \
             -workspace ios/UIChatMira.xcworkspace \
             -scheme UIChatMira \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios/build/DerivedData \
+            -derivedDataPath "$derived_data" \
             CODE_SIGNING_ALLOWED=NO \
             build
-          app_path=$(find ios/build/DerivedData/Build/Products -type d -name '*.app' | head -n 1)
+
+          app_path=$(find "$derived_data/Build/Products" -type d -name '*.app' -print -quit)
           test -n "$app_path"
           ditto -c -k --sequesterRsrc --keepParent "$app_path" ios/build/uichat-mira-mobile-ios-simulator.zip
 
@@ -241,6 +248,91 @@ jobs:
         with:
           name: uichat-mira-mobile-ios-simulator
           path: ios/build/uichat-mira-mobile-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Build unsigned iPhone app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          derived_data='ios/build/UnsignedDeviceDerivedData'
+          rm -rf "$derived_data"
+
+          xcodebuild \
+            -workspace ios/UIChatMira.xcworkspace \
+            -scheme UIChatMira \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$derived_data" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build
+
+      - name: Package and verify unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          derived_data='ios/build/UnsignedDeviceDerivedData'
+          products_dir="$derived_data/Build/Products/Release-iphoneos"
+          app_path=$(find "$products_dir" -maxdepth 1 -type d -name '*.app' -print -quit)
+
+          if [ -z "$app_path" ]; then
+            echo 'No Release-iphoneos .app bundle was produced.' >&2
+            exit 1
+          fi
+
+          test -f "$app_path/Info.plist"
+          test -f "$app_path/main.jsbundle"
+
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_path/Info.plist")
+          test -n "$executable"
+          test -f "$app_path/$executable"
+
+          archs=$(lipo -archs "$app_path/$executable")
+          echo "Device executable architectures: $archs"
+          printf '%s\n' "$archs" | tr ' ' '\n' | grep -Fxq arm64
+
+          package_dir='ios/build/unsigned-device-package'
+          ipa='ios/build/uichat-mira-mobile-ios-unsigned-device.ipa'
+          checksum="$ipa.sha256"
+
+          rm -rf "$package_dir" "$ipa" "$checksum"
+          mkdir -p "$package_dir/Payload"
+          ditto "$app_path" "$package_dir/Payload/$(basename "$app_path")"
+
+          (
+            cd "$package_dir"
+            ditto -c -k --sequesterRsrc --keepParent Payload "../$(basename "$ipa")"
+          )
+
+          unzip -tq "$ipa"
+          entries="$RUNNER_TEMP/ios-unsigned-device-entries.txt"
+          unzip -Z1 "$ipa" > "$entries"
+          grep -Eq '^Payload/[^/]+\.app/Info\.plist$' "$entries"
+          grep -Eq '^Payload/[^/]+\.app/main\.jsbundle$' "$entries"
+
+          if grep -Eq '^Payload/[^/]+\.app/embedded\.mobileprovision$' "$entries"; then
+            echo 'Unsigned IPA unexpectedly contains an embedded provisioning profile.' >&2
+            exit 1
+          fi
+
+          (
+            cd "$(dirname "$ipa")"
+            shasum -a 256 "$(basename "$ipa")" > "$(basename "$checksum")"
+          )
+
+      - name: Upload unsigned device IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: uichat-mira-mobile-ios-unsigned-device
+          path: |
+            ios/build/uichat-mira-mobile-ios-unsigned-device.ipa
+            ios/build/uichat-mira-mobile-ios-unsigned-device.ipa.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -274,10 +366,43 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Generate checksums
+      - name: Verify dev release asset set
+        shell: bash
         run: |
+          set -euo pipefail
+
+          required=(
+            uichat-mira-mobile-dev.apk
+            uichat-mira-mobile-release.apk
+            uichat-mira-mobile-release.apk.sha256
+            uichat-mira-mobile-ios-simulator.zip
+            uichat-mira-mobile-ios-unsigned-device.ipa
+            uichat-mira-mobile-ios-unsigned-device.ipa.sha256
+          )
+
+          for name in "${required[@]}"; do
+            if [ ! -s "release-assets/$name" ]; then
+              echo "Required dev release asset is missing or empty: $name" >&2
+              exit 1
+            fi
+          done
+
+          (
+            cd release-assets
+            sha256sum -c uichat-mira-mobile-release.apk.sha256
+            sha256sum -c uichat-mira-mobile-ios-unsigned-device.ipa.sha256
+            unzip -tq uichat-mira-mobile-ios-simulator.zip
+            unzip -tq uichat-mira-mobile-ios-unsigned-device.ipa
+          )
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
           cd release-assets
-          sha256sum * > SHA256SUMS.txt
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS.txt
 
       - name: Upload dev artifacts to Cloudflare R2
         env:
@@ -289,7 +414,10 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           for name in \
             AWS_ACCESS_KEY_ID \
             AWS_SECRET_ACCESS_KEY \
@@ -308,29 +436,53 @@ jobs:
 
           upload() {
             aws s3 sync release-assets/ "s3://${R2_BUCKET}/${latest_prefix}/" \
-              --delete \
               --endpoint-url "$endpoint" \
               --cache-control 'public, max-age=300, must-revalidate' \
               --only-show-errors
           }
 
+          verify_remote() {
+            while IFS= read -r -d '' file; do
+              filename=$(basename "$file")
+              key="${latest_prefix}/${filename}"
+              local_size=$(stat -c '%s' "$file")
+              remote_size=$(aws s3api head-object \
+                --bucket "$R2_BUCKET" \
+                --key "$key" \
+                --endpoint-url "$endpoint" \
+                --query ContentLength \
+                --output text)
+
+              if [ "$local_size" != "$remote_size" ]; then
+                echo "R2 verification failed for $key: local=$local_size remote=$remote_size" >&2
+                return 1
+              fi
+            done < <(find release-assets -maxdepth 1 -type f -print0)
+          }
+
+          published=false
           for attempt in 1 2 3; do
-            if upload; then
+            if upload && verify_remote; then
+              published=true
               break
             fi
 
-            if [ "$attempt" -eq 3 ]; then
-              echo "R2 upload failed after ${attempt} attempts." >&2
-              exit 1
+            echo "R2 upload or verification attempt ${attempt} failed." >&2
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 10))
             fi
-
-            sleep $((attempt * 10))
           done
+
+          if [ "$published" != true ]; then
+            echo 'R2 publication failed after 3 attempts; existing latest files were not deleted.' >&2
+            exit 1
+          fi
 
           public_base="${R2_PUBLIC_BASE_URL%/}"
           {
             echo "### Cloudflare R2"
             echo "Latest: ${public_base}/${latest_prefix}/"
+            echo "Unsigned iOS IPA: ${public_base}/${latest_prefix}/uichat-mira-mobile-ios-unsigned-device.ipa"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish rolling dev release
@@ -346,7 +498,8 @@ jobs:
           - Commit: \`$GITHUB_SHA\`
           - CI run: \`$GITHUB_RUN_ID\`
           - Android: debug APK and signed release APK
-          - iOS: unsigned Simulator app archive, not an IPA
+          - iOS Simulator: unsigned app archive
+          - iOS device: unsigned arm64 IPA for local Windows signing and sideloading
           - R2 mirror: \`${{ secrets.R2_PUBLIC_BASE_URL }}/mira/mobile/dev/latest/\`
           EOF
 
