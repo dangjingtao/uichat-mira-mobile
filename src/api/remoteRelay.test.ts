@@ -11,6 +11,9 @@ const relay: RemoteRelayEndpoint = {
   token: 'r'.repeat(43),
 };
 
+const BASE64_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
 type SocketHandler = ((event?: any) => void) | null;
 
 class FakeWebSocket {
@@ -52,7 +55,50 @@ class FakeWebSocket {
 const parseSent = (socket: FakeWebSocket) =>
   socket.sent.map(value => JSON.parse(value) as Record<string, unknown>);
 
-const base64 = (value: string) => Buffer.from(value, 'utf8').toString('base64');
+const utf8Bytes = (value: string) => {
+  const bytes: number[] = [];
+  for (const char of value) {
+    const codePoint = char.codePointAt(0) ?? 0xfffd;
+    if (codePoint <= 0x7f) {
+      bytes.push(codePoint);
+    } else if (codePoint <= 0x7ff) {
+      bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+    } else if (codePoint <= 0xffff) {
+      bytes.push(
+        0xe0 | (codePoint >> 12),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    } else {
+      bytes.push(
+        0xf0 | (codePoint >> 18),
+        0x80 | ((codePoint >> 12) & 0x3f),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    }
+  }
+  return bytes;
+};
+
+const base64 = (value: string) => {
+  const bytes = utf8Bytes(value);
+  let output = '';
+  for (let index = 0; index < bytes.length; index += 3) {
+    const a = bytes[index];
+    const b = index + 1 < bytes.length ? bytes[index + 1] : 0;
+    const c = index + 2 < bytes.length ? bytes[index + 2] : 0;
+    const packed = (a << 16) | (b << 8) | c;
+    output += BASE64_ALPHABET[(packed >> 18) & 63];
+    output += BASE64_ALPHABET[(packed >> 12) & 63];
+    output +=
+      index + 1 < bytes.length
+        ? BASE64_ALPHABET[(packed >> 6) & 63]
+        : '=';
+    output += index + 2 < bytes.length ? BASE64_ALPHABET[packed & 63] : '=';
+  }
+  return output;
+};
 
 const connect = async (socket: FakeWebSocket) => {
   socket.open();
@@ -145,7 +191,8 @@ describe('Mira Relay transport', () => {
       path: '/proxy/chat/default',
       credential: 'mira_device_device-1.secret',
       body: { id: 'thread-1', messageId: 'message-1' },
-      parse: value => JSON.parse(value) as { type: string; delta: string },
+      parse: value =>
+        JSON.parse(String(value)) as { type: string; delta: string },
     });
 
     const socket = FakeWebSocket.instances[0];
