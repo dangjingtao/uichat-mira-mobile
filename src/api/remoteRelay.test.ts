@@ -191,8 +191,7 @@ describe('Mira Relay transport', () => {
       path: '/proxy/chat/default',
       credential: 'mira_device_device-1.secret',
       body: { id: 'thread-1', messageId: 'message-1' },
-      parse: value =>
-        JSON.parse(String(value)) as { type: string; delta: string },
+      parse: value => value as { type: string; delta: string },
     });
 
     const socket = FakeWebSocket.instances[0];
