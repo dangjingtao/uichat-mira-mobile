@@ -40,8 +40,7 @@ export const normalizeRelayEndpoint = (value: string): string => {
     throw new Error('Mira Relay URL must include a hostname');
   }
 
-  parsed.pathname = '/';
-  return parsed.toString().replace(/\/$/u, '');
+  return `${parsed.protocol}//${parsed.host}`;
 };
 
 const parseRelay = (parsed: URL): RemoteRelayEndpoint | null => {
@@ -53,7 +52,10 @@ const parseRelay = (parsed: URL): RemoteRelayEndpoint | null => {
   if (!endpointValue || !RELAY_ID_PATTERN.test(relayId)) {
     throw new Error('Pairing link contains an invalid Mira Relay endpoint');
   }
-  if (token.length < RELAY_TOKEN_MIN_LENGTH || token.length > RELAY_TOKEN_MAX_LENGTH) {
+  if (
+    token.length < RELAY_TOKEN_MIN_LENGTH ||
+    token.length > RELAY_TOKEN_MAX_LENGTH
+  ) {
     throw new Error('Pairing link contains an invalid Mira Relay token');
   }
 
