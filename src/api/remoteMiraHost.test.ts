@@ -4,6 +4,12 @@ import { RemoteMiraHostClient, type PendingPairing } from './remoteMiraHost';
 import { MemoryDeviceCredentialStore } from '../security/deviceCredentialStore';
 import type { RemoteRelayEndpoint } from '../protocol/remotePairingV1';
 
+type JsonTransport = <T>(request: RemoteJsonRequest<T>) => Promise<T>;
+type RelayJsonTransport = <T>(
+  relay: RemoteRelayEndpoint,
+  request: RemoteJsonRequest<T>,
+) => Promise<T>;
+
 const relay: RemoteRelayEndpoint = {
   endpoint: 'https://relay.tomz.io',
   relayId: 'relay_1234567890abcdef',
@@ -127,18 +133,19 @@ describe('RemoteMiraHostClient transport selection', () => {
       savedAt: '2026-08-02T00:00:00.000Z',
     });
 
-    const direct = jest.fn(async <T>(_request: RemoteJsonRequest<T>): Promise<T> => {
+    const directMock = jest.fn();
+    const direct: JsonTransport = async _request => {
+      directMock();
       throw new RemoteHostError('NETWORK_ERROR', 'tailnet unavailable');
-    });
-    const relayJson = jest.fn(async <T>(
-      _relay: RemoteRelayEndpoint,
-      request: RemoteJsonRequest<T>,
-    ): Promise<T> => {
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (_relay, request) => {
+      relayJsonMock(_relay, request);
       if (request.path === '/remote/v1/manifest') {
         return request.parse(manifestPayload);
       }
       return request.parse([]);
-    });
+    };
     const client = new RemoteMiraHostClient(
       store,
       direct,
@@ -149,8 +156,8 @@ describe('RemoteMiraHostClient transport selection', () => {
     await expect(client.restoreConnection()).resolves.toMatchObject({
       manifest: manifestPayload,
     });
-    expect(direct).toHaveBeenCalledTimes(1);
-    expect(relayJson).toHaveBeenCalledTimes(1);
+    expect(directMock).toHaveBeenCalledTimes(1);
+    expect(relayJsonMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not hide Host authorization errors behind Relay fallback', async () => {
@@ -164,10 +171,14 @@ describe('RemoteMiraHostClient transport selection', () => {
       savedAt: '2026-08-02T00:00:00.000Z',
     });
 
-    const direct = jest.fn(async <T>(_request: RemoteJsonRequest<T>): Promise<T> => {
+    const direct: JsonTransport = async _request => {
       throw new RemoteHostError('HTTP_403', 'revoked', 403);
-    });
-    const relayJson = jest.fn();
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (_relay, request) => {
+      relayJsonMock(_relay, request);
+      return request.parse(manifestPayload);
+    };
     const client = new RemoteMiraHostClient(
       store,
       direct,
@@ -176,7 +187,7 @@ describe('RemoteMiraHostClient transport selection', () => {
     );
 
     await expect(client.restoreConnection()).rejects.toMatchObject({ status: 403 });
-    expect(relayJson).not.toHaveBeenCalled();
+    expect(relayJsonMock).not.toHaveBeenCalled();
     await expect(store.load()).resolves.toBeNull();
   });
 });
