@@ -221,7 +221,10 @@ const base64Encode = (bytes: Uint8Array) => {
 const base64Decode = (value: string): Uint8Array => {
   const normalized = value.replace(/\s+/g, '');
   if (!normalized || normalized.length % 4 !== 0) {
-    throw new RemoteHostError('INVALID_RELAY_CHUNK', 'Mira Relay returned invalid base64 data');
+    throw new RemoteHostError(
+      'INVALID_RELAY_CHUNK',
+      'Mira Relay returned invalid base64 data',
+    );
   }
 
   const bytes: number[] = [];
@@ -231,7 +234,10 @@ const base64Decode = (value: string): Uint8Array => {
       char === '=' ? 0 : BASE64_ALPHABET.indexOf(char),
     );
     if (values.some(item => item < 0)) {
-      throw new RemoteHostError('INVALID_RELAY_CHUNK', 'Mira Relay returned invalid base64 data');
+      throw new RemoteHostError(
+        'INVALID_RELAY_CHUNK',
+        'Mira Relay returned invalid base64 data',
+      );
     }
     const packed =
       (values[0] << 18) | (values[1] << 12) | (values[2] << 6) | values[3];
@@ -289,7 +295,8 @@ const extractEnvelopeError = (value: unknown) => {
   };
 };
 
-const normalizePath = (value: string) => (value.startsWith('/') ? value : `/${value}`);
+const normalizePath = (value: string) =>
+  value.startsWith('/') ? value : `/${value}`;
 
 const createHeaders = (input: {
   credential?: string;
@@ -305,10 +312,11 @@ const createHeaders = (input: {
 };
 
 const buildSocketUrl = (relay: RemoteRelayEndpoint) => {
-  const url = new URL(normalizeRelayEndpoint(relay.endpoint));
-  url.protocol = 'wss:';
-  url.pathname = `/v1/relay/${encodeURIComponent(relay.relayId)}/socket`;
-  return url.toString();
+  const baseUrl = normalizeRelayEndpoint(relay.endpoint).replace(
+    /^https:/u,
+    'wss:',
+  );
+  return `${baseUrl}/v1/relay/${encodeURIComponent(relay.relayId)}/socket`;
 };
 
 const parseInboundFrame = (value: unknown): RelayInboundFrame | null => {
@@ -401,7 +409,10 @@ class RelayConnection {
   async requestJson<T>(request: RemoteJsonRequest<T>): Promise<T> {
     await this.ensureConnected();
     if (request.signal?.aborted) {
-      throw new RemoteHostError('REQUEST_ABORTED', 'Mira Host request was cancelled');
+      throw new RemoteHostError(
+        'REQUEST_ABORTED',
+        'Mira Host request was cancelled',
+      );
     }
 
     const requestId = this.nextRequestId();
@@ -421,7 +432,12 @@ class RelayConnection {
         if (!this.pending.has(requestId)) return;
         this.pending.delete(requestId);
         this.send({ version: 1, type: 'cancel', requestId });
-        reject(new RemoteHostError('REQUEST_ABORTED', 'Mira Host request was cancelled'));
+        reject(
+          new RemoteHostError(
+            'REQUEST_ABORTED',
+            'Mira Host request was cancelled',
+          ),
+        );
       };
       request.signal?.addEventListener('abort', abort, { once: true });
 
@@ -431,15 +447,27 @@ class RelayConnection {
         requestId,
         method: request.method ?? 'GET',
         path: normalizePath(request.path),
-        headers: createHeaders({ credential: request.credential, body: request.body }),
+        headers: createHeaders({
+          credential: request.credential,
+          body: request.body,
+        }),
         ...(request.body === undefined
           ? {}
-          : { bodyBase64: base64Encode(utf8Encode(JSON.stringify(request.body))) }),
+          : {
+              bodyBase64: base64Encode(
+                utf8Encode(JSON.stringify(request.body)),
+              ),
+            }),
       });
       if (!sent) {
         request.signal?.removeEventListener('abort', abort);
         this.pending.delete(requestId);
-        reject(new RemoteHostError('RELAY_DISCONNECTED', 'Mira Relay is not connected'));
+        reject(
+          new RemoteHostError(
+            'RELAY_DISCONNECTED',
+            'Mira Relay is not connected',
+          ),
+        );
       }
     });
   }
@@ -473,11 +501,18 @@ class RelayConnection {
               body: request.body,
               sse: true,
             }),
-            bodyBase64: base64Encode(utf8Encode(JSON.stringify(request.body))),
+            bodyBase64: base64Encode(
+              utf8Encode(JSON.stringify(request.body)),
+            ),
           })
         ) {
           this.pending.delete(requestId);
-          queue.fail(new RemoteHostError('RELAY_DISCONNECTED', 'Mira Relay is not connected'));
+          queue.fail(
+            new RemoteHostError(
+              'RELAY_DISCONNECTED',
+              'Mira Relay is not connected',
+            ),
+          );
         }
       })
       .catch(error => queue.fail(error));
@@ -490,13 +525,20 @@ class RelayConnection {
         if (this.pending.delete(requestId)) {
           this.send({ version: 1, type: 'cancel', requestId });
         }
-        queue.fail(new RemoteHostError('REQUEST_ABORTED', 'Mira Host stream was cancelled'));
+        queue.fail(
+          new RemoteHostError(
+            'REQUEST_ABORTED',
+            'Mira Host stream was cancelled',
+          ),
+        );
       },
     };
   }
 
   close() {
-    this.failAll(new RemoteHostError('RELAY_DISCONNECTED', 'Mira Relay connection closed'));
+    this.failAll(
+      new RemoteHostError('RELAY_DISCONNECTED', 'Mira Relay connection closed'),
+    );
     const socket = this.socket;
     this.socket = null;
     this.connectPromise = null;
@@ -512,10 +554,11 @@ class RelayConnection {
     if (this.socket?.readyState === 1) return Promise.resolve();
     if (this.connectPromise) return this.connectPromise;
 
-    this.connectPromise = new Promise<void>((resolve, reject) => {
+    const connectPromise = new Promise<void>((resolve, reject) => {
       this.resolveConnect = resolve;
       this.rejectConnect = reject;
     });
+    this.connectPromise = connectPromise;
 
     let socket: WebSocket;
     try {
@@ -529,7 +572,7 @@ class RelayConnection {
           error,
         ),
       );
-      return this.connectPromise;
+      return connectPromise;
     }
     this.socket = socket;
 
@@ -545,7 +588,10 @@ class RelayConnection {
       this.handshakeTimer = setTimeout(() => {
         if (this.socket !== socket || !this.connectPromise) return;
         this.finishConnectFailure(
-          new RemoteHostError('RELAY_HANDSHAKE_TIMEOUT', 'Mira Relay handshake timed out'),
+          new RemoteHostError(
+            'RELAY_HANDSHAKE_TIMEOUT',
+            'Mira Relay handshake timed out',
+          ),
         );
         try {
           socket.close(1008, 'Relay handshake timeout');
@@ -605,7 +651,10 @@ class RelayConnection {
       if (this.socket !== socket) return;
       if (this.connectPromise) {
         this.finishConnectFailure(
-          new RemoteHostError('RELAY_NETWORK_ERROR', 'Unable to reach Mira Relay'),
+          new RemoteHostError(
+            'RELAY_NETWORK_ERROR',
+            'Unable to reach Mira Relay',
+          ),
         );
       }
     };
@@ -616,19 +665,26 @@ class RelayConnection {
       this.stopHandshakeTimer();
       const reason = event.reason || 'Mira Relay connection closed';
       if (this.connectPromise) {
-        this.finishConnectFailure(new RemoteHostError('RELAY_DISCONNECTED', reason));
+        this.finishConnectFailure(
+          new RemoteHostError('RELAY_DISCONNECTED', reason),
+        );
       }
       this.failAll(new RemoteHostError('RELAY_DISCONNECTED', reason));
     };
 
-    return this.connectPromise;
+    return connectPromise;
   }
 
   private handleFrame(frame: RelayInboundFrame) {
     if (frame.type === 'error' && !frame.requestId) {
       if (this.connectPromise) {
         this.finishConnectFailure(
-          new RemoteHostError(`RELAY_${frame.code}`, frame.message, undefined, frame),
+          new RemoteHostError(
+            `RELAY_${frame.code}`,
+            frame.message,
+            undefined,
+            frame,
+          ),
         );
       }
       return;
@@ -674,7 +730,10 @@ class RelayConnection {
         return;
       }
 
-      if (pending.status !== null && (pending.status < 200 || pending.status >= 300)) {
+      if (
+        pending.status !== null &&
+        (pending.status < 200 || pending.status >= 300)
+      ) {
         pending.errorChunks.push(bytes);
         return;
       }
@@ -723,7 +782,10 @@ class RelayConnection {
             : unwrapApiEnvelope(payload, pending.parse),
         );
       } catch (error) {
-        const value = error as Error & { code?: string | number; details?: unknown };
+        const value = error as Error & {
+          code?: string | number;
+          details?: unknown;
+        };
         pending.reject(
           new RemoteHostError(
             value.code === undefined ? 'INVALID_RESPONSE' : String(value.code),
@@ -742,7 +804,10 @@ class RelayConnection {
     const status = pending.status ?? 0;
     if (status < 200 || status >= 300) {
       try {
-        const payload = parseJsonText(decodeUtf8(concatBytes(pending.errorChunks)), status);
+        const payload = parseJsonText(
+          decodeUtf8(concatBytes(pending.errorChunks)),
+          status,
+        );
         const envelope = extractEnvelopeError(payload);
         pending.queue.fail(
           new RemoteHostError(
