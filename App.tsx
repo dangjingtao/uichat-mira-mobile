@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'react-native';
 import {
   NavigationContainer,
@@ -17,6 +17,7 @@ import { AboutScreen } from './src/screens/AboutScreen';
 import { LicenseScreen } from './src/screens/LicenseScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
+import { desktopMiraHostClient } from './src/api/desktopMiraHost';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,10 +41,39 @@ function StatusBarThemed() {
 }
 
 function AppInner() {
+  const [bootstrapChecked, setBootstrapChecked] = useState(false);
+  const [hasCredential, setHasCredential] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    desktopMiraHostClient
+      .getStoredHostUrl()
+      .then((hostUrl) => {
+        if (cancelled) return;
+        setHasCredential(hostUrl != null);
+        setBootstrapChecked(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHasCredential(false);
+        setBootstrapChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!bootstrapChecked) {
+    return null;
+  }
+
   return (
     <>
       <TailscaleConnectivityLifecycle />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        initialRouteName={hasCredential ? 'SessionList' : 'HostConfig'}
+        screenOptions={{ headerShown: false }}
+      >
         <Stack.Screen name="SessionList" component={SessionListScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="HostConfig" component={HostConfigScreen} />

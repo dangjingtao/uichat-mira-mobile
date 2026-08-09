@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { remoteMiraHostClient } from '../api/remoteMiraHost';
+import { desktopMiraHostClient } from '../api/desktopMiraHost';
 import { useHostStore } from '../store/hostStore';
 import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
 import { subscribeToSystemNetworkChanges } from './systemNetworkMonitor';
@@ -21,13 +21,13 @@ export function TailscaleConnectivityLifecycle() {
 
   useEffect(() => {
     let cancelled = false;
-    if (configuredHostUrl || !remoteMiraHostClient.isSecureStorageAvailable()) {
+    if (configuredHostUrl || !desktopMiraHostClient.isSecureStorageAvailable()) {
       return () => {
         cancelled = true;
       };
     }
 
-    remoteMiraHostClient
+    desktopMiraHostClient
       .getStoredHostUrl()
       .then((storedHostUrl) => {
         if (cancelled || !storedHostUrl) return;
@@ -120,14 +120,14 @@ export function TailscaleConnectivityLifecycle() {
     }
 
     if (connectivityState === 'ready') {
-      if (!remoteMiraHostClient.isSecureStorageAvailable()) {
+      if (!desktopMiraHostClient.isSecureStorageAvailable()) {
         hostState.setConnectionStatus('disconnected');
         return () => {
           cancelled = true;
         };
       }
 
-      void remoteMiraHostClient
+      void desktopMiraHostClient
         .restoreConnection()
         .then((restored) => {
           if (cancelled) return;
