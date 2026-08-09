@@ -322,7 +322,12 @@ export class RemoteMiraHostClient {
         body: {
           id: input.threadId,
           messageId: input.messageId,
-          messages: [{ role: 'user', content }],
+          messages: [
+            {
+              role: 'user',
+              parts: [{ type: 'text', text: content }],
+            },
+          ],
           ...(typeof input.agentEnabled === 'boolean'
             ? { agentEnabled: input.agentEnabled }
             : {}),
