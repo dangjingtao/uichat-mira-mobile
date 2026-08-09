@@ -19,7 +19,6 @@ import { ChevronLeft, MoreVertical, Send, Square } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
-import { desktopMiraHostClient } from '../api/desktopMiraHost';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
@@ -157,8 +156,8 @@ export function ChatScreen() {
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
-    // 同时中断网络层流式请求，避免后台继续占用连接。
-    desktopMiraHostClient.cancelCurrentSend();
+    // 中断当前实际使用的 Direct 或 Relay 流。
+    miraHostClient.cancelCurrentSend();
   }, []);
 
   const openMenu = useCallback(() => {
