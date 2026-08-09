@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionListScreen } from './src/screens/SessionListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { HostConfigScreen } from './src/screens/HostConfigScreen';
+import { RemotePairingScreen } from './src/screens/RemotePairingScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { PersonalizationScreen } from './src/screens/PersonalizationScreen';
@@ -17,7 +18,7 @@ import { AboutScreen } from './src/screens/AboutScreen';
 import { LicenseScreen } from './src/screens/LicenseScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
-import { desktopMiraHostClient } from './src/api/desktopMiraHost';
+import { miraHostClient } from './src/api/miraHostClient';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -26,7 +27,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['mira://'],
   config: {
     screens: {
-      HostConfig: 'pair',
+      Pairing: 'pair',
     },
   },
 };
@@ -46,11 +47,11 @@ function AppInner() {
 
   useEffect(() => {
     let cancelled = false;
-    desktopMiraHostClient
-      .getStoredHostUrl()
-      .then((hostUrl) => {
+    miraHostClient
+      .prepareStoredConnection()
+      .then((available) => {
         if (cancelled) return;
-        setHasCredential(hostUrl != null);
+        setHasCredential(available);
         setBootstrapChecked(true);
       })
       .catch(() => {
@@ -76,6 +77,7 @@ function AppInner() {
       >
         <Stack.Screen name="SessionList" component={SessionListScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Pairing" component={RemotePairingScreen} />
         <Stack.Screen name="HostConfig" component={HostConfigScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'none' }} />
