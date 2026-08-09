@@ -86,6 +86,10 @@ type RemoteEndpoints = {
   relay: RemoteRelayEndpoint | null;
 };
 
+type PairingClaimWithTransport = PairingClaimResponse & {
+  transport: RemoteTransportKind;
+};
+
 const DIRECT_RETRY_COOLDOWN_MS = 30_000;
 
 const parseArray = <T>(
@@ -133,11 +137,10 @@ export class RemoteMiraHostClient {
     identity: MobileDeviceIdentity,
   ): Promise<PendingPairing> {
     const descriptor = parsePairingUriV1(pairingUri);
-    const transport = await this.selectPairingTransport(descriptor);
-    const claim = await this.claimPairingOnTransport(descriptor, identity, transport);
+    const claim = await this.claimPairing(descriptor, identity);
     return {
       descriptor,
-      transport,
+      transport: claim.transport,
       claimId: claim.claimId,
       pollToken: claim.pollToken,
       expiresAt: claim.expiresAt,
@@ -147,9 +150,14 @@ export class RemoteMiraHostClient {
   async claimPairing(
     descriptor: PairingDescriptorV1,
     identity: MobileDeviceIdentity,
-  ): Promise<PairingClaimResponse> {
+  ): Promise<PairingClaimWithTransport> {
     const transport = await this.selectPairingTransport(descriptor);
-    return this.claimPairingOnTransport(descriptor, identity, transport);
+    const claim = await this.claimPairingOnTransport(
+      descriptor,
+      identity,
+      transport,
+    );
+    return { ...claim, transport };
   }
 
   async pollPairing(pending: PendingPairing): Promise<PairingPollResponse> {
@@ -496,7 +504,10 @@ export class RemoteMiraHostClient {
     if (transport === 'direct') {
       if (!endpoints.hostUrl) {
         return Promise.reject(
-          new RemoteHostError('DIRECT_ENDPOINT_UNAVAILABLE', 'Direct Mira Host endpoint is unavailable'),
+          new RemoteHostError(
+            'DIRECT_ENDPOINT_UNAVAILABLE',
+            'Direct Mira Host endpoint is unavailable',
+          ),
         );
       }
       return this.jsonTransport({
@@ -508,7 +519,10 @@ export class RemoteMiraHostClient {
 
     if (!endpoints.relay) {
       return Promise.reject(
-        new RemoteHostError('RELAY_ENDPOINT_UNAVAILABLE', 'Mira Relay endpoint is unavailable'),
+        new RemoteHostError(
+          'RELAY_ENDPOINT_UNAVAILABLE',
+          'Mira Relay endpoint is unavailable',
+        ),
       );
     }
     return this.relayJsonTransport(endpoints.relay, {
