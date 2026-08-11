@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   KeyRound,
   RefreshCw,
+  ScanLine,
   ShieldCheck,
   Wifi,
 } from 'lucide-react-native';
@@ -40,6 +41,7 @@ import {
 import { remoteMiraHostClient } from '../api/remoteMiraHost';
 import { useRemotePairing } from '../pairing/useRemotePairing';
 import { useTheme } from '../theme/ThemeContext';
+import { PairingScannerModal } from '../components/PairingScannerModal';
 
 const connectivityTitle = (state: TailscaleConnectivityState) => {
   switch (state) {
@@ -89,6 +91,7 @@ export function HostConfigScreen() {
   const [pairingDescriptor, setPairingDescriptor] =
     useState<PairingDescriptor | null>(null);
   const [pairingLinkError, setPairingLinkError] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const isProbing = connectivityState === 'probing';
   const isTransportReady =
@@ -105,31 +108,52 @@ export function HostConfigScreen() {
     secureStorageAvailable,
   } = useRemotePairing(pairingDescriptor, isTransportReady);
 
+  const loadPairingUri = useCallback(
+    (uri: string) => {
+      try {
+        const descriptor = parsePairingUri(uri);
+        setPairingDescriptor(descriptor);
+        setPairingLinkError(null);
+        setHostUrl(descriptor.hostUrl);
+        setConnectivityHostUrl(descriptor.hostUrl);
+
+        const current = useTailscaleConnectivityStore.getState();
+        if (
+          current.hostUrl !== descriptor.hostUrl ||
+          (current.state !== 'probing' && current.state !== 'ready')
+        ) {
+          void current.probe(descriptor.hostUrl, 'manual').catch((error: unknown) => {
+            setPairingLinkError(
+              error instanceof Error
+                ? error.message
+                : '无法检查 Mira Host 连接',
+            );
+          });
+        }
+        return true;
+      } catch (error) {
+        setPairingDescriptor(null);
+        setPairingLinkError(
+          error instanceof Error ? error.message : '无法读取桌面配对链接',
+        );
+        return false;
+      }
+    },
+    [setConnectivityHostUrl],
+  );
+
   useEffect(() => {
     try {
       const uri = buildPairingUriFromRoute(route.params);
       if (!uri) return;
-
-      const descriptor = parsePairingUri(uri);
-      setPairingDescriptor(descriptor);
-      setPairingLinkError(null);
-      setHostUrl(descriptor.hostUrl);
-      setConnectivityHostUrl(descriptor.hostUrl);
-
-      const current = useTailscaleConnectivityStore.getState();
-      if (
-        current.hostUrl !== descriptor.hostUrl ||
-        (current.state !== 'probing' && current.state !== 'ready')
-      ) {
-        void current.probe(descriptor.hostUrl, 'manual');
-      }
+      loadPairingUri(uri);
     } catch (error) {
       setPairingDescriptor(null);
       setPairingLinkError(
         error instanceof Error ? error.message : '无法读取桌面配对链接',
       );
     }
-  }, [route.params, setConnectivityHostUrl]);
+  }, [route.params, loadPairingUri]);
 
   useEffect(() => {
     if (pairingState.phase !== 'paired' || !pairingDescriptor) return;
@@ -249,7 +273,7 @@ export function HostConfigScreen() {
       style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
       edges={['top', 'bottom']}
     >
-      <View style={[styles.header, { borderBottomColor: colors.border.soft }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border.soft }]}> 
         <Pressable onPress={handleBack} style={styles.backBtn}>
           <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
@@ -283,7 +307,7 @@ export function HostConfigScreen() {
             </Text>
           </View>
 
-          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}> 
             <View style={styles.sectionHeading}>
               <KeyRound
                 size={20}
@@ -291,6 +315,20 @@ export function HostConfigScreen() {
               />
               <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>配对请求</Text>
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="扫码配对"
+              onPress={() => setScannerOpen(true)}
+              style={({ pressed }) => [
+                styles.scanBtn,
+                { backgroundColor: colors.primary },
+                pressed && { backgroundColor: colors.primaryActive },
+              ]}
+            >
+              <ScanLine size={18} color={colors.onPrimary} />
+              <Text style={[styles.scanBtnText, { color: colors.onPrimary }]}>扫码配对</Text>
+            </Pressable>
 
             {pairingLinkError ? (
               <Text style={[styles.bodyText, { color: colors.status.error }]}> 
@@ -312,7 +350,7 @@ export function HostConfigScreen() {
             )}
           </View>
 
-          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}> 
             <View style={styles.sectionHeading}>
               <Wifi size={20} color={colors.text.ink} />
               <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Tailscale 联通</Text>
@@ -397,7 +435,7 @@ export function HostConfigScreen() {
             </Pressable>
           </View>
 
-          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}> 
             <View style={styles.sectionHeading}>
               <ShieldCheck size={20} color={colors.text.ink} />
               <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Mira 授权</Text>
@@ -451,6 +489,15 @@ export function HostConfigScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PairingScannerModal
+        visible={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanned={(uri) => {
+          setScannerOpen(false);
+          loadPairingUri(uri);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -517,6 +564,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 14,
   },
+  scanBtn: {
+    minHeight: 48,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  scanBtnText: { fontSize: 15, fontWeight: '700' },
   statusBox: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
