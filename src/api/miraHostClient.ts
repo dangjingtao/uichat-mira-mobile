@@ -34,6 +34,9 @@ const unsupportedMutation = (operation: string): never => {
   );
 };
 
+const createMessageId = () =>
+  `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 /**
  * Mobile runtime compatibility adapter.
  *
@@ -107,13 +110,16 @@ class PairedRemoteMiraHostClient implements MiraHostApi {
   async sendMessage(
     sessionId: string,
     content: string,
+    messageId: string = createMessageId(),
   ): Promise<AsyncIterable<string>> {
-    const messageId = `mobile-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
+    const stableMessageId = messageId.trim();
+    if (!stableMessageId) {
+      throw new Error('A stable message id is required');
+    }
+
     const session = await this.remote.sendMessage({
       threadId: sessionId,
-      messageId,
+      messageId: stableMessageId,
       content,
     });
     this.currentSendAbort = session.abort;
