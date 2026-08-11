@@ -124,8 +124,14 @@ class PairedRemoteMiraHostClient implements MiraHostApi {
         for await (const event of session.events) {
           if (event.type === 'text-delta' && typeof event.delta === 'string') {
             yield event.delta;
-          } else if (event.type === 'error') {
-            throw new Error(event.errorText || 'Mira Host stream failed');
+            continue;
+          }
+          if (event.type === 'error') {
+            const errorText =
+              'errorText' in event && typeof event.errorText === 'string'
+                ? event.errorText
+                : 'Mira Host stream failed';
+            throw new Error(errorText);
           }
         }
       } finally {
