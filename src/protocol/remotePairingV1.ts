@@ -4,9 +4,12 @@ const RELAY_ID_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const RELAY_TOKEN_MIN_LENGTH = 32;
 const RELAY_TOKEN_MAX_LENGTH = 512;
 
-export interface RemoteRelayEndpoint {
+export interface RemoteRelayHint {
   endpoint: string;
   relayId: string;
+}
+
+export interface RemoteRelayEndpoint extends RemoteRelayHint {
   token: string;
 }
 
@@ -14,6 +17,11 @@ export interface PairingDescriptorV1 {
   version: 1;
   hostUrl: string | null;
   relay: RemoteRelayEndpoint | null;
+  /**
+   * Desktop may advertise Relay endpoint metadata before a client transport
+   * credential is available. A hint is not sufficient to open Relay.
+   */
+  relayHint?: RemoteRelayHint | null;
   challengeId: string;
   code: string;
 }
@@ -43,14 +51,33 @@ export const normalizeRelayEndpoint = (value: string): string => {
   return `${parsed.protocol}//${parsed.host}`;
 };
 
-const parseRelay = (parsed: URL): RemoteRelayEndpoint | null => {
+type ParsedRelay = {
+  relay: RemoteRelayEndpoint | null;
+  relayHint: RemoteRelayHint | null;
+};
+
+const parseRelay = (parsed: URL): ParsedRelay => {
   const endpointValue = parsed.searchParams.get('relay')?.trim() ?? '';
   const relayId = parsed.searchParams.get('relayId')?.trim() ?? '';
   const token = parsed.searchParams.get('relayToken')?.trim() ?? '';
 
-  if (!endpointValue && !relayId && !token) return null;
+  if (!endpointValue && !relayId && !token) {
+    return { relay: null, relayHint: null };
+  }
   if (!endpointValue || !RELAY_ID_PATTERN.test(relayId)) {
     throw new Error('Pairing link contains an invalid Mira Relay endpoint');
+  }
+
+  const relayHint: RemoteRelayHint = {
+    endpoint: normalizeRelayEndpoint(endpointValue),
+    relayId,
+  };
+
+  // Current Desktop V1 advertises relay + relayId without exposing the
+  // long-lived client token. Keep that link valid, but do not pretend the hint
+  // is an authenticated Relay endpoint.
+  if (!token) {
+    return { relay: null, relayHint };
   }
   if (
     token.length < RELAY_TOKEN_MIN_LENGTH ||
@@ -60,9 +87,8 @@ const parseRelay = (parsed: URL): RemoteRelayEndpoint | null => {
   }
 
   return {
-    endpoint: normalizeRelayEndpoint(endpointValue),
-    relayId,
-    token,
+    relay: { ...relayHint, token },
+    relayHint,
   };
 };
 
@@ -88,7 +114,7 @@ export const parsePairingUriV1 = (value: string): PairingDescriptorV1 => {
   const hostUrl = hostValue
     ? normalizeHostUrl(hostValue, { allowInsecureDevelopment: __DEV__ })
     : null;
-  const relay = parseRelay(parsed);
+  const { relay, relayHint } = parseRelay(parsed);
   const challengeId = parsed.searchParams.get('challenge')?.trim() ?? '';
   const code = parsed.searchParams.get('code')?.trim().toUpperCase() ?? '';
 
@@ -103,6 +129,7 @@ export const parsePairingUriV1 = (value: string): PairingDescriptorV1 => {
     version: 1,
     hostUrl,
     relay,
+    relayHint,
     challengeId,
     code,
   };
