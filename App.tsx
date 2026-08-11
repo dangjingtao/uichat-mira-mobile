@@ -18,6 +18,7 @@ import { LicenseScreen } from './src/screens/LicenseScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
+import { deviceCredentialStore } from './src/security/deviceCredentialStore';
 import { useHostStore } from './src/store/hostStore';
 import type { RootStackParamList } from './src/types/navigation';
 
@@ -50,15 +51,23 @@ function AppInner() {
 
     const bootstrapRemoteHost = async () => {
       try {
-        const storedHostUrl = await remoteMiraHostClient.getStoredHostUrl();
-        if (cancelled) return;
-
-        if (!storedHostUrl) {
-          useHostStore.getState().setConnectionStatus('disconnected');
-          setHasDeviceCredential(false);
+        if (!remoteMiraHostClient.isSecureStorageAvailable()) {
+          if (!cancelled) {
+            setHasDeviceCredential(false);
+            useHostStore.getState().setConnectionStatus('disconnected');
+          }
           return;
         }
 
+        const stored = await deviceCredentialStore.load();
+        if (cancelled) return;
+        if (!stored) {
+          setHasDeviceCredential(false);
+          useHostStore.getState().setConnectionStatus('disconnected');
+          return;
+        }
+
+        setHasDeviceCredential(true);
         try {
           const restored = await remoteMiraHostClient.restoreConnection();
           if (cancelled) return;
@@ -71,20 +80,13 @@ function AppInner() {
         } catch {
           if (cancelled) return;
 
-          // restoreConnection clears the stored credential only for 401/403.
-          // A transient network failure must not be mistaken for revocation.
-          const stillStored = (await remoteMiraHostClient.getStoredHostUrl()) != null;
-          if (cancelled) return;
-
-          setHasDeviceCredential(stillStored);
-          useHostStore
-            .getState()
-            .setConnectionStatus(stillStored ? 'reconnecting' : 'disconnected');
+          // Direct or Relay may be temporarily unreachable. The paired-device
+          // credential remains valid unless the Host explicitly returns 401/403.
+          setHasDeviceCredential(true);
+          useHostStore.getState().setConnectionStatus('reconnecting');
         }
       } finally {
-        if (!cancelled) {
-          setBootstrapChecked(true);
-        }
+        if (!cancelled) setBootstrapChecked(true);
       }
     };
 
@@ -94,9 +96,7 @@ function AppInner() {
     };
   }, []);
 
-  if (!bootstrapChecked) {
-    return null;
-  }
+  if (!bootstrapChecked) return null;
 
   return (
     <>
