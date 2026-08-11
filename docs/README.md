@@ -3,6 +3,7 @@
 ## 工程与发布
 
 - [GitHub Actions 构建与发布](github-build-release.md)
+- [依赖安全技术债务](dependency-security-debt.md)
 
 ## 当前工程主线
 
