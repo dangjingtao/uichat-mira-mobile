@@ -18,6 +18,7 @@ import { LicenseScreen } from './src/screens/LicenseScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
+import { useHostStore } from './src/store/hostStore';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -46,18 +47,48 @@ function AppInner() {
 
   useEffect(() => {
     let cancelled = false;
-    remoteMiraHostClient
-      .getStoredHostUrl()
-      .then((hostUrl) => {
+
+    const bootstrapRemoteHost = async () => {
+      try {
+        const storedHostUrl = await remoteMiraHostClient.getStoredHostUrl();
         if (cancelled) return;
-        setHasDeviceCredential(hostUrl != null);
-        setBootstrapChecked(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setHasDeviceCredential(false);
-        setBootstrapChecked(true);
-      });
+
+        if (!storedHostUrl) {
+          useHostStore.getState().setConnectionStatus('disconnected');
+          setHasDeviceCredential(false);
+          return;
+        }
+
+        try {
+          const restored = await remoteMiraHostClient.restoreConnection();
+          if (cancelled) return;
+
+          const connected = restored != null;
+          setHasDeviceCredential(connected);
+          useHostStore
+            .getState()
+            .setConnectionStatus(connected ? 'connected' : 'disconnected');
+        } catch {
+          if (cancelled) return;
+
+          // restoreConnection clears the stored credential only for 401/403.
+          // A transient network failure must not be mistaken for revocation.
+          const stillStored = (await remoteMiraHostClient.getStoredHostUrl()) != null;
+          if (cancelled) return;
+
+          setHasDeviceCredential(stillStored);
+          useHostStore
+            .getState()
+            .setConnectionStatus(stillStored ? 'reconnecting' : 'disconnected');
+        }
+      } finally {
+        if (!cancelled) {
+          setBootstrapChecked(true);
+        }
+      }
+    };
+
+    void bootstrapRemoteHost();
     return () => {
       cancelled = true;
     };
