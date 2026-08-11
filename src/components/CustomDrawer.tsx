@@ -39,7 +39,8 @@ interface CategoryItem {
 const categories: CategoryItem[] = [
   { id: 'images', label: '图片', icon: ImageIcon },
   { id: 'files', label: '文件库', icon: FolderKanban },
-  { id: 'projects', label: '项目', icon: FolderOpen },
+  // Product term “项目” maps to the Desktop Host Chat Workspace domain.
+  { id: 'workspaces', label: '项目', icon: FolderOpen },
   { id: 'remote', label: 'Remote', icon: Monitor },
   { id: 'planned', label: '已计划', icon: Clock },
   { id: 'plugins', label: '插件', icon: Grid3x3 },
