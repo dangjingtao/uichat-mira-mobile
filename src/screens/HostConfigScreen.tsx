@@ -90,6 +90,10 @@ export function HostConfigScreen() {
   const isProbing = connectivityState === 'probing';
   const isTransportReady =
     connectivityState === 'ready' && connectivityResult?.hostUrl != null;
+  const hasTransportError =
+    connectivityState !== 'idle' &&
+    connectivityState !== 'probing' &&
+    connectivityState !== 'ready';
 
   const {
     state: pairingState,
@@ -338,10 +342,9 @@ export function HostConfigScreen() {
               style={[
                 styles.statusBox,
                 {
-                  backgroundColor:
-                    connectivityState === 'failed'
-                      ? colors.status.errorBg
-                      : colors.bg.soft,
+                  backgroundColor: hasTransportError
+                    ? colors.status.errorBg
+                    : colors.bg.soft,
                   borderColor: statusColor,
                 },
               ]}
