@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { desktopMiraHostClient } from '../api/desktopMiraHost';
+import { remoteMiraHostClient } from '../api/remoteMiraHost';
 import { useHostStore } from '../store/hostStore';
 import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
 import { subscribeToSystemNetworkChanges } from './systemNetworkMonitor';
@@ -8,7 +8,7 @@ import { subscribeToSystemNetworkChanges } from './systemNetworkMonitor';
 /**
  * Keeps the observable Mobile -> Tailscale -> Mira Host transport state fresh.
  * It never clears device credentials on transport failures; authorization is a
- * separate layer and is validated only after connectivity becomes ready.
+ * separate layer and is validated through Remote Host V1 manifest checks.
  */
 export function TailscaleConnectivityLifecycle() {
   const configuredHostUrl = useHostStore((state) => state.config?.hostUrl ?? '');
@@ -21,13 +21,13 @@ export function TailscaleConnectivityLifecycle() {
 
   useEffect(() => {
     let cancelled = false;
-    if (configuredHostUrl || !desktopMiraHostClient.isSecureStorageAvailable()) {
+    if (configuredHostUrl || !remoteMiraHostClient.isSecureStorageAvailable()) {
       return () => {
         cancelled = true;
       };
     }
 
-    desktopMiraHostClient
+    remoteMiraHostClient
       .getStoredHostUrl()
       .then((storedHostUrl) => {
         if (cancelled || !storedHostUrl) return;
@@ -120,14 +120,14 @@ export function TailscaleConnectivityLifecycle() {
     }
 
     if (connectivityState === 'ready') {
-      if (!desktopMiraHostClient.isSecureStorageAvailable()) {
+      if (!remoteMiraHostClient.isSecureStorageAvailable()) {
         hostState.setConnectionStatus('disconnected');
         return () => {
           cancelled = true;
         };
       }
 
-      void desktopMiraHostClient
+      void remoteMiraHostClient
         .restoreConnection()
         .then((restored) => {
           if (cancelled) return;
@@ -137,7 +137,16 @@ export function TailscaleConnectivityLifecycle() {
         })
         .catch(() => {
           if (cancelled) return;
-          useHostStore.getState().setConnectionStatus('disconnected');
+
+          // Network failure is not device revocation. restoreConnection clears
+          // the device credential only for 401/403, so preserve reconnecting
+          // while a credential still exists.
+          void remoteMiraHostClient.getStoredHostUrl().then((storedHostUrl) => {
+            if (cancelled) return;
+            useHostStore
+              .getState()
+              .setConnectionStatus(storedHostUrl ? 'reconnecting' : 'disconnected');
+          });
         });
 
       return () => {

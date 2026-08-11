@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -9,21 +9,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ChevronLeft, MoreVertical, Send, Square } from 'lucide-react-native';
+import { ChevronLeft, Send, Square } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
-import { desktopMiraHostClient } from '../api/desktopMiraHost';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
-import { ConversationMenu } from '../components/ConversationMenu';
 
 function ThinkingIndicator({ color }: { color: string }) {
   const dots = useRef([
@@ -70,12 +67,15 @@ function ThinkingIndicator({ color }: { color: string }) {
   );
 }
 
+const createLocalMessageId = () =>
+  `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 export function ChatScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { sessionId, title } = route.params;
   const { colors } = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
@@ -89,44 +89,63 @@ export function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  // 发送失败：消息 id -> 具体错误信息（用于展示失败原因）
-  const [failedMessages, setFailedMessages] = useState<Map<string, string>>(new Map());
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number }>({
-    top: 0,
-    right: spacing.sm,
-  });
-  const flatListRef = useRef<FlatList>(null);
-  const menuButtonRef = useRef<View>(null);
+  const [failedMessages, setFailedMessages] = useState<Map<string, string>>(
+    new Map(),
+  );
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const abortRef = useRef(false);
 
-  useEffect(() => {
-    miraHostClient.getMessages(sessionId).then((msgs) => setMessages(msgs)).catch(() => {});
+  const loadMessages = useCallback(async () => {
+    try {
+      setMessages(await miraHostClient.getMessages(sessionId));
+    } catch {
+      // Connection and authorization state are surfaced by the remote host flow.
+    }
   }, [sessionId]);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
 
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, []);
 
   const sendMessage = useCallback(
-    async (text?: string) => {
-      const content = (text ?? inputText).trim();
+    async (text?: string, existingMessage?: ChatMessage) => {
+      const content = (text ?? existingMessage?.content ?? inputText).trim();
       if (!content || isLoading) return;
+
+      const userMsg: ChatMessage =
+        existingMessage ?? {
+          id: createLocalMessageId(),
+          role: 'user',
+          content,
+          timestamp: new Date(),
+        };
+
+      if (!existingMessage) {
+        setMessages((prev) => [...prev, userMsg]);
+      }
+      setFailedMessages((prev) => {
+        if (!prev.has(userMsg.id)) return prev;
+        const next = new Map(prev);
+        next.delete(userMsg.id);
+        return next;
+      });
       setInputText('');
       setIsLoading(true);
       setStreamingText('');
       abortRef.current = false;
 
-      const userMsg: ChatMessage = {
-        id: `local-${Date.now()}`,
-        role: 'user',
-        content,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
-
       try {
-        const stream = await miraHostClient.sendMessage(sessionId, content);
+        // Reuse the same user-message id on retry. Remote Host V1 requires a
+        // stable messageId so an uncertain reconnect cannot duplicate a user message.
+        const stream = await miraHostClient.sendMessage(
+          sessionId,
+          content,
+          userMsg.id,
+        );
         let fullReply = '';
         for await (const chunk of stream) {
           if (abortRef.current) break;
@@ -134,52 +153,42 @@ export function ChatScreen() {
           setStreamingText(fullReply);
           scrollToBottom();
         }
-        const assistantMsg: ChatMessage = {
-          id: `local-assistant-${Date.now()}`,
-          role: 'assistant',
-          content: fullReply,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
+
+        if (!abortRef.current && fullReply) {
+          const assistantMsg: ChatMessage = {
+            id: `local-assistant-${Date.now()}`,
+            role: 'assistant',
+            content: fullReply,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+        }
         setStreamingText('');
       } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : '发送失败，请重试';
-        setFailedMessages((prev) => new Map(prev).set(userMsg.id, message));
+        if (!abortRef.current) {
+          const message =
+            error instanceof Error && error.message
+              ? error.message
+              : '发送失败，请重试';
+          setFailedMessages((prev) =>
+            new Map(prev).set(userMsg.id, message),
+          );
+        }
       } finally {
         setIsLoading(false);
       }
     },
-    [inputText, isLoading, sessionId, scrollToBottom],
+    [inputText, isLoading, scrollToBottom, sessionId],
   );
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
-    // 同时中断网络层流式请求，避免后台继续占用连接。
-    desktopMiraHostClient.cancelCurrentSend();
+    miraHostClient.cancelCurrentSend();
   }, []);
-
-  const openMenu = useCallback(() => {
-    menuButtonRef.current?.measureInWindow((x, y, width, height) => {
-      setMenuAnchor({
-        top: y + height + spacing.xs,
-        right: Math.max(spacing.sm, windowWidth - x - width),
-      });
-      setIsMenuVisible(true);
-    });
-  }, [windowWidth]);
 
   const handleRetry = useCallback(
     (msg: ChatMessage) => {
-      setFailedMessages((prev) => {
-        const next = new Map(prev);
-        next.delete(msg.id);
-        return next;
-      });
-      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
-      sendMessage(msg.content);
+      void sendMessage(undefined, msg);
     },
     [sendMessage],
   );
@@ -189,6 +198,7 @@ export function ChatScreen() {
       const isUser = item.role === 'user';
       const failureMessage = isUser ? failedMessages.get(item.id) : undefined;
       const isFailed = failureMessage !== undefined;
+
       return (
         <View
           style={[
@@ -213,15 +223,16 @@ export function ChatScreen() {
                 <AssistantMarkdown content={item.content} />
               )}
             </View>
-            {isFailed && (
+            {isFailed ? (
               <>
-                <Text
-                  style={[styles.failureText, { color: colors.status.error }]}
-                >
+                <Text style={[styles.failureText, { color: colors.status.error }]}>
                   {failureMessage}
                 </Text>
                 <Pressable
-                  style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [
+                    styles.retryBtn,
+                    pressed && { opacity: 0.6 },
+                  ]}
                   onPress={() => handleRetry(item)}
                 >
                   <Text style={[styles.retryText, { color: colors.status.error }]}>
@@ -229,12 +240,12 @@ export function ChatScreen() {
                   </Text>
                 </Pressable>
               </>
-            )}
+            ) : null}
           </View>
         </View>
       );
     },
-    [failedMessages, handleRetry, colors, themedStyles],
+    [colors, failedMessages, handleRetry, themedStyles],
   );
 
   const renderFooter = useCallback(() => {
@@ -250,14 +261,20 @@ export function ChatScreen() {
         </View>
       </View>
     );
-  }, [streamingText, isLoading, colors]);
+  }, [colors.text.soft, isLoading, streamingText]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
+      edges={['top', 'bottom']}
+    >
       <View
         style={[
           styles.header,
-          { borderBottomColor: colors.border.soft, backgroundColor: colors.bg.canvas },
+          {
+            borderBottomColor: colors.border.soft,
+            backgroundColor: colors.bg.canvas,
+          },
         ]}
       >
         <Pressable
@@ -272,31 +289,14 @@ export function ChatScreen() {
         >
           <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>
+        <Text
+          style={[styles.headerTitle, { color: colors.text.ink }]}
+          numberOfLines={1}
+        >
           {title}
         </Text>
-        <Pressable
-          ref={menuButtonRef}
-          collapsable={false}
-          accessibilityRole="button"
-          accessibilityLabel="打开会话菜单"
-          hitSlop={8}
-          onPress={openMenu}
-          style={({ pressed }) => [
-            styles.iconButton,
-            pressed && { backgroundColor: colors.bg.soft },
-          ]}
-        >
-          <MoreVertical size={22} color={colors.text.ink} />
-        </Pressable>
+        <View style={styles.iconButton} />
       </View>
-
-      <ConversationMenu
-        visible={isMenuVisible}
-        title={title}
-        anchor={menuAnchor}
-        onClose={() => setIsMenuVisible(false)}
-      />
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -316,13 +316,19 @@ export function ChatScreen() {
         <View
           style={[
             styles.inputBar,
-            { borderTopColor: colors.border.soft, backgroundColor: colors.bg.canvas },
+            {
+              borderTopColor: colors.border.soft,
+              backgroundColor: colors.bg.canvas,
+            },
           ]}
         >
           <View
             style={[
               styles.inputWrapper,
-              { backgroundColor: colors.bg.input, borderColor: colors.border.default },
+              {
+                backgroundColor: colors.bg.input,
+                borderColor: colors.border.default,
+              },
             ]}
           >
             <TextInput
@@ -335,7 +341,7 @@ export function ChatScreen() {
               maxLength={500}
               editable={!isLoading}
               blurOnSubmit={false}
-              onSubmitEditing={() => sendMessage()}
+              onSubmitEditing={() => void sendMessage()}
             />
             {isLoading ? (
               <Pressable
@@ -343,11 +349,19 @@ export function ChatScreen() {
                 accessibilityLabel="停止生成"
                 style={({ pressed }) => [
                   styles.sendBtn,
-                  { backgroundColor: pressed ? colors.primaryActive : colors.text.ink },
+                  {
+                    backgroundColor: pressed
+                      ? colors.primaryActive
+                      : colors.text.ink,
+                  },
                 ]}
                 onPress={handleStop}
               >
-                <Square size={16} color={colors.bg.elevated} fill={colors.bg.elevated} />
+                <Square
+                  size={16}
+                  color={colors.bg.elevated}
+                  fill={colors.bg.elevated}
+                />
               </Pressable>
             ) : (
               <Pressable
@@ -355,10 +369,16 @@ export function ChatScreen() {
                 accessibilityLabel="发送消息"
                 style={({ pressed }) => [
                   styles.sendBtn,
-                  { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-                  !inputText.trim() && { backgroundColor: colors.primaryDisabled },
+                  {
+                    backgroundColor: pressed
+                      ? colors.primaryActive
+                      : colors.primary,
+                  },
+                  !inputText.trim() && {
+                    backgroundColor: colors.primaryDisabled,
+                  },
                 ]}
-                onPress={() => sendMessage()}
+                onPress={() => void sendMessage()}
                 disabled={!inputText.trim()}
               >
                 <Send size={18} color={colors.onPrimary} strokeWidth={2.5} />
@@ -425,7 +445,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   thinkingDot: { width: 6, height: 6, borderRadius: 3 },
-  retryBtn: { marginTop: 4, alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 8 },
+  retryBtn: {
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
   retryText: { fontSize: fontSize.sm },
   failureText: { fontSize: fontSize.sm, lineHeight: 18, marginTop: 6 },
   inputBar: {

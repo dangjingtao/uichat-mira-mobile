@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,8 +22,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   KeyRound,
-  Laptop,
-  LogOut,
+  RefreshCw,
+  ShieldCheck,
   Wifi,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
@@ -33,21 +33,42 @@ import {
   tailscaleConnectivityMessage,
   type TailscaleConnectivityState,
 } from '../connectivity/tailscaleConnectivity';
-import { desktopMiraHostClient } from '../api/desktopMiraHost';
+import {
+  parsePairingUri,
+  type PairingDescriptor,
+} from '../protocol/remoteHostV1';
+import { remoteMiraHostClient } from '../api/remoteMiraHost';
+import { useRemotePairing } from '../pairing/useRemotePairing';
 import { useTheme } from '../theme/ThemeContext';
-import { MiraHostError } from '../api/miraHost';
 
 const connectivityTitle = (state: TailscaleConnectivityState) => {
   switch (state) {
     case 'idle':
-      return '未检查';
+      return '尚未检查';
     case 'probing':
-      return '检查中';
+      return '正在检查连接';
     case 'ready':
-      return '已连接';
+      return 'Tailscale 已联通';
     default:
-      return '连接失败';
+      return '联通失败';
   }
+};
+
+const buildPairingUriFromRoute = (
+  params: RootStackParamList['HostConfig'],
+): string | null => {
+  if (!params) return null;
+  const { version, host, challenge, code } = params;
+  if (!version && !host && !challenge && !code) return null;
+  if (!version || !host || !challenge || !code) {
+    throw new Error('配对链接缺少 version、host、challenge 或 code');
+  }
+
+  // Current canonical Mobile Host Protocol V1 intentionally consumes only
+  // version/host/challenge/code. Relay metadata remains forward-compatible and
+  // is ignored until the main Mira dev contract defines Mobile Relay access.
+  const query = new URLSearchParams({ version, host, challenge, code });
+  return `mira://pair?${query.toString()}`;
 };
 
 export function HostConfigScreen() {
@@ -55,115 +76,165 @@ export function HostConfigScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'HostConfig'>>();
   const { colors } = useTheme();
-  const { config, clearConfig, setConnectionStatus } = useHostStore();
-  const connectivityState = useTailscaleConnectivityStore(state => state.state);
-  const connectivityResult = useTailscaleConnectivityStore(
-    state => state.result,
-  );
+  const { config, setConfig, clearConfig, setConnectionStatus } = useHostStore();
+  const connectivityState = useTailscaleConnectivityStore((state) => state.state);
+  const connectivityResult = useTailscaleConnectivityStore((state) => state.result);
   const setConnectivityHostUrl = useTailscaleConnectivityStore(
-    state => state.setHostUrl,
+    (state) => state.setHostUrl,
   );
-  const resetConnectivity = useTailscaleConnectivityStore(state => state.reset);
+  const probe = useTailscaleConnectivityStore((state) => state.probe);
+  const resetConnectivity = useTailscaleConnectivityStore((state) => state.reset);
 
-  const [hostInput, setHostInput] = useState(
-    (route.params as { host?: string } | undefined)?.host ?? '',
-  );
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [hostUrl, setHostUrl] = useState(config?.hostUrl ?? '');
+  const [pairingDescriptor, setPairingDescriptor] =
+    useState<PairingDescriptor | null>(null);
+  const [pairingLinkError, setPairingLinkError] = useState<string | null>(null);
 
   const isProbing = connectivityState === 'probing';
+  const isTransportReady =
+    connectivityState === 'ready' && connectivityResult?.hostUrl != null;
+  const hasTransportError =
+    connectivityState !== 'idle' &&
+    connectivityState !== 'probing' &&
+    connectivityState !== 'ready';
 
-  const applyHost = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      setHostInput(value);
-      if (!trimmed) return;
-      setConnectivityHostUrl(trimmed);
-      const current = useTailscaleConnectivityStore.getState();
-      if (
-        current.hostUrl !== trimmed ||
-        (current.state !== 'probing' && current.state !== 'ready')
-      ) {
-        current.probe(trimmed, 'manual').catch(() => {
-          // 探测失败状态已写入 store，这里不打断表单输入。
-        });
-      }
-    },
-    [setConnectivityHostUrl],
-  );
+  const {
+    state: pairingState,
+    start: startPairing,
+    reset: resetPairing,
+    secureStorageAvailable,
+  } = useRemotePairing(pairingDescriptor, isTransportReady);
 
   useEffect(() => {
-    if (config?.hostUrl) {
-      setConnectivityHostUrl(config.hostUrl);
-    }
-  }, [config?.hostUrl, setConnectivityHostUrl]);
-
-  const handleLogin = useCallback(async () => {
-    const host = hostInput.trim();
-    if (!host || !username.trim() || !password) {
-      setLoginError('请填写完整的地址、用户名和密码');
-      return;
-    }
-    if (isLoggingIn) return;
-
-    setIsLoggingIn(true);
-    setLoginError(null);
     try {
-      await desktopMiraHostClient.login(host, username, password);
-      setConnectionStatus('connected');
-      navigation.reset({ index: 0, routes: [{ name: 'SessionList' }] });
+      const uri = buildPairingUriFromRoute(route.params);
+      if (!uri) return;
+
+      const descriptor = parsePairingUri(uri);
+      setPairingDescriptor(descriptor);
+      setPairingLinkError(null);
+      setHostUrl(descriptor.hostUrl);
+      setConnectivityHostUrl(descriptor.hostUrl);
+
+      const current = useTailscaleConnectivityStore.getState();
+      if (
+        current.hostUrl !== descriptor.hostUrl ||
+        (current.state !== 'probing' && current.state !== 'ready')
+      ) {
+        void current.probe(descriptor.hostUrl, 'manual');
+      }
     } catch (error) {
-      const details =
-        error instanceof MiraHostError
-          ? error.details
-          : error instanceof Error
-          ? undefined
-          : undefined;
-      const message =
-        error instanceof MiraHostError
-          ? error.message
-          : error instanceof Error
-          ? error.message
-          : '登录失败，请检查地址与账号';
-      const detailText =
-        typeof details === 'string' && details.trim()
-          ? `\n（服务端返回：${details}）`
-          : '';
-      setLoginError(`${message}${detailText}`);
-    } finally {
-      setIsLoggingIn(false);
+      setPairingDescriptor(null);
+      setPairingLinkError(
+        error instanceof Error ? error.message : '无法读取桌面配对链接',
+      );
     }
-  }, [hostInput, username, password, isLoggingIn, navigation, setConnectionStatus]);
+  }, [route.params, setConnectivityHostUrl]);
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      await desktopMiraHostClient.disconnect();
-    } catch {
-      // 忽略断开时的清理错误
-    }
-    clearConfig();
-    resetConnectivity();
-    setPassword('');
-  }, [clearConfig, resetConnectivity]);
+  useEffect(() => {
+    if (pairingState.phase !== 'paired' || !pairingDescriptor) return;
+
+    setConfig({
+      hostUrl: pairingDescriptor.hostUrl,
+      token: '',
+    });
+    setConnectionStatus('connected');
+    navigation.reset({ index: 0, routes: [{ name: 'SessionList' }] });
+  }, [
+    navigation,
+    pairingDescriptor,
+    pairingState.phase,
+    setConfig,
+    setConnectionStatus,
+  ]);
 
   const statusColor =
     connectivityState === 'ready'
       ? colors.status.success
       : connectivityState === 'idle' || connectivityState === 'probing'
-      ? colors.status.warning
-      : colors.status.error;
+        ? colors.status.warning
+        : colors.status.error;
 
   const statusMessage = useMemo(() => {
     if (connectivityState === 'idle') {
-      return '输入桌面端地址后自动检查连接。';
+      return '打开桌面 Mira 生成的配对链接后会自动检查 Tailscale 传输。';
     }
     if (connectivityState === 'probing') {
-      return '正在检查网络与 Mira Host。';
+      return '正在检查 Tailscale / HTTPS / Mira Host 是否可达。';
     }
     return tailscaleConnectivityMessage(connectivityState);
   }, [connectivityState]);
+
+  const pairingBusy =
+    pairingState.phase === 'claiming' ||
+    pairingState.phase === 'waiting_approval';
+  const pairingCompleted = pairingState.phase === 'paired';
+  const pairingActionDisabled =
+    !pairingDescriptor ||
+    !isTransportReady ||
+    !secureStorageAvailable ||
+    pairingBusy ||
+    pairingCompleted;
+
+  const pairingTitle = (() => {
+    switch (pairingState.phase) {
+      case 'claiming':
+        return '正在提交设备申请';
+      case 'waiting_approval':
+        return '等待桌面确认';
+      case 'paired':
+        return '设备已配对';
+      case 'rejected':
+        return '桌面已拒绝';
+      case 'expired':
+        return '配对请求已过期';
+      case 'error':
+      case 'blocked':
+        return '设备配对未完成';
+      default:
+        if (!pairingDescriptor) return '等待桌面配对请求';
+        return isTransportReady
+          ? '可以申请设备授权'
+          : '先完成 Tailscale 联通';
+    }
+  })();
+
+  const pairingMessage =
+    pairingState.message ??
+    (!secureStorageAvailable
+      ? '当前构建没有可用的系统安全存储，不能领取一次性设备凭证。'
+      : pairingDescriptor
+        ? 'Mobile 使用独立设备凭证连接 Mira。桌面账号、密码与 JWT 不会下发到手机。'
+        : '请在 Mira Desktop 的“远程连接”中生成一次性配对请求，再用手机打开。');
+
+  const handleCheck = async () => {
+    const target = hostUrl.trim();
+    if (!target || isProbing) return;
+
+    setConnectivityHostUrl(target);
+    setConnectionStatus('connecting');
+    try {
+      await probe(target, 'manual');
+    } finally {
+      if (pairingState.phase !== 'paired') {
+        // Transport reachability is not application authorization.
+        setConnectionStatus('disconnected');
+      }
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (secureStorageAvailable) {
+      await remoteMiraHostClient.disconnect();
+    }
+    clearConfig();
+    resetConnectivity();
+    resetPairing();
+    setHostUrl('');
+    setPairingDescriptor(null);
+    setPairingLinkError(null);
+    setConnectionStatus('disconnected');
+  };
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -179,24 +250,10 @@ export function HostConfigScreen() {
       edges={['top', 'bottom']}
     >
       <View style={[styles.header, { borderBottomColor: colors.border.soft }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={handleBack}
-          style={({ pressed }) => [
-            styles.backBtn,
-            {
-              backgroundColor: colors.bg.soft,
-              borderColor: colors.border.default,
-            },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
+        <Pressable onPress={handleBack} style={styles.backBtn}>
           <ChevronLeft size={24} color={colors.text.ink} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.ink }]}>
-          连接桌面端
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.text.ink }]}>连接桌面端</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -204,7 +261,10 @@ export function HostConfigScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.form}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.hero}>
             <View
               style={[
@@ -215,28 +275,79 @@ export function HostConfigScreen() {
                 },
               ]}
             >
-              <Laptop size={38} color={colors.primary} strokeWidth={1.6} />
+              <ShieldCheck size={38} color={colors.primary} strokeWidth={1.6} />
             </View>
-            <Text style={[styles.heroTitle, { color: colors.text.ink }]}>
-              连接 Mira Host
-            </Text>
-            <Text style={[styles.heroSubtitle, { color: colors.text.muted }]}>
-              通过 Tailscale 访问桌面端会话，登录你的 Mira 本地账号
+            <Text style={[styles.heroTitle, { color: colors.text.ink }]}>设备配对</Text>
+            <Text style={[styles.heroSubtitle, { color: colors.text.muted }]}> 
+              手机作为独立设备获得最小权限，不登录桌面账号。
             </Text>
           </View>
 
-          {/* ── 连接状态 ─────────────────────── */}
-          <View style={styles.section}>
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+            <View style={styles.sectionHeading}>
+              <KeyRound
+                size={20}
+                color={pairingLinkError ? colors.status.error : colors.primary}
+              />
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>配对请求</Text>
+            </View>
+
+            {pairingLinkError ? (
+              <Text style={[styles.bodyText, { color: colors.status.error }]}> 
+                {pairingLinkError}
+              </Text>
+            ) : pairingDescriptor ? (
+              <>
+                <Text style={[styles.cardTitle, { color: colors.text.ink }]}> 
+                  已载入一次性请求
+                </Text>
+                <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
+                  请求 {pairingDescriptor.challengeId.slice(0, 8)}… · 有效后需在桌面端明确批准。
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
+                还没有配对请求。请从 Mira Desktop 生成配对链接或二维码。
+              </Text>
+            )}
+          </View>
+
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+            <View style={styles.sectionHeading}>
+              <Wifi size={20} color={colors.text.ink} />
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Tailscale 联通</Text>
+            </View>
+
+            <Text style={[styles.label, { color: colors.text.muted }]}>Mira Host 地址</Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: colors.border.default,
+                  backgroundColor: colors.bg.input,
+                  color: colors.text.ink,
+                },
+              ]}
+              value={hostUrl}
+              onChangeText={(value) => {
+                setHostUrl(value);
+                setConnectivityHostUrl(value);
+              }}
+              placeholder="https://mira-desktop.tailnet-name.ts.net"
+              placeholderTextColor={colors.text.placeholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              editable={!isProbing && !pairingDescriptor}
+            />
+
             <View
               style={[
                 styles.statusBox,
                 {
-                  backgroundColor:
-                    connectivityState === 'ready' ||
-                    connectivityState === 'probing' ||
-                    connectivityState === 'idle'
-                      ? colors.bg.soft
-                      : colors.status.errorBg,
+                  backgroundColor: hasTransportError
+                    ? colors.status.errorBg
+                    : colors.bg.soft,
                   borderColor: statusColor,
                 },
               ]}
@@ -251,169 +362,92 @@ export function HostConfigScreen() {
                 ) : (
                   <AlertTriangle size={18} color={statusColor} />
                 )}
-                <Text style={[styles.statusTitle, { color: colors.text.ink }]}>
+                <Text style={[styles.statusTitle, { color: colors.text.ink }]}> 
                   {connectivityTitle(connectivityState)}
                 </Text>
               </View>
-              {connectivityState !== 'ready' ? (
-                <Text style={[styles.statusText, { color: colors.text.muted }]}>
-                  {statusMessage}
-                </Text>
-              ) : null}
+              <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
+                {statusMessage}
+              </Text>
               {connectivityResult?.identity ? (
-                <Text style={[styles.detailText, { color: colors.text.soft }]}>
-                  {connectivityResult.identity.displayName} · v
-                  {connectivityResult.identity.version} ·{' '}
+                <Text style={[styles.detailText, { color: colors.text.soft }]}> 
+                  {connectivityResult.identity.displayName} · v{connectivityResult.identity.version} ·{' '}
                   {connectivityResult.latencyMs ?? 0} ms
                 </Text>
               ) : null}
             </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: colors.primary },
+                pressed && { backgroundColor: colors.bg.soft },
+              ]}
+              onPress={handleCheck}
+              disabled={isProbing || !hostUrl.trim()}
+            >
+              {isProbing ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <RefreshCw size={18} color={colors.primary} />
+              )}
+              <Text style={[styles.secondaryBtnText, { color: colors.primary }]}> 
+                {isProbing ? '正在检查' : '重新检查连接'}
+              </Text>
+            </Pressable>
           </View>
 
-          {/* ── 登录表单 ─────────────────────── */}
-          <View style={styles.section}>
-            <Text style={[styles.fieldLabel, { color: colors.text.muted }]}>
-              桌面端地址
-            </Text>
-            <TextInput
-              accessibilityLabel="桌面端地址"
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.border.default,
-                  backgroundColor: colors.bg.input,
-                  color: colors.text.ink,
-                },
-              ]}
-              value={hostInput}
-              onChangeText={applyHost}
-              placeholder="https://my-machine.tailnet.ts.net"
-              placeholderTextColor={colors.text.placeholder}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
+          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
+            <View style={styles.sectionHeading}>
+              <ShieldCheck size={20} color={colors.text.ink} />
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Mira 授权</Text>
+            </View>
+            <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{pairingTitle}</Text>
+            <Text style={[styles.bodyText, { color: colors.text.muted }]}>{pairingMessage}</Text>
 
-            <Text style={[styles.fieldLabel, { color: colors.text.muted }]}>
-              用户名
-            </Text>
-            <TextInput
-              accessibilityLabel="用户名"
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.border.default,
-                  backgroundColor: colors.bg.input,
-                  color: colors.text.ink,
-                },
-              ]}
-              value={username}
-              onChangeText={setUsername}
-              placeholder="桌面端本地账号（如 Tomz）"
-              placeholderTextColor={colors.text.placeholder}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <Text style={[styles.fieldLabel, { color: colors.text.muted }]}>
-              密码
-            </Text>
-            <TextInput
-              accessibilityLabel="密码"
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.border.default,
-                  backgroundColor: colors.bg.input,
-                  color: colors.text.ink,
-                },
-              ]}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="桌面端登录密码"
-              placeholderTextColor={colors.text.placeholder}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              onSubmitEditing={handleLogin}
-            />
-
-            {loginError ? (
-              <Text style={[styles.errorText, { color: colors.status.error }]}>
-                {loginError}
+            {pairingState.scopes.length > 0 ? (
+              <Text style={[styles.detailText, { color: colors.text.soft }]}> 
+                已批准：{pairingState.scopes.join(' · ')}
               </Text>
             ) : null}
 
             <Pressable
               style={({ pressed }) => [
-                styles.loginBtn,
+                styles.primaryBtn,
                 { backgroundColor: colors.primary },
-                (isLoggingIn || pressed) && {
-                  backgroundColor: pressed && !isLoggingIn ? colors.primaryActive : colors.primaryDisabled,
+                (pairingActionDisabled || pressed) && {
+                  backgroundColor: colors.primaryDisabled,
                 },
               ]}
-              onPress={handleLogin}
-              disabled={isLoggingIn}
+              onPress={startPairing}
+              disabled={pairingActionDisabled}
             >
-              {isLoggingIn ? (
+              {pairingBusy ? (
                 <ActivityIndicator size="small" color={colors.onPrimary} />
+              ) : pairingCompleted ? (
+                <CheckCircle2 size={18} color={colors.onPrimary} />
               ) : (
                 <KeyRound size={18} color={colors.onPrimary} />
               )}
-              <Text style={[styles.loginBtnText, { color: colors.onPrimary }]}>
-                {isLoggingIn ? '正在登录...' : '登录并连接'}
+              <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}> 
+                {pairingState.phase === 'waiting_approval'
+                  ? '等待桌面确认'
+                  : pairingCompleted
+                    ? '设备已配对'
+                    : '提交设备配对申请'}
               </Text>
             </Pressable>
-
-            <Text style={[styles.hintText, { color: colors.text.muted }]}>
-              账号密码与桌面端 Web 登录一致；未改过时默认账号
-              Tomz / 123456。登录凭据只保存在本机安全存储中。
-            </Text>
           </View>
 
-          {/* ── 已连接状态 ───────────────────── */}
           {config ? (
-            <View style={styles.section}>
-              <View
-                style={[
-                  styles.connectedBox,
-                  { borderColor: colors.border.default, backgroundColor: colors.bg.card },
-                ]}
-              >
-                <View style={styles.connectedHeader}>
-                  <View
-                    style={[
-                      styles.connectedDot,
-                      { backgroundColor: colors.status.success },
-                    ]}
-                  />
-                  <Text style={[styles.connectedTitle, { color: colors.text.ink }]}>
-                    已连接
-                  </Text>
-                </View>
-                <Text style={[styles.detailText, { color: colors.text.soft }]}>
-                  {desktopMiraHostClient.getUsername()
-                    ? `当前账号：${desktopMiraHostClient.getUsername()}`
-                    : ''}
-                </Text>
-                <Text style={[styles.detailText, { color: colors.text.soft }]}>
-                  {config.hostUrl}
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.disconnectBtn,
-                    { borderColor: colors.status.errorBg },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={handleDisconnect}
-                >
-                  <LogOut size={16} color={colors.status.error} />
-                  <Text style={[styles.disconnectBtnText, { color: colors.status.error }]}>
-                    断开并清除登录
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+            <Pressable
+              style={[styles.disconnectBtn, { borderColor: colors.status.errorBg }]}
+              onPress={handleDisconnect}
+            >
+              <Text style={[styles.disconnectBtnText, { color: colors.status.error }]}> 
+                断开并清除设备授权
+              </Text>
+            </Pressable>
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -433,8 +467,6 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -446,20 +478,16 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { width: 44 },
   container: { flex: 1 },
-  form: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
-  hero: {
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 28,
-  },
+  form: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  hero: { alignItems: 'center', paddingTop: 4, paddingBottom: 24 },
   heroIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   heroTitle: { fontSize: 26, fontWeight: '600', textAlign: 'center' },
   heroSubtitle: {
@@ -468,11 +496,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  section: { marginBottom: 24 },
+  card: { borderRadius: 16, padding: 18, marginBottom: 16 },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
+  cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  bodyText: { fontSize: 13, lineHeight: 20 },
+  detailText: { fontSize: 12, lineHeight: 18, marginTop: 8 },
+  label: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  input: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 14,
+    marginBottom: 14,
+  },
   statusBox: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     padding: 14,
+    marginBottom: 14,
   },
   statusHeader: {
     flexDirection: 'row',
@@ -481,65 +530,34 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   statusTitle: { fontSize: 15, fontWeight: '700' },
-  statusText: { fontSize: 13, lineHeight: 20 },
-  detailText: { fontSize: 12, lineHeight: 18, marginTop: 6 },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 14,
-    marginBottom: 8,
+  secondaryBtn: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
   },
-  input: {
+  secondaryBtnText: { fontSize: 14, fontWeight: '700' },
+  primaryBtn: {
     minHeight: 48,
-    borderWidth: 1,
+    marginTop: 16,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  errorText: {
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 12,
-  },
-  loginBtn: {
-    minHeight: 52,
-    marginTop: 20,
-    borderRadius: 26,
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
   },
-  loginBtnText: { fontSize: 15, fontWeight: '600' },
-  hintText: {
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  connectedBox: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 14,
-  },
-  connectedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  connectedDot: { width: 10, height: 10, borderRadius: 5 },
-  connectedTitle: { fontSize: 15, fontWeight: '700' },
+  primaryBtnText: { fontSize: 15, fontWeight: '700' },
   disconnectBtn: {
-    marginTop: 14,
-    height: 46,
-    borderRadius: 23,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  disconnectBtnText: { fontSize: 14, fontWeight: '600' },
+  disconnectBtnText: { fontSize: 15, fontWeight: '600' },
 });
