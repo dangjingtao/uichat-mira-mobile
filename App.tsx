@@ -17,7 +17,7 @@ import { AboutScreen } from './src/screens/AboutScreen';
 import { LicenseScreen } from './src/screens/LicenseScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
-import { desktopMiraHostClient } from './src/api/desktopMiraHost';
+import { remoteMiraHostClient } from './src/api/remoteMiraHost';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -42,20 +42,20 @@ function StatusBarThemed() {
 
 function AppInner() {
   const [bootstrapChecked, setBootstrapChecked] = useState(false);
-  const [hasCredential, setHasCredential] = useState(false);
+  const [hasDeviceCredential, setHasDeviceCredential] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    desktopMiraHostClient
+    remoteMiraHostClient
       .getStoredHostUrl()
       .then((hostUrl) => {
         if (cancelled) return;
-        setHasCredential(hostUrl != null);
+        setHasDeviceCredential(hostUrl != null);
         setBootstrapChecked(true);
       })
       .catch(() => {
         if (cancelled) return;
-        setHasCredential(false);
+        setHasDeviceCredential(false);
         setBootstrapChecked(true);
       });
     return () => {
@@ -71,7 +71,7 @@ function AppInner() {
     <>
       <TailscaleConnectivityLifecycle />
       <Stack.Navigator
-        initialRouteName={hasCredential ? 'SessionList' : 'HostConfig'}
+        initialRouteName={hasDeviceCredential ? 'SessionList' : 'HostConfig'}
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="SessionList" component={SessionListScreen} />
