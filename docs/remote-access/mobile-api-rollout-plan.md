@@ -13,7 +13,11 @@ Mobile 只消费 Mira Host 已定义的 canonical HTTP contract，不使用 Desk
 
 当前聊天只接普通 Chat：Thread / Message / `POST /proxy/chat/default`。本排期不扩 Agent UI。
 
-## 2. 当前已经可用：Chat 基线
+**Relay 是业务能力之前的 Transport 前置工程。** Mobile 先完成 Direct / Relay 统一传输层，再继续 Memory、文件库、Workspace 等业务接入。详细 Relay 施工计划见：
+
+- [`relay-mobile-rollout.md`](relay-mobile-rollout.md)
+
+## 2. 当前已经可用：Chat + Tailscale 基线
 
 以下接口已经在 Remote Host V1 canonical allowlist 中，可由 Mobile 的设备凭证直接调用：
 
@@ -28,9 +32,53 @@ Mobile 只消费 Mira Host 已定义的 canonical HTTP contract，不使用 Desk
 
 当前边界继续保持：不开放 Thread 新建、重命名、删除；不把 Agent 当 Chat 一起接入。
 
-## 3. 主站已有、Mobile 可以排期接入的接口
+当前配对仍然是 Tailscale-gated：Desktop 创建 pairing challenge 时要求 Tailscale `ready`。这只是当前基线，不是 Relay 最终产品形态。
 
-### 3.1 Memory — 优先级 P0
+## 3. Transport 前置：Mira Relay — 优先级 P0
+
+目标不是再造一套 Mobile API，而是让同一个 `RemoteMiraHostClient` 可以运行在两种 Transport 上：
+
+```text
+RemoteMiraHostClient
+  -> DirectRemoteTransport -> HTTP / SSE -> Tailscale Serve
+  -> RelayRemoteTransport  -> WSS Relay Frames -> Desktop Relay Connector
+```
+
+两种 Transport 共用同一个 `mira_device_*` 业务 credential、scope、manifest 与业务 route。
+
+当前主站 `dev` 已有：
+
+- Relay Worker / Durable Object POC；
+- Desktop Relay Connector；
+- request / response / chunk / complete / cancel / error frame；
+- Relay 产品配置；
+- Desktop 自动生成 relayId / hostToken / clientToken；
+- pairing URI 可追加 `relay` / `relayId`。
+
+当前仍缺：
+
+- Mobile `RelayRemoteTransport`；
+- Relay client credential 的安全下发与保存合同；
+- Relay-only pairing；
+- 同一设备多 endpoint；
+- Direct -> Relay 自动 fallback；
+- pairing 去掉 Tailscale ready 硬耦合。
+
+Mobile Relay 分阶段：
+
+```text
+R0 RemoteTransport 抽象
+R1 Relay JSON / manifest / threads
+R2 Chat stream / cancel / reconnect
+R3 Relay-only pairing + pairing endpoint 解耦
+R4 Auto Direct -> Relay fallback
+```
+
+Mobile 不得自行发明 clientToken 下发方式；必须等待 Mira 主项目 `dev` canonical contract。
+
+## 4. 主站已有、Mobile 可以排期接入的业务接口
+
+### 4.1 Memory — 优先级 P0
 
 对应 Mobile：设置 → 我的 Mira →「记忆」。
 
@@ -52,7 +100,7 @@ Mobile 目标：
 
 依赖：主项目新增设备凭证可用的 Memory Remote contract。
 
-### 3.2 文件库 / Knowledge Base Documents — 优先级 P0
+### 4.2 文件库 / Knowledge Base Documents — 优先级 P0
 
 产品定义：Mobile「文件库」优先映射 Mira Host 的 Knowledge Base documents，不等同于聊天附件目录。
 
@@ -86,7 +134,7 @@ Mobile 首轮目标：知识库切换、文档列表、详情/状态、手机文
 
 依赖：主项目定义 Knowledge Base read/upload 的 Remote 权限边界和上传限制。
 
-### 3.3 项目 = Chat Workspace — 优先级 P0
+### 4.3 项目 = Chat Workspace — 优先级 P0
 
 产品定义已确认：Mobile UI 的「项目」就是 Mira Host 的 **Chat Workspace**；UI 可以继续显示“项目”，代码/协议使用 `workspace` / `workspaceId`。
 
@@ -110,7 +158,7 @@ DELETE /chat-workspaces/:id
 
 依赖：主项目新增 Workspace Remote contract；若需要“把现有 Thread 移入项目”，还需同时决定是否对设备凭证开放对应 Thread update 能力。
 
-### 3.4 Plugins / MCP — 优先级 P1
+### 4.4 Plugins / MCP — 优先级 P1
 
 对应 Mobile：Drawer / 设置里的「插件」。
 
@@ -126,7 +174,7 @@ GET /mcp/external/servers
 
 依赖：主项目定义 Mobile-safe 的 MCP projection 和可管理边界。Desktop 全量 MCP API 不应原样放行给设备凭证。
 
-### 3.5 Voice / Host TTS — 优先级 P1
+### 4.5 Voice / Host TTS — 优先级 P1
 
 对应 Mobile：设置 →「语音」，以及后续 Assistant 消息朗读。
 
@@ -144,7 +192,7 @@ GPT-SoVITS/Provider 配置、参考音频管理等高级接口暂不进入 Mobil
 
 依赖：主项目定义 Mobile-safe TTS contract，避免把 provider administration 一起放行。
 
-### 3.6 Images — 优先级 P2
+### 4.6 Images — 优先级 P2
 
 对应 Mobile：Drawer「图片」与 Search「图片」。
 
@@ -166,7 +214,7 @@ GET /threads/:id/media/:mediaId/content
 
 依赖：先确认 Mobile「图片」首版是生成入口还是图库，再由主项目补 Remote contract。
 
-### 3.7 About / Host Meta — 优先级 P2
+### 4.7 About / Host Meta — 优先级 P2
 
 主站已有：
 
@@ -178,7 +226,7 @@ GET /app/meta
 
 注意：这不是 Mobile App 自身的版本更新接口；Mobile 版本仍以移动端 package/release 为准。
 
-## 4. 当前不要接的 Desktop 接口
+## 5. 当前不要接的 Desktop 接口
 
 以下主站能力即使存在，也不应直接映射为 Mobile 设备能力：
 
@@ -190,31 +238,36 @@ GET /app/meta
 - Provider / Model / secret 管理；
 - Agent / Tool 全量接口（当前聊天排期明确只接普通 Chat）。
 
-## 5. Mobile 排期
+## 6. Mobile 总排期
 
-排期原则：日期是 **Mobile 实施窗口**，前提是对应 Mira Host Remote contract 已在主项目 `dev` 落地。若 Host contract 未到位，该项标记 Blocked，不能通过 Desktop JWT 或自定义私有 endpoint 绕过。
+排期原则：日期是 **Mobile 实施窗口**，前提是对应 Mira Host canonical contract 已在主项目 `dev` 落地。若 Host contract 未到位，该项标记 Blocked，不能通过 Desktop JWT 或自定义私有 endpoint 绕过。
 
 | 阶段 | 日期 | Mobile 交付 | Host 依赖 |
 | --- | --- | --- | --- |
-| M0 | 已完成，至 2026-08-12 | 配对、manifest、会话读、消息读、普通 Chat SSE、重连 | Remote Host V1 已存在 |
-| M1 | 2026-08-12 ～ 08-13 | Memory 页面真实接入；Host Meta adapter | Memory + app meta Remote contract |
-| M2 | 2026-08-14 ～ 08-16 | 文件库：KB 列表、文档列表/详情/状态、手机文件上传 | KB read/upload Remote contract |
-| M3 | 2026-08-17 ～ 08-18 | 项目/Workspace：列表、CRUD、Workspace 会话分组；Search 项目 tab | Workspace Remote contract；必要时 Thread workspace mutation |
-| M4 | 2026-08-19 ～ 08-20 | Plugins 首轮只读；Voice 列表、合成、音频播放 | Mobile-safe MCP projection + TTS Remote contract |
-| M5 | 2026-08-21 ～ 08-23 | Images 生成任务、进度、Thread media；决定是否启用图片搜索/图库入口 | Image Generation Remote contract；图库 query 若需要则另补 |
+| M0 | 已完成，至 2026-08-12 | Tailscale 配对、manifest、会话读、消息读、普通 Chat SSE、重连 | Remote Host V1 |
+| R0 | 2026-08-12 | `RemoteTransport` 抽象 + `DirectRemoteTransport`，行为不变 | 无新协议依赖 |
+| R1 | 2026-08-13 ～ 08-14 | `RelayRemoteTransport`、manifest、threads 经 Relay | Relay client credential + endpoint + hello/auth canonical contract |
+| R2 | 2026-08-15 | Chat SSE/chunk、cancel、reconnect 经 Relay | Relay streaming contract |
+| R3 | 2026-08-16 | Relay-only pairing；配对 UI 去 Tailscale 硬耦合 | pairing endpoint / Relay credential delivery canonical contract |
+| R4 | 2026-08-16 | 多 endpoint + Auto Direct -> Relay fallback | endpoint persistence / selection contract |
+| M1 | 2026-08-17 ～ 08-18 | Memory 页面真实接入；Host Meta adapter | Memory + app meta Remote contract |
+| M2 | 2026-08-19 ～ 08-21 | 文件库：KB 列表、文档列表/详情/状态、手机文件上传 | KB read/upload Remote contract |
+| M3 | 2026-08-22 ～ 08-23 | 项目/Workspace：列表、CRUD、Workspace 会话分组；Search 项目 tab | Workspace Remote contract；必要时 Thread workspace mutation |
+| M4 | 2026-08-24 ～ 08-25 | Plugins 首轮只读；Voice 列表、合成、音频播放 | Mobile-safe MCP projection + TTS Remote contract |
+| M5 | 2026-08-26 ～ 08-28 | Images 生成任务、进度、Thread media；决定是否启用图片搜索/图库入口 | Image Generation Remote contract；图库 query 若需要则另补 |
 
 ### 每一期 Mobile 的固定完成条件
 
 每个阶段只有同时满足以下条件才算完成：
 
-1. main Mira `dev` 文档已经定义对应 Remote route/scope/ownership；
-2. `RemoteMiraHostClient` 增加类型化 adapter，不允许页面直接 fetch；
-3. `manifest` 能表达 Mobile 实际获得的能力，UI 根据 capability 显示/禁用；
-4. 401/403 与普通网络失败分开处理，不因断网清除设备凭证；
+1. main Mira `dev` 文档已经定义对应 Remote / Relay route、credential、scope、ownership；
+2. `RemoteMiraHostClient` 只消费类型化 Transport / adapter，不允许页面直接 fetch；
+3. `manifest` 能表达 Mobile 实际获得的业务能力，UI 根据 capability 显示/禁用；
+4. 401/403 与普通网络失败分开处理，不因断网或 Relay 故障清除设备凭证；
 5. Android/iOS 共用业务协议层；平台差异只放设备能力层；
 6. `npm run typecheck`、`npm run lint`、`npm test` 通过；涉及原生能力时再要求对应平台构建/真机验证。
 
-## 6. 后续未排期能力
+## 7. 后续未排期能力
 
 这些 Mobile 视觉项目前没有足够的 Host canonical surface，不给假日期：
 
@@ -225,12 +278,13 @@ GET /app/meta
 - 全局 Search 的图片/文档/项目统一搜索：需要各 domain 的可查询 contract 或统一 search contract；
 - 泛化「设备同步」：当前只有 Remote Host canonical state replay，不代表所有设置跨设备同步。
 
-## 7. 实施顺序
+## 8. 实施顺序
 
 Mobile 后续开发按下面顺序执行，不因页面已经画出来而跳级：
 
 ```text
-Chat baseline
+Chat / Tailscale baseline
+  -> Relay Transport
   -> Memory
   -> File Library
   -> Workspace
@@ -238,5 +292,7 @@ Chat baseline
   -> Voice
   -> Images
 ```
+
+业务 adapter 必须运行在统一 `RemoteTransport` 之上，不能分别维护“一个 Tailscale API client + 一个 Relay API client”。
 
 主站合同晚于 Mobile 排期时，Mobile 保留真实 placeholder/disabled 状态；主站合同一旦到位，按本表进入对应阶段，不重新讨论产品映射。
