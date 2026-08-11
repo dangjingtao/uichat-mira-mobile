@@ -48,7 +48,7 @@ const connectivityTitle = (state: TailscaleConnectivityState) => {
     case 'probing':
       return '正在检查连接';
     case 'ready':
-      return '传输已联通';
+      return 'Tailscale 已联通';
     default:
       return '联通失败';
   }
@@ -64,6 +64,9 @@ const buildPairingUriFromRoute = (
     throw new Error('配对链接缺少 version、host、challenge 或 code');
   }
 
+  // Current canonical Mobile Host Protocol V1 intentionally consumes only
+  // version/host/challenge/code. Relay metadata remains forward-compatible and
+  // is ignored until the main Mira dev contract defines Mobile Relay access.
   const query = new URLSearchParams({ version, host, challenge, code });
   return `mira://pair?${query.toString()}`;
 };
@@ -154,7 +157,7 @@ export function HostConfigScreen() {
 
   const statusMessage = useMemo(() => {
     if (connectivityState === 'idle') {
-      return '打开桌面 Mira 生成的配对链接后会自动检查当前传输。';
+      return '打开桌面 Mira 生成的配对链接后会自动检查 Tailscale 传输。';
     }
     if (connectivityState === 'probing') {
       return '正在检查 Tailscale / HTTPS / Mira Host 是否可达。';
@@ -192,7 +195,7 @@ export function HostConfigScreen() {
         if (!pairingDescriptor) return '等待桌面配对请求';
         return isTransportReady
           ? '可以申请设备授权'
-          : '先完成传输联通';
+          : '先完成 Tailscale 联通';
     }
   })();
 
@@ -312,7 +315,7 @@ export function HostConfigScreen() {
           <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
             <View style={styles.sectionHeading}>
               <Wifi size={20} color={colors.text.ink} />
-              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>当前传输</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Tailscale 联通</Text>
             </View>
 
             <Text style={[styles.label, { color: colors.text.muted }]}>Mira Host 地址</Text>
