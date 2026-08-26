@@ -1,5 +1,7 @@
 # Mira Mobile Relay 接入排期
 
+> 远程连接行为以 [远程连接唯一真相源 V1](remote-connection-canonical-v1.md) 为准；本文只记录实施排期与历史状态。
+
 > 状态：Current plan  
 > 基线日期：2026-08-12  
 > 主站真相源：`dangjingtao/uichat-mira@dev`
@@ -48,15 +50,16 @@ Relay connection credential 与 `mira_device_*` 必须保持分离。Relay 不�
 
 - Mobile `RelayRemoteTransport`；
 - Mobile Relay connection credential 的安全下发与保存合同；
-- Relay-only pairing；
+- Relay frame 级别的首次配对实网验收；
 - 同一设备保存 Direct + Relay 多 endpoint；
 - Direct -> Relay 自动 fallback；
-- pairing 去掉 “Tailscale 必须 ready” 的硬耦合；
 - Relay Chat streaming / cancel / reconnect 的 Mobile 实网验收。
 
-因此，当前 Mobile 截图里的“设备配对”仍然是 **Tailscale-gated pairing**。这不是 Relay 最终形态。
+当前 `dev` 已完成配对入口去 Tailscale 硬门槛、Relay-first preflight、Direct 兜底和 claim 通道上报；Relay 传输层的完整实网验收仍未完成。
 
 ## 3. 最终配对体验
+
+详细的 Relay-first 首次配对、claim 一次性副作用和日常 Direct-first 规则见唯一真相源，本文不重复定义另一套选择策略。
 
 目标不是让用户分别做一次 Tailscale 配对、再做一次 Relay 配对。
 

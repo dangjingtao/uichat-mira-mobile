@@ -1,5 +1,7 @@
 # Mira Mobile Relay Transport V1
 
+> 配对与远程连接选择顺序以 [远程连接唯一真相源 V1](remote-connection-canonical-v1.md) 为准；本文保留 Transport frame 和 endpoint 数据结构说明。
+
 ## 目标
 
 在不替换 Tailscale Direct 的前提下，让 Mobile Remote Host V1 同时支持：
@@ -46,6 +48,8 @@ relayToken=<required with relay>
 旧版只含 `hostUrl` 的 Direct-only credential 必须继续可读。
 
 ## Selection
+
+首次配对采用 Relay-first，配对后的日常业务请求采用 Direct-first；完整流程、claim 通道字段和禁止跨 Transport 重发规则见唯一真相源。
 
 - Direct 可用时优先。
 - Direct 仅在网络层失败时回退 Relay。

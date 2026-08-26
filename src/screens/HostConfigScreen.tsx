@@ -112,7 +112,7 @@ export function HostConfigScreen() {
     start: startPairing,
     reset: resetPairing,
     secureStorageAvailable,
-  } = useRemotePairing(pairingDescriptor, isDirectReady);
+  } = useRemotePairing(pairingDescriptor);
 
   const loadPairingUri = useCallback(
     (uri: string) => {
@@ -195,14 +195,19 @@ export function HostConfigScreen() {
   const statusMessage = useMemo(() => {
     if (connectivityState === 'idle') {
       return hasDirectEndpoint
-        ? '已获得 Direct endpoint，等待检查 Tailscale 传输。'
+        ? hasRelayEndpoint
+          ? '已获得 Direct 与 Relay endpoint，正在检查可用传输。'
+          : '已获得 Direct endpoint，正在检查可用传输。'
         : '当前配对请求没有 Direct endpoint；如果包含 Mira Relay，可直接通过 Relay 配对。';
     }
     if (connectivityState === 'probing') {
-      return '正在检查 Tailscale / HTTPS / Mira Host 是否可达。';
+      return '正在检查 Direct / Relay / Mira Host 是否可达。';
+    }
+    if (hasRelayEndpoint) {
+      return 'Direct 当前不可用，配对将继续尝试 Mira Relay。';
     }
     return tailscaleConnectivityMessage(connectivityState);
-  }, [connectivityState, hasDirectEndpoint]);
+  }, [connectivityState, hasDirectEndpoint, hasRelayEndpoint]);
 
   const pairingBusy =
     pairingState.phase === 'claiming' ||

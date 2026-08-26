@@ -38,10 +38,7 @@ const INITIAL_STATE: RemotePairingViewState = {
 
 const POLL_INTERVAL_MS = 1_500;
 
-export const useRemotePairing = (
-  descriptor: PairingDescriptorV1 | null,
-  directConnectivityReady: boolean,
-) => {
+export const useRemotePairing = (descriptor: PairingDescriptorV1 | null) => {
   const [state, setState] = useState<RemotePairingViewState>(INITIAL_STATE);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingGeneration = useRef(0);
@@ -165,14 +162,6 @@ export const useRemotePairing = (
       });
       return;
     }
-    if (!directConnectivityReady && !descriptor.relay) {
-      setState({
-        ...INITIAL_STATE,
-        phase: 'blocked',
-        message: '当前没有可用的 Direct 或 Mira Relay 连接，未提交配对申请。',
-      });
-      return;
-    }
     if (!remoteMiraHostClient.isSecureStorageAvailable()) {
       setState({
         ...INITIAL_STATE,
@@ -187,7 +176,7 @@ export const useRemotePairing = (
     setState({
       ...INITIAL_STATE,
       phase: 'claiming',
-      message: '正在向 Mira Desktop 提交设备申请。',
+      message: '正在检查可用传输。',
     });
 
     try {
@@ -218,13 +207,21 @@ export const useRemotePairing = (
       beginPolling(pending);
     } catch (error) {
       if (generation !== pollingGeneration.current) return;
+      if (error instanceof Error && 'code' in error && error.code === 'PAIRING_CLAIM_UNCERTAIN') {
+        setState({
+          ...INITIAL_STATE,
+          phase: 'error',
+          message: '设备申请状态不确定，请回到 Mira Desktop 确认是否已收到申请；不要通过另一条通道重新提交。',
+        });
+        return;
+      }
       setState({
         ...INITIAL_STATE,
         phase: 'error',
         message: error instanceof Error ? error.message : '提交配对申请失败',
       });
     }
-  }, [beginPolling, descriptor, directConnectivityReady, stopPolling]);
+  }, [beginPolling, descriptor, stopPolling]);
 
   return {
     state,
