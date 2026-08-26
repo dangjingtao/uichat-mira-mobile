@@ -67,6 +67,73 @@ function ThinkingIndicator({ color }: { color: string }) {
   );
 }
 
+function MessageHistorySkeleton({
+  colors,
+}: {
+  colors: ReturnType<typeof useTheme>['colors'];
+}) {
+  const opacity = useRef(new Animated.Value(0.55)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.55,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <View
+      style={styles.historySkeleton}
+      accessibilityLabel="正在加载聊天记录"
+      accessibilityRole="progressbar"
+    >
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonAssistant,
+          { backgroundColor: colors.bg.bubble, opacity },
+        ]}
+      >
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '78%' }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '54%' }]} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonUser,
+          { backgroundColor: colors.bg.soft, opacity },
+        ]}
+      >
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '64%' }]} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonAssistant,
+          { backgroundColor: colors.bg.bubble, opacity },
+        ]}
+      >
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '68%' }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '42%' }]} />
+      </Animated.View>
+    </View>
+  );
+}
+
 const createLocalMessageId = () =>
   `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -86,6 +153,7 @@ export function ChatScreen() {
   );
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -95,16 +163,26 @@ export function ChatScreen() {
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const abortRef = useRef(false);
 
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (): Promise<ChatMessage[] | null> => {
     try {
-      setMessages(await miraHostClient.getMessages(sessionId));
+      const canonicalMessages = await miraHostClient.getMessages(sessionId);
+      setMessages(canonicalMessages);
+      return canonicalMessages;
     } catch {
       // Connection and authorization state are surfaced by the remote host flow.
+      return null;
     }
   }, [sessionId]);
 
   useEffect(() => {
-    void loadMessages();
+    let active = true;
+    setIsLoadingHistory(true);
+    void loadMessages().finally(() => {
+      if (active) setIsLoadingHistory(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [loadMessages]);
 
   const scrollToBottom = useCallback(() => {
@@ -154,18 +232,19 @@ export function ChatScreen() {
           scrollToBottom();
         }
 
-        if (!abortRef.current && fullReply) {
-          const assistantMsg: ChatMessage = {
-            id: `local-assistant-${Date.now()}`,
-            role: 'assistant',
-            content: fullReply,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-        }
+        // The stream is a delivery channel only. Re-read canonical Thread /
+        // Message state so the UI never invents an Assistant message locally.
+        await loadMessages();
         setStreamingText('');
       } catch (error) {
-        if (!abortRef.current) {
+        setStreamingText('');
+        const canonicalMessages = await loadMessages();
+        const hasCanonicalAssistant = canonicalMessages?.some(
+          (message) =>
+            message.role === 'assistant' &&
+            message.timestamp.getTime() >= userMsg.timestamp.getTime(),
+        );
+        if (!abortRef.current && !hasCanonicalAssistant) {
           const message =
             error instanceof Error && error.message
               ? error.message
@@ -178,7 +257,7 @@ export function ChatScreen() {
         setIsLoading(false);
       }
     },
-    [inputText, isLoading, scrollToBottom, sessionId],
+    [inputText, isLoading, loadMessages, scrollToBottom, sessionId],
   );
 
   const handleStop = useCallback(() => {
@@ -310,6 +389,9 @@ export function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={scrollToBottom}
+          ListEmptyComponent={
+            isLoadingHistory ? <MessageHistorySkeleton colors={colors} /> : null
+          }
           ListFooterComponent={renderFooter}
         />
 
@@ -421,6 +503,24 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  historySkeleton: {
+    flex: 1,
+    minHeight: 300,
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  skeletonBubble: {
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  skeletonAssistant: { width: '76%', alignSelf: 'flex-start' },
+  skeletonUser: { width: '58%', alignSelf: 'flex-end' },
+  skeletonLine: { height: 10, borderRadius: radius.full },
   messageRow: { marginBottom: spacing.lg, flexDirection: 'row' },
   messageRowLeft: { justifyContent: 'flex-start' },
   messageRowRight: { justifyContent: 'flex-end' },

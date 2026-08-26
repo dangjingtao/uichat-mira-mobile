@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -135,6 +136,7 @@ export function SessionListScreen() {
   const { connectionStatus } = useHostStore();
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const backdropAnim = useState(new Animated.Value(0))[0];
@@ -171,11 +173,14 @@ export function SessionListScreen() {
   }, [drawerAnim, backdropAnim]);
 
   const loadSessions = useCallback(async () => {
+    setIsLoading(true);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
     } catch {
       // Connection state and authorization are surfaced elsewhere.
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -262,29 +267,37 @@ export function SessionListScreen() {
             />
           </>
         )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <View
-              style={[
-                styles.emptyIllustration,
-                {
-                  backgroundColor: colors.bg.card,
-                  borderColor: colors.border.default,
-                },
-              ]}
-            >
-              <MessageSquare
-                size={48}
-                strokeWidth={1.25}
-                color={colors.border.default}
-              />
+        ListEmptyComponent={() =>
+          isLoading ? (
+            <View style={styles.loadingState} accessibilityLabel="正在加载线程列表" accessibilityRole="progressbar">
+              <ActivityIndicator size="small" color={colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
-              Remote Host V1 当前只展示桌面端已有会话
-            </Text>
-          </View>
-        )}
+          ) : (
+            <View style={styles.emptyState}>
+              <View
+                style={[
+                  styles.emptyIllustration,
+                  {
+                    backgroundColor: colors.bg.card,
+                    borderColor: colors.border.default,
+                  },
+                ]}
+              >
+                <MessageSquare
+                  size={48}
+                  strokeWidth={1.25}
+                  color={colors.border.default}
+                />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
+              <Text
+                style={[styles.emptySubtitle, { color: colors.text.soft }]}
+              >
+                Remote Host V1 当前只展示桌面端已有会话
+              </Text>
+            </View>
+          )
+        }
       />
 
       {drawerOpen ? (
@@ -407,6 +420,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.section,
     paddingBottom: 80,
+  },
+  loadingState: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyIllustration: {
     width: 112,

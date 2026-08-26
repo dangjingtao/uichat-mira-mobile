@@ -140,13 +140,14 @@ export function PairingScannerModal({
               onError={() => setCameraState('unavailable')}
             />
             <View pointerEvents="none" style={styles.finderLayer}>
-              <View style={[styles.finder, { width: finderSize, height: finderSize }]}>
+              <View
+                style={[styles.finder, { width: finderSize, height: finderSize }]}
+              >
                 <View style={[styles.finderCorner, styles.finderCornerTopLeft]} />
                 <View style={[styles.finderCorner, styles.finderCornerTopRight]} />
                 <View style={[styles.finderCorner, styles.finderCornerBottomLeft]} />
                 <View style={[styles.finderCorner, styles.finderCornerBottomRight]} />
               </View>
-              <Text style={styles.finderHint}>将二维码放入框内</Text>
             </View>
             {scanError ? (
               <View style={styles.errorBanner}>
@@ -272,11 +273,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 4,
     borderRightWidth: 4,
     borderBottomRightRadius: 12,
-  },
-  finderHint: {
-    marginTop: 20,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
   },
   centered: {
     flex: 1,
