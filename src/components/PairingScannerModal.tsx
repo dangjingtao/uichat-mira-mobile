@@ -19,7 +19,7 @@ import {
   type Permission,
 } from 'react-native-permissions';
 import { ScanLine, Settings, X } from 'lucide-react-native';
-import { parsePairingUri } from '../protocol/remoteHostV1';
+import { parseScannedPairingUri } from '../pairing/parseScannedPairingUri';
 
 type CameraState =
   | 'checking'
@@ -80,8 +80,7 @@ export function PairingScannerModal({
       if (scanLocked.current) return;
       scanLocked.current = true;
       try {
-        parsePairingUri(value);
-        onScanned(value.trim());
+        onScanned(parseScannedPairingUri(value));
       } catch {
         setScanError('这不是有效的 Mira 配对二维码');
         setTimeout(() => {
