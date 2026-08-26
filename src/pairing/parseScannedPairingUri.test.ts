@@ -4,7 +4,7 @@ import { parsePairingUriV1 } from '../protocol/remotePairingV1';
 describe('parseScannedPairingUri', () => {
   it('accepts the canonical Relay-only pairing QR from Desktop', () => {
     const pairingUri =
-      'mira://pair?challenge=challenge-1&code=ABCD2345&version=1&relay=https%3A%2F%2Frelay.tomz.io&relayId=relay%5FDqko12345678901&relayToken=ccccccccccccccccccccccccccccccc1X%5FMsccccccc';
+      'mira://pair?challenge=challenge-1&code=ABCD2345&version=1&relay=https%3A%2F%2Frelay.tomz.io&relayId=relay_Dqko12345678901&relayToken=ccccccccccccccccccccccccccccccc1X_Msccccccc';
 
     const scanned = parseScannedPairingUri(`  ${pairingUri}\n`);
 
