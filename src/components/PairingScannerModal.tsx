@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,6 +46,8 @@ export function PairingScannerModal({
   const [cameraState, setCameraState] = useState<CameraState>('checking');
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLocked = useRef(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const finderSize = Math.min(Math.max(windowWidth - 48, 0), 300);
 
   const ensureCameraPermission = useCallback(async () => {
     setCameraState('checking');
@@ -129,15 +132,22 @@ export function PairingScannerModal({
               cameraType={CameraType.Back}
               scanBarcode
               allowedBarcodeTypes={['qr']}
-              showFrame
-              frameColor="#ffffff"
-              laserColor="#22c55e"
+              showFrame={false}
               scanThrottleDelay={800}
               onReadCode={event =>
                 handleReadCode(event.nativeEvent.codeStringValue)
               }
               onError={() => setCameraState('unavailable')}
             />
+            <View pointerEvents="none" style={styles.finderLayer}>
+              <View style={[styles.finder, { width: finderSize, height: finderSize }]}>
+                <View style={[styles.finderCorner, styles.finderCornerTopLeft]} />
+                <View style={[styles.finderCorner, styles.finderCornerTopRight]} />
+                <View style={[styles.finderCorner, styles.finderCornerBottomLeft]} />
+                <View style={[styles.finderCorner, styles.finderCornerBottomRight]} />
+              </View>
+              <Text style={styles.finderHint}>将二维码放入框内</Text>
+            </View>
             {scanError ? (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{scanError}</Text>
@@ -214,6 +224,60 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { width: 44 },
   cameraContainer: { flex: 1, overflow: 'hidden' },
+  finderLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finder: {
+    aspectRatio: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    borderRadius: 12,
+  },
+  finderCorner: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderColor: '#ffffff',
+  },
+  finderCornerTopLeft: {
+    top: -1,
+    left: -1,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 12,
+  },
+  finderCornerTopRight: {
+    top: -1,
+    right: -1,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 12,
+  },
+  finderCornerBottomLeft: {
+    bottom: -1,
+    left: -1,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 12,
+  },
+  finderCornerBottomRight: {
+    bottom: -1,
+    right: -1,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 12,
+  },
+  finderHint: {
+    marginTop: 20,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',

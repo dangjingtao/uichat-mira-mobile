@@ -4,6 +4,8 @@
 
 适用分支：`dev`
 
+最近修订：2026-08-26
+
 本文定义 Mira Mobile 首次配对与配对后远程连接的 Transport 行为。其他移动端远程连接文档必须引用本文；如有冲突，以本文为准。
 
 ## 1. Transport 边界
@@ -16,6 +18,8 @@ Mira Mobile 与 Mira Host 共用同一套 `mira_device_*` 设备凭据和 scope�
 - `relay`、`relayId`、`relayToken`：可选的 Mira Relay endpoint。
 
 必须至少存在一种可达 endpoint。Relay-only 配对不要求 Tailscale 已开启。
+
+对用户而言，Relay 与 Tailscale Direct 不是两种需要选择的连接模式，而是客户端内部自动选择的传输路径。
 
 ## 2. 首次配对：Relay-first
 
@@ -56,14 +60,50 @@ Direct 网络/传输失败 -> Relay
 
 Transport 切换不能删除、重建或改变已经批准的 `mira_device_*` 身份。
 
-## 5. Mobile 界面流程
+## 5. Mobile 界面流程与文案
 
-1. 扫码或粘贴链接后显示“正在检查可用传输”。
-2. Relay 可用时显示“已选择 Mira Relay”，然后提交 claim。
-3. Relay 预检失败但 Direct 可用时显示“Relay 不可用，正在切换 Tailscale Direct”，然后提交 claim。
-4. 两者都不可用时显示可操作的连接错误，不提交 claim。
-5. claim 成功后显示“已提交设备申请，等待桌面确认”。
-6. claim 响应不确定时不自动换通道重试，提示用户回到 Desktop 确认。
+### 5.1 交互原则
+
+- 用户只需要扫码或粘贴一条配对链接，不选择 Relay、Tailscale 或其他 Transport。
+- 主流程只表达用户任务和当前进度，不要求用户理解 endpoint、preflight、claim 等实现术语。
+- 客户端自动按 Relay-first、Direct fallback 执行；只有两条路径都失败时才要求用户介入。
+- Relay 与 Tailscale 的实际状态、切换原因和诊断信息放在“连接详情”中，不作为主流程标题或前置条件。
+
+### 5.2 推荐主流程文案
+
+```text
+设备配对
+扫描 Mira Desktop 上的二维码
+
+正在连接桌面…
+我们会自动选择可用的安全连接
+
+等待桌面端批准
+
+设备已连接
+```
+
+### 5.3 失败与不确定状态
+
+两条 Transport 都不可用时：
+
+```text
+暂时无法连接桌面
+请确认桌面端仍在等待配对。
+我们已尝试所有可用连接方式。
+
+重新尝试
+查看连接详情
+```
+
+claim 已发出但响应不确定时：
+
+```text
+配对请求状态未知
+请回到桌面端确认是否收到申请，不要重复提交。
+```
+
+“连接详情”可以显示当前尝试的 Transport、备用 Transport、失败阶段和可操作建议，例如“当前尝试：Mira Relay”“备用连接：Tailscale Direct”。这些信息不得被设计成用户必须选择的设置。
 
 ## 6. Desktop 对应要求
 
