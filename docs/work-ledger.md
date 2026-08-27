@@ -8,8 +8,8 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-006。
-- MOB-007 至 MOB-010 已完成任务卡定义并纳入总台账；当前仅派卡，尚未开始对应业务代码施工。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-007。
+- MOB-007 已完成并合入 `dev`；MOB-008 至 MOB-010 已完成任务卡定义并纳入总台账，当前尚未开始对应业务代码施工。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威线程、项目和角色业务数据，不猜测远端接口字段。
 - Desktop #77 / #78 / #80 已完成合同实现并合入 Desktop `dev`；Mobile 通过 MOB-010 统一完成正式 Remote 合同适配和真实联调，不重开旧任务历史。
 - 线程置顶与未读首轮明确为 Mobile **设备级本地 UI 状态**，分别由 MOB-007 / MOB-008 实现；不得把本机状态伪装成账户级或跨端统一状态。
@@ -26,7 +26,7 @@
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | **有条件完成**：Mobile 侧层级规则已完成；待 MOB-010 接入 #77/#80 正式接口并完成真机项目闭环后升级为完全完成 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003, MOB-010 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 原视觉分类代码完成；Desktop #78 已交付 `/remote/v1/roles`，权威角色名补充展示由 MOB-010 收口 | `mob_005_visual_kinds` | MOB-001, MOB-010 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、错误态、状态真实性，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
-| MOB-007 | 本机线程置顶 | 以稳定线程 ID 持久化本机置顶，支持置顶/取消置顶与稳定排序，不写回 Remote Thread | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_007_local_pinning` | MOB-006 |
+| MOB-007 | 本机线程置顶 | 以稳定线程 ID 持久化本机置顶，支持置顶/取消置顶与稳定排序，不写回 Remote Thread | **完成**：本机持久化、主列表置顶排序、Drawer/Search 同源展示已合入 `dev`；不写回 Remote Thread，不做跨端同步 | `mob_007_local_pinning` | MOB-006 |
 | MOB-008 | 本机未读状态 | 持久化本机已读进度，以真实消息进度判定未读；仅表达当前设备是否读过 | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_008_device_unread` | MOB-006 |
 | MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 移除主流程 Direct/Host 地址配置；保留扫码并增加 `mira://pair?...` 粘贴兜底 | 待实施；任务卡已创建；不修改 Desktop / Pairing V1 协议 | 待派工 | 现有 Remote Pairing V1 |
 | MOB-010 | Desktop Remote 合同接入收口 | 对齐 `/remote/v1/workspaces`、`/remote/v1/roles`、Workspace Thread 权威分页，完成 #77/#78/#80 Mobile 联调验收 | 待实施；Desktop 正式合同已交付并合入 `dev` | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
@@ -232,18 +232,25 @@
 
 ### MOB-007：本机线程置顶
 
-**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-007-local-thread-pinning.md`。
+**状态：完成。** 任务卡：`docs/task-cards/MOB-007-local-thread-pinning.md`。代码已通过 PR #28 squash 合入 `dev`，提交 `90ecf42ad6ba1b23aaa17e1735b168bacc891046`。
 
 产品与实现边界：
 
-- 以稳定 `thread/session id` 为键持久化本机置顶；首轮可使用 `threadId -> pinnedAt`，不无故引入 `pinOrder`。
+- 以稳定 `thread/session id` 为键持久化本机置顶；首轮使用 `threadId -> pinnedAt`，未引入额外 `pinOrder`。
 - 置顶只影响当前手机的排序与展示，不写回 Remote Thread，不宣称 Desktop / 其他 Mobile 已同步。
-- 主列表支持置顶、取消置顶；置顶组优先，同组默认继续按 Host `updatedAt` 倒序。
-- Drawer / Search 如展示置顶标记，应复用同一状态源；Search 不因置顶修改搜索相关性排序。
-- Host 删除 / 404 的线程允许清理本机置顶记录，避免幽灵会话。
-- 本地 UI 状态不得塞入 `deviceCredentialStore` 等安全凭证存储。
+- 主列表支持置顶、取消置顶；置顶组优先，同组继续按 Host `updatedAt` 倒序。
+- Drawer / Search 复用同一状态源展示本机置顶标记；Search 不因置顶修改搜索相关性排序。
+- Android 使用独立 `MiraLocalStore -> SharedPreferences`；iOS 使用 React Native `Settings -> NSUserDefaults`。本地 UI 状态未塞入 `deviceCredentialStore` 等安全凭证存储。
+- Host 当前 `/threads` 读取只返回 `status=active`；因此“未出现在 active 列表”不等价于“已删除”，MOB-007 不再据此误清置顶。只有未来拿到明确删除 / 404 证据时才允许清理对应本机状态。
+- 持久化写入做顺序串行化，避免快速置顶 / 取消置顶发生旧写覆盖新写。
+- Workspace 层级规则、Role/Agent 分类和 Remote Thread 真相模型均未改变。
 
-验收至少覆盖：App 重启后置顶保留、取消置顶恢复普通排序、多置顶稳定排序、Host 刷新标题/更新时间不丢置顶，以及 typecheck / lint / Jest。
+验证与交付：
+
+- PR #28 的施工分支至少一轮 `Typecheck, lint and test` 全部成功；后续收口修正继续通过 PR 管理。
+- 按维护者明确决定，本次合并不等待最终 Android / iOS 平台构建结果；平台构建与真机视觉回归继续并入 MOB-006，不作为 MOB-007 合并阻塞。
+- PR #28 已 squash 合入 `dev`，合并提交 `90ecf42ad6ba1b23aaa17e1735b168bacc891046`。
+- 已知技术债：本机置顶状态 hydrate 读取失败时，目前仍缺显式错误提示与重试入口；记录为 P2，不影响正常存储路径下的置顶能力完成状态。
 
 ### MOB-008：本机未读状态
 
@@ -312,7 +319,7 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 2. #77 / #78 / #80 暂不关闭，待 Mobile 完成真实接入、权限/错误态和真机或等价远程联调后关闭。
 3. 是否需要权威唯一 `threadKind` 仍未决定；若不需要，移动端继续只派生 UI 显示分类。
 
-线程已读 / 置顶已从跨端阻塞中移除：Desktop #79 已关闭为 `not planned`，当前由 MOB-007 / MOB-008 负责设备级本地实现。
+线程已读 / 置顶已从跨端阻塞中移除：Desktop #79 已关闭为 `not planned`；MOB-007 的设备级本机置顶已完成，MOB-008 的设备级本机未读仍待实施。
 
 ## 实施授权门槛
 
@@ -322,7 +329,7 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - MOB-004：已获得维护者明确实施授权；层级规则已完成，待 MOB-010 完成后做真实闭环验收。
 - MOB-005：已获得维护者明确实施授权；三类视觉映射已完成，Role summary 名称接入转 MOB-010。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
-- MOB-007：已完成任务卡和产品边界定义；当前未开始业务代码施工。
+- MOB-007：已获得维护者明确实施授权；本机线程置顶代码已完成并通过 PR #28 squash 合入 `dev`。
 - MOB-008：已完成任务卡和产品边界定义；当前未开始业务代码施工。
 - MOB-009：已完成任务卡和产品边界定义；当前未开始业务代码施工。
 - MOB-010：已完成任务卡和 Desktop 正式合同核对；当前未开始业务代码施工。
@@ -332,11 +339,10 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 
 1. MOB-010：优先接住 Desktop 0.99.11 已交付的 #77/#78/#80，避免 Mobile 继续依赖已经过时的 `/chat-workspaces` 与全量 Thread 本地过滤方式。
 2. MOB-009：把配对主流程从网络工程配置页收回为“扫码 / 粘贴 Mira 链接 -> 桌面授权”，解决当前真机直接可见的问题。
-3. MOB-007：实现本机线程置顶，恢复真实而非伪造的置顶交互。
-4. MOB-008：实现本机未读进度和判定，恢复真实而非伪造的未读提示。
-5. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009/010 完成后补相应回归。
-6. MOB-004：MOB-010 接入完成后执行真实设备项目层级闭环回归，通过后标记完全完成。
-7. MOB-001 / MOB-002 / MOB-003 / MOB-005：保留原完成历史，不重开；后续正式 Remote 合同适配统一由 MOB-010 记录。
+3. MOB-008：实现本机未读进度和判定，恢复真实而非伪造的未读提示。
+4. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009/010 完成后补相应回归。
+5. MOB-004：MOB-010 接入完成后执行真实设备项目层级闭环回归，通过后标记完全完成。
+6. MOB-001 / MOB-002 / MOB-003 / MOB-005：保留原完成历史，不重开；后续正式 Remote 合同适配统一由 MOB-010 记录。
 
 ## 交付记录
 
@@ -366,3 +372,5 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - 2026-08-28：MOB-007 至 MOB-009 正式并入 `docs/work-ledger.md` 总台账，旧编号与历史交付记录保持不变。
 - 2026-08-28：Desktop #77 / #78 / #80 正式合同已完成并合入 Desktop `dev`；Mobile 新增 MOB-010《Desktop Remote 合同接入收口》统一承接 Workspace、Role summary 与 Workspace Thread 分页适配。
 - 2026-08-28：MOB-010 正式并入总台账；旧 MOB-002 / MOB-003 / MOB-005 完成记录保留，正式 Remote 合同增量适配不通过“重开旧卡”改写历史。
+- 2026-08-28：开始 MOB-007；实现设备级本机线程置顶、主列表稳定排序、Drawer/Search 同源标记和独立本地持久化，不修改 Desktop / Host。
+- 2026-08-28：PR #28 squash 合入 `dev`，提交 `90ecf42ad6ba1b23aaa17e1735b168bacc891046`；按维护者决定不等待最终平台构建，MOB-007 标记完成；置顶 hydrate 失败缺少显式错误/重试入口记录为 P2 技术债。
