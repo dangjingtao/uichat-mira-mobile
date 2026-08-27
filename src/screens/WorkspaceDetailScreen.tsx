@@ -34,13 +34,12 @@ import {
   getWorkspaceDetailContractError,
 } from './workspaceDetailState';
 
+const twoDigits = (value: number) => String(value).padStart(2, '0');
+
 function formatUpdatedAt(date: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return `${date.getMonth() + 1}/${date.getDate()} ${twoDigits(date.getHours())}:${twoDigits(
+    date.getMinutes(),
+  )}`;
 }
 
 export function WorkspaceDetailScreen() {
@@ -193,7 +192,7 @@ export function WorkspaceDetailScreen() {
                 >
                   {item.title}
                 </Text>
-                <Text style={[styles.sessionTime, { color: colors.text.soft }]}> 
+                <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
                   {formatUpdatedAt(item.updatedAt)}
                 </Text>
               </View>
@@ -218,7 +217,11 @@ export function WorkspaceDetailScreen() {
                   onPress={() => void loadWorkspaceSessions()}
                   style={({ pressed }) => [
                     styles.retryButton,
-                    { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+                    {
+                      backgroundColor: pressed
+                        ? colors.primaryActive
+                        : colors.primary,
+                    },
                   ]}
                 >
                   <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
@@ -261,7 +264,11 @@ const styles = StyleSheet.create({
   },
   headerCaption: { marginTop: 2, fontSize: fontSize.caption },
   headerSpacer: { width: sizing.touchTarget },
-  listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.sm },
+  listContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+  },
   centerState: {
     flex: 1,
     alignItems: 'center',
@@ -269,7 +276,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.section,
     paddingVertical: spacing.section,
   },
-  stateTitle: { fontSize: fontSize.titleLg, fontWeight: '600', textAlign: 'center' },
+  stateTitle: {
+    fontSize: fontSize.titleLg,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   stateBody: {
     marginTop: spacing.md,
     fontSize: fontSize.bodyMd,
