@@ -21,7 +21,7 @@
 | MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Workspace/Role 远程读取合同仍分别处理 | `mob_001_contract` | Remote contract |
 | MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | Mobile 已按 Desktop `ChatWorkspace` 接真实项目列表读取并通过代码级验证；远程只读放行与 `rootPath` 安全投影由 Desktop Issue #77 跟踪 | `mob_002_workspace_list` | MOB-001, Desktop #77 |
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 代码实施完成并通过 typecheck/lint/Jest；真实 Workspace 行可进入详情，详情按 `workspaceId` 精确过滤真实线程 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
-| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 代码实施完成并合入 `dev`；主列表、抽屉、搜索统一遵守项目层级，非法 Agent 不降级；typecheck/lint/Jest 通过 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
+| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | **有条件完成**：Mobile 侧代码已合入 `dev`，主列表、抽屉、搜索统一遵守项目层级，非法 Agent 不降级，typecheck/lint/Jest 通过；最终运行时闭环待 Desktop Issue #77 放行 Workspace Remote 读取并完成真机回归 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003, Desktop #77 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 代码实施完成并通过 typecheck/lint/Jest；三入口已统一视觉分类与可访问性文案 | `mob_005_visual_kinds` | MOB-001 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
@@ -136,6 +136,8 @@
 
 ### MOB-004：项目线程层级导航
 
+**状态：有条件完成。** Mobile 侧实现与代码级验证已完成；升级为“完全完成”的条件是 Desktop Issue #77 放行 Workspace Remote 读取后，完成真实设备的项目层级闭环回归。
+
 代码实施已完成并合入 `dev`：
 
 - 新增共享 `resolveSessionOpenTarget()`，主会话列表、抽屉最近会话、搜索结果三个全局入口统一消费同一层级规则。
@@ -156,10 +158,11 @@
 - PR #25 已 squash 合入 `dev`，提交 `ff0edfe`。
 - Android / iOS 平台构建由同一 CI 独立执行；MOB-004 为 JS/TS 导航层改动，代码级完成不以平台构建替代真机验收。
 
-当前剩余：
+完成条件 / 当前剩余：
 
-- Desktop Issue #77 仍决定真实设备是否能读取 Workspace；该跨端依赖不再阻塞 Mobile 的层级 UI、路由规则和异常处理完成状态。
-- 真机返回路径与视觉覆盖并入 MOB-006 的设备验收清单。
+- Desktop Issue #77 完成后，使用已配对真实设备验证 `主列表 / Drawer / Search -> WorkspaceList -> WorkspaceDetail -> Chat` 的完整路径、返回路径与错误恢复。
+- 在上述运行时闭环验收通过前，MOB-004 保持“有条件完成”，不升级为“完全完成”。
+- 真机视觉覆盖继续并入 MOB-006 的设备验收清单。
 
 ### MOB-005：线程类型视觉区分
 
@@ -225,7 +228,7 @@
 - MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
 - MOB-002：已获得维护者明确实施授权；Mobile 已按 Desktop `ChatWorkspace` 落真实列表读取；跨端只读权限与安全投影由 #77 跟踪。
 - MOB-003：已获得维护者明确实施授权；项目详情、真实线程过滤、WorkspaceList -> WorkspaceDetail -> Chat 路径已完成并通过自动化代码级验证。
-- MOB-004：已获得维护者明确实施授权；三个全局线程入口的项目层级规则已完成并通过自动化代码级验证。
+- MOB-004：已获得维护者明确实施授权；Mobile 侧三个全局线程入口的项目层级规则已完成并通过自动化代码级验证，任务状态为“有条件完成”；待 Desktop #77 完成并通过真机闭环回归后升级为完全完成。
 - MOB-005：已获得维护者明确实施授权；三类线程视觉映射与可访问性统一已完成并通过自动化代码级验证。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
 - 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
@@ -237,7 +240,7 @@
 3. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
 4. MOB-002：Mobile 真实项目列表代码已存在；跨端只读权限与 `rootPath` 安全投影等待 #77。
 5. MOB-003：代码实施完成；运行时项目读取依赖 #77。
-6. MOB-004：代码实施完成；运行时 Workspace 读取依赖 #77，真机返回路径并入 MOB-006。
+6. MOB-004：有条件完成；等待 #77 后执行真实设备项目层级闭环回归，通过后再标记完全完成。
 
 ## 交付记录
 
@@ -259,4 +262,5 @@
 - 2026-08-27：WorkspaceList 真实项目行接入 `WorkspaceDetail({ workspaceId, workspaceName })`；详情线程进入 Chat，形成项目列表 -> 项目详情 -> Chat 的可运行 Mobile 路径。
 - 2026-08-27：Mobile CI #273 的 `Typecheck, lint and test` 通过；MOB-003 代码实施完成，Desktop / Host 未在本轮修改。
 - 2026-08-27：开始 MOB-004；新增统一线程打开策略，收紧主列表、抽屉、搜索三个全局入口，并为项目线程补充 UI 层级提示与非法 Agent 契约异常处理。
-- 2026-08-27：Mobile CI #282 的 `Typecheck, lint and test` 通过；PR #25 squash 合入 `dev`，MOB-004 代码实施完成。
+- 2026-08-27：Mobile CI #282 的 `Typecheck, lint and test` 通过；PR #25 squash 合入 `dev`，MOB-004 Mobile 侧代码实施完成。
+- 2026-08-27：MOB-004 标记为“有条件完成”；完全完成条件为 Desktop #77 放行 Workspace Remote 读取后完成真实设备项目层级闭环回归。
