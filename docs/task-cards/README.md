@@ -8,6 +8,7 @@
 |---|---|---|---|
 | MOB-007 | 本机线程置顶 | 待实施 | 无 |
 | MOB-008 | 本机未读状态 | 待实施 | 无 |
+| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 待实施 | 无新增依赖 |
 
 ## 产品决策
 
@@ -18,7 +19,10 @@
 - 不把设备级状态伪装成账户级或跨端统一状态。
 - 将来如明确需要 Desktop ↔ Mobile 或多 Mobile 同步，再新建设计账户级线程状态同步任务。
 
+2026-08-28 决定：桌面配对页只暴露用户需要理解的配对流程。扫码为主入口，扫码失败时允许粘贴 `mira://pair?...` 配对链接兜底；Direct / Relay 继续作为底层 transport，不再在主页面提供 Host URL、手工 Direct 检查或传输选择。
+
 详细任务卡：
 
 - `MOB-007-local-thread-pinning.md`
 - `MOB-008-device-local-unread.md`
+- `MOB-009-pairing-screen-simplification.md`
