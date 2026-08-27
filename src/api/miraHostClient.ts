@@ -26,6 +26,7 @@ const threadToSession = (thread: RemoteThread): Session => ({
   roleId: thread.roleId,
   agentEnabled: thread.agentEnabled,
   status: thread.status,
+  messageCount: thread.messageCount,
 });
 
 const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
