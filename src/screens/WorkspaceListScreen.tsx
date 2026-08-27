@@ -151,10 +151,19 @@ export function WorkspaceListScreen() {
           renderItem={({ item }) => {
             const updatedAt = formatUpdatedAt(item.updatedAt);
             return (
-              <View
-                style={styles.workspaceRow}
-                accessible
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel={`${item.name}${item.isDefault ? '，默认项目' : ''}${item.status === 'archived' ? '，已归档' : ''}`}
+                onPress={() =>
+                  navigation.navigate('WorkspaceDetail', {
+                    workspaceId: item.id,
+                    workspaceName: item.name,
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.workspaceRow,
+                  pressed && { backgroundColor: colors.bg.soft },
+                ]}
               >
                 <View
                   style={[
@@ -208,7 +217,7 @@ export function WorkspaceListScreen() {
                     <Text style={[styles.meta, { color: colors.text.soft }]}>更新于 {updatedAt}</Text>
                   ) : null}
                 </View>
-              </View>
+              </Pressable>
             );
           }}
         />
@@ -286,7 +295,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    paddingHorizontal: spacing.xs,
     paddingVertical: spacing.md,
+    borderRadius: radius.sm,
   },
   workspaceIcon: {
     width: 44,
