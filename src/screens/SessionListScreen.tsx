@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -33,6 +34,7 @@ import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
+import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 
@@ -76,10 +78,13 @@ function SessionRow({
   colors,
   onOpen,
 }: SessionRowProps) {
+  const belongsToWorkspace =
+    typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}`}
+      accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}`}
       style={({ pressed }) => [
         styles.sessionItem,
         {
@@ -124,9 +129,11 @@ function SessionRow({
           style={[styles.sessionPreview, { color: colors.text.muted }]}
           numberOfLines={1}
         >
-          {connectionStatus === 'connected'
-            ? '继续与 Mira 对话'
-            : '连接 Mira Host 后继续对话'}
+          {belongsToWorkspace
+            ? '项目会话 · 从项目中打开'
+            : connectionStatus === 'connected'
+              ? '继续与 Mira 对话'
+              : '连接 Mira Host 后继续对话'}
         </Text>
       </View>
     </Pressable>
@@ -212,6 +219,22 @@ export function SessionListScreen() {
     [insets.bottom, sessions.length],
   );
 
+  const openSession = (session: Session) => {
+    const target = resolveSessionOpenTarget(session);
+    if (target.kind === 'workspace-list') {
+      navigation.navigate('WorkspaceList');
+      return;
+    }
+    if (target.kind === 'contract-error') {
+      Alert.alert('无法打开会话', target.message);
+      return;
+    }
+    navigation.navigate('Chat', {
+      sessionId: session.id,
+      title: session.title,
+    });
+  };
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
@@ -258,12 +281,7 @@ export function SessionListScreen() {
             item={item}
             connectionStatus={connectionStatus}
             colors={colors}
-            onOpen={() =>
-              navigation.navigate('Chat', {
-                sessionId: item.id,
-                title: item.title,
-              })
-            }
+            onOpen={() => openSession(item)}
           />
         )}
         ListEmptyComponent={() => {
@@ -319,7 +337,7 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}> 
                 Remote Host V1 当前只展示桌面端已有会话
               </Text>
             </View>
