@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   Platform,
@@ -35,6 +36,7 @@ import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from '../screens/sessionCollectionState';
+import { resolveSessionOpenTarget } from '../screens/sessionNavigation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 const miraLogo = require('../../assets/branding/mira-logo-square.png');
@@ -92,7 +94,17 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   );
 
   const handleOpenSession = (session: Session) => {
+    const target = resolveSessionOpenTarget(session);
     onClose();
+
+    if (target.kind === 'workspace-list') {
+      navigation.navigate('WorkspaceList');
+      return;
+    }
+    if (target.kind === 'contract-error') {
+      Alert.alert('无法打开会话', target.message);
+      return;
+    }
     navigation.navigate('Chat', {
       sessionId: session.id,
       title: session.title,
@@ -188,30 +200,38 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
               data={sessions}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
-              renderItem={({ item }) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}`}
-                  style={({ pressed }) => [
-                    styles.recentItem,
-                    pressed && { backgroundColor: colors.bg.soft },
-                  ]}
-                  onPress={() => handleOpenSession(item)}
-                >
-                  <SessionKindIcon
-                    session={item}
-                    size={18}
-                    strokeWidth={1.8}
-                    color={colors.text.muted}
-                  />
-                  <Text
-                    style={[styles.recentLabel, { color: colors.text.base }]}
-                    numberOfLines={1}
+              renderItem={({ item }) => {
+                const belongsToWorkspace =
+                  typeof item.workspaceId === 'string' &&
+                  item.workspaceId.trim().length > 0;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}`}
+                    style={({ pressed }) => [
+                      styles.recentItem,
+                      pressed && { backgroundColor: colors.bg.soft },
+                    ]}
+                    onPress={() => handleOpenSession(item)}
                   >
-                    {item.title}
-                  </Text>
-                </Pressable>
-              )}
+                    <SessionKindIcon
+                      session={item}
+                      size={18}
+                      strokeWidth={1.8}
+                      color={colors.text.muted}
+                    />
+                    <Text
+                      style={[styles.recentLabel, { color: colors.text.base }]}
+                      numberOfLines={1}
+                    >
+                      {item.title}
+                    </Text>
+                    {belongsToWorkspace ? (
+                      <FolderOpen size={16} color={colors.text.soft} strokeWidth={1.7} />
+                    ) : null}
+                  </Pressable>
+                );
+              }}
               ItemSeparatorComponent={() => (
                 <View
                   style={[
