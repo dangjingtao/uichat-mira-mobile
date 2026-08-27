@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Search, X } from 'lucide-react-native';
+import { FolderOpen, Search, X } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
@@ -25,6 +26,7 @@ import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
+import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const tabs = [
   { id: 'all', label: '全部', implemented: true },
@@ -71,6 +73,15 @@ export function SearchScreen() {
   }, [query, sessions]);
 
   const openSession = (session: Session) => {
+    const target = resolveSessionOpenTarget(session);
+    if (target.kind === 'workspace-list') {
+      navigation.navigate('WorkspaceList');
+      return;
+    }
+    if (target.kind === 'contract-error') {
+      Alert.alert('无法打开会话', target.message);
+      return;
+    }
     navigation.navigate('Chat', { sessionId: session.id, title: session.title });
   };
 
@@ -148,32 +159,43 @@ export function SearchScreen() {
             </Pressable>
           </View>
         ) : results.length > 0 ? (
-          results.map((session) => (
-            <Pressable
-              key={session.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}`}
-              style={styles.result}
-              onPress={() => openSession(session)}
-            >
-              <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]}>
-                <SessionKindIcon
-                  session={session}
-                  size={20}
-                  strokeWidth={1.8}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
-                <Text
-                  style={[styles.resultTitle, { color: colors.text.ink }]}
-                  numberOfLines={1}
-                >
-                  {session.title}
-                </Text>
-              </View>
-            </Pressable>
-          ))
+          results.map((session) => {
+            const belongsToWorkspace =
+              typeof session.workspaceId === 'string' &&
+              session.workspaceId.trim().length > 0;
+            return (
+              <Pressable
+                key={session.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}`}
+                style={styles.result}
+                onPress={() => openSession(session)}
+              >
+                <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]}>
+                  <SessionKindIcon
+                    session={session}
+                    size={20}
+                    strokeWidth={1.8}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
+                  <Text
+                    style={[styles.resultTitle, { color: colors.text.ink }]}
+                    numberOfLines={1}
+                  >
+                    {session.title}
+                  </Text>
+                  {belongsToWorkspace ? (
+                    <View style={styles.projectHint}>
+                      <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
+                      <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })
         ) : (
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
@@ -260,13 +282,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resultLine: {
-    height: sizing.buttonHeight,
+    minHeight: sizing.buttonHeight,
     borderRadius: radius.md,
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   resultTitle: { fontSize: fontSize.bodyMd },
+  projectHint: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  projectHintText: { fontSize: fontSize.xs },
   placeholderText: {
     textAlign: 'center',
     marginTop: spacing.xl,
