@@ -6,7 +6,6 @@ import {
   FolderPlus,
   House,
   Paperclip,
-  Pin,
   Search,
   Share2,
   Trash2,
@@ -14,7 +13,11 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 
-type MenuIcon = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+type MenuIcon = React.ComponentType<{
+  color?: string;
+  size?: number;
+  strokeWidth?: number;
+}>;
 
 interface ConversationMenuItem {
   id: string;
@@ -27,13 +30,18 @@ interface ConversationMenuItem {
 
 const menuItems: ConversationMenuItem[] = [
   { id: 'share', label: '分享', icon: Share2 },
-  { id: 'pin', label: '置顶', icon: Pin },
   { id: 'project', label: '添加到项目', icon: FolderPlus, hasChevron: true },
   { id: 'files', label: '已上传文件', icon: Paperclip },
   { id: 'search', label: '在聊天中查找', icon: Search },
   { id: 'home', label: '添加到首页', icon: House },
   { id: 'archive', label: '归档', icon: Archive },
-  { id: 'delete', label: '删除', icon: Trash2, destructive: true, addTopSpacing: true },
+  {
+    id: 'delete',
+    label: '删除',
+    icon: Trash2,
+    destructive: true,
+    addTopSpacing: true,
+  },
 ];
 
 interface ConversationMenuProps {
@@ -46,7 +54,12 @@ interface ConversationMenuProps {
   onClose: () => void;
 }
 
-export function ConversationMenu({ visible, title, anchor, onClose }: ConversationMenuProps) {
+export function ConversationMenu({
+  visible,
+  title,
+  anchor,
+  onClose,
+}: ConversationMenuProps) {
   const { colors } = useTheme();
 
   return (
@@ -75,11 +88,16 @@ export function ConversationMenu({ visible, title, anchor, onClose }: Conversati
             },
           ]}
         >
-          <Text style={[styles.title, { color: colors.text.muted }]} numberOfLines={1}>
+          <Text
+            style={[styles.title, { color: colors.text.muted }]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
           {menuItems.map((item) => {
-            const itemColor = item.destructive ? colors.status.error : colors.text.ink;
+            const itemColor = item.destructive
+              ? colors.status.error
+              : colors.text.ink;
             const Icon = item.icon;
             return (
               <Pressable
@@ -94,8 +112,12 @@ export function ConversationMenu({ visible, title, anchor, onClose }: Conversati
                 ]}
               >
                 <Icon size={20} color={itemColor} strokeWidth={2.2} />
-                <Text style={[styles.itemLabel, { color: itemColor }]}>{item.label}</Text>
-                {item.hasChevron && <ChevronRight size={18} color={itemColor} strokeWidth={2.2} />}
+                <Text style={[styles.itemLabel, { color: itemColor }]}>
+                  {item.label}
+                </Text>
+                {item.hasChevron && (
+                  <ChevronRight size={18} color={itemColor} strokeWidth={2.2} />
+                )}
               </Pressable>
             );
           })}

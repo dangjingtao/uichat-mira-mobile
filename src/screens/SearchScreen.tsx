@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,10 @@ import type { Session } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import {
+  getSessionLoadErrorMessage,
+  resolveSessionCollectionState,
+} from './sessionCollectionState';
 
 const tabs = [
   { id: 'all', label: '全部', implemented: true },
@@ -33,23 +38,32 @@ export function SearchScreen() {
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('all');
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       setSessions(await miraHostClient.listSessions());
-    } catch {
+    } catch (error) {
       setSessions([]);
+      setLoadError(getSessionLoadErrorMessage(error));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSessions();
+    void loadSessions();
   }, [loadSessions]);
 
   const results = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return sessions;
-    return sessions.filter((session) => session.title.toLowerCase().includes(normalizedQuery));
+    return sessions.filter((session) =>
+      session.title.toLowerCase().includes(normalizedQuery),
+    );
   }, [query, sessions]);
 
   const openSession = (session: Session) => {
@@ -57,9 +71,17 @@ export function SearchScreen() {
   };
 
   const isImplementedTab = activeTab === 'all' || activeTab === 'conversations';
+  const collectionState = resolveSessionCollectionState(
+    loading,
+    loadError,
+    sessions.length,
+  );
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg.canvas }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.screen, { backgroundColor: colors.bg.canvas }]}
+      edges={['top', 'bottom']}
+    >
       <View style={[styles.tabs, { borderBottomColor: colors.border.soft }]}>
         {tabs.map((tab) => (
           <Pressable
@@ -71,12 +93,18 @@ export function SearchScreen() {
             ]}
             onPress={tab.implemented ? () => setActiveTab(tab.id) : undefined}
             accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === tab.id, disabled: !tab.implemented }}
+            accessibilityState={{
+              selected: activeTab === tab.id,
+              disabled: !tab.implemented,
+            }}
           >
             <Text
               style={[
                 styles.tabLabel,
-                { color: activeTab === tab.id ? colors.text.ink : colors.text.muted },
+                {
+                  color:
+                    activeTab === tab.id ? colors.text.ink : colors.text.muted,
+                },
               ]}
             >
               {tab.label}
@@ -85,25 +113,67 @@ export function SearchScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.results} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.results}
+        keyboardShouldPersistTaps="handled"
+      >
         {!isImplementedTab ? (
           <Text style={[styles.placeholderText, { color: colors.text.soft }]}>该类型搜索即将支持</Text>
+        ) : collectionState === 'loading' ? (
+          <View
+            style={styles.centerState}
+            accessibilityLabel="正在加载会话"
+            accessibilityRole="progressbar"
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : collectionState === 'error' ? (
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>加载会话失败</Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>{loadError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试加载会话"
+              onPress={() => void loadSessions()}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
         ) : results.length > 0 ? (
           results.map((session) => (
-            <Pressable key={session.id} style={styles.result} onPress={() => openSession(session)}>
+            <Pressable
+              key={session.id}
+              style={styles.result}
+              onPress={() => openSession(session)}
+            >
               <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]} />
               <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
-                <Text style={[styles.resultTitle, { color: colors.text.ink }]} numberOfLines={1}>{session.title}</Text>
+                <Text
+                  style={[styles.resultTitle, { color: colors.text.ink }]}
+                  numberOfLines={1}
+                >
+                  {session.title}
+                </Text>
               </View>
             </Pressable>
           ))
         ) : (
-          [0, 1, 2].map((item) => (
-            <View key={item} style={styles.result}>
-              <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]} />
-              <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]} />
-            </View>
-          ))
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
+              {collectionState === 'empty'
+                ? '暂无会话'
+                : `没有找到“${query.trim()}”`}
+            </Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+              {collectionState === 'empty'
+                ? 'Remote Host V1 当前只搜索桌面端已有会话'
+                : '换个关键词再试试'}
+            </Text>
+          </View>
         )}
       </ScrollView>
 
@@ -158,6 +228,7 @@ const styles = StyleSheet.create({
   placeholderTab: { opacity: 0.55 },
   tabLabel: { fontSize: fontSize.bodyMd },
   results: {
+    flexGrow: 1,
     padding: spacing.lg,
     paddingBottom: sizing.buttonHeight + spacing.xl,
     gap: spacing.md,
@@ -168,7 +239,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  resultIcon: { width: sizing.touchTarget, height: sizing.touchTarget, borderRadius: radius.md },
+  resultIcon: {
+    width: sizing.touchTarget,
+    height: sizing.touchTarget,
+    borderRadius: radius.md,
+  },
   resultLine: {
     height: sizing.buttonHeight,
     borderRadius: radius.md,
@@ -177,7 +252,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   resultTitle: { fontSize: fontSize.bodyMd },
-  placeholderText: { textAlign: 'center', marginTop: spacing.xl, fontSize: fontSize.bodyMd },
+  placeholderText: {
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    fontSize: fontSize.bodyMd,
+  },
+  centerState: {
+    flex: 1,
+    minHeight: 260,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  stateTitle: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  stateText: {
+    marginTop: spacing.sm,
+    fontSize: fontSize.button,
+    textAlign: 'center',
+  },
+  retryButton: {
+    minHeight: sizing.touchTarget,
+    minWidth: 88,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLabel: { fontSize: fontSize.button, fontWeight: '600' },
   composer: {
     position: 'absolute',
     left: 0,
@@ -198,7 +300,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingHorizontal: spacing.md,
   },
-  input: { flex: 1, minHeight: sizing.buttonHeight, paddingVertical: 0, fontSize: fontSize.titleMd },
+  input: {
+    flex: 1,
+    minHeight: sizing.buttonHeight,
+    paddingVertical: 0,
+    fontSize: fontSize.titleMd,
+  },
   dismiss: {
     width: sizing.iconButton,
     height: sizing.iconButton,

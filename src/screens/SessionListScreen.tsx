@@ -16,7 +16,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Menu,
   MessageSquare,
-  Pin,
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
@@ -26,6 +25,10 @@ import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
+import {
+  getSessionLoadErrorMessage,
+  resolveSessionCollectionState,
+} from './sessionCollectionState';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 
@@ -59,8 +62,6 @@ function getStatusColor(
 interface SessionRowProps {
   item: Session;
   connectionStatus: string;
-  showUnreadIndicator: boolean;
-  showPinnedIndicator: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
   onOpen: () => void;
 }
@@ -68,8 +69,6 @@ interface SessionRowProps {
 function SessionRow({
   item,
   connectionStatus,
-  showUnreadIndicator,
-  showPinnedIndicator,
   colors,
   onOpen,
 }: SessionRowProps) {
@@ -99,18 +98,12 @@ function SessionRow({
       <View style={styles.sessionContent}>
         <View style={styles.sessionTopRow}>
           <View style={styles.sessionTitleGroup}>
-            {showUnreadIndicator ? (
-              <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
-            ) : null}
             <Text
               style={[styles.sessionTitle, { color: colors.text.ink }]}
               numberOfLines={1}
             >
               {item.title}
             </Text>
-            {showPinnedIndicator ? (
-              <Pin size={14} strokeWidth={1.7} color={colors.text.soft} />
-            ) : null}
           </View>
           <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
             {formatTime(item.updatedAt)}
@@ -137,6 +130,7 @@ export function SessionListScreen() {
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const backdropAnim = useState(new Animated.Value(0))[0];
@@ -174,11 +168,13 @@ export function SessionListScreen() {
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
-    } catch {
-      // Connection state and authorization are surfaced elsewhere.
+    } catch (error) {
+      setSessions([]);
+      setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -188,6 +184,12 @@ export function SessionListScreen() {
     useCallback(() => {
       void loadSessions();
     }, [loadSessions]),
+  );
+
+  const collectionState = resolveSessionCollectionState(
+    isLoading,
+    loadError,
+    sessions.length,
   );
 
   const listContentStyle = useMemo(
@@ -240,39 +242,55 @@ export function SessionListScreen() {
         data={sessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
-        ListHeaderComponent={
-          sessions.length > 0 ? (
-            <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>置顶</Text>
-          ) : null
-        }
-        renderItem={({ item, index }) => (
-          <>
-            {index === 1 ? (
-              <Text style={[styles.recentSectionLabel, { color: colors.text.soft }]}>
-                最近对话
-              </Text>
-            ) : null}
-            <SessionRow
-              item={item}
-              connectionStatus={connectionStatus}
-              showUnreadIndicator={index === 0}
-              showPinnedIndicator={index === 0}
-              colors={colors}
-              onOpen={() =>
-                navigation.navigate('Chat', {
-                  sessionId: item.id,
-                  title: item.title,
-                })
-              }
-            />
-          </>
+        renderItem={({ item }) => (
+          <SessionRow
+            item={item}
+            connectionStatus={connectionStatus}
+            colors={colors}
+            onOpen={() =>
+              navigation.navigate('Chat', {
+                sessionId: item.id,
+                title: item.title,
+              })
+            }
+          />
         )}
-        ListEmptyComponent={() =>
-          isLoading ? (
-            <View style={styles.loadingState} accessibilityLabel="正在加载线程列表" accessibilityRole="progressbar">
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          ) : (
+        ListEmptyComponent={() => {
+          if (collectionState === 'loading') {
+            return (
+              <View
+                style={styles.loadingState}
+                accessibilityLabel="正在加载线程列表"
+                accessibilityRole="progressbar"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            );
+          }
+
+          if (collectionState === 'error') {
+            return (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>加载会话失败</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+                  {loadError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重试加载会话"
+                  onPress={() => void loadSessions()}
+                  style={({ pressed }) => [
+                    styles.retryButton,
+                    { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+                  ]}
+                >
+                  <Text style={[styles.retryButtonLabel, { color: colors.onPrimary }]}>重试</Text>
+                </Pressable>
+              </View>
+            );
+          }
+
+          return (
             <View style={styles.emptyState}>
               <View
                 style={[
@@ -290,14 +308,12 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text
-                style={[styles.emptySubtitle, { color: colors.text.soft }]}
-              >
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
                 Remote Host V1 当前只展示桌面端已有会话
               </Text>
             </View>
-          )
-        }
+          );
+        }}
       />
 
       {drawerOpen ? (
@@ -362,18 +378,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: { paddingHorizontal: spacing.lg },
-  sectionLabel: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    fontSize: fontSize.captionUppercase,
-  },
-  recentSectionLabel: {
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    fontSize: fontSize.captionUppercase,
-  },
   sessionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -403,12 +407,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  unreadDot: {
-    width: spacing.sm,
-    height: spacing.sm,
-    borderRadius: radius.full,
     marginRight: spacing.sm,
   },
   sessionTitle: { fontSize: fontSize.bodyMd, fontWeight: '600', flex: 1 },
@@ -442,6 +440,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   emptySubtitle: { fontSize: fontSize.button, textAlign: 'center' },
+  retryButton: {
+    minHeight: sizing.touchTarget,
+    minWidth: 96,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonLabel: { fontSize: fontSize.bodyMd, fontWeight: '600' },
   drawerBackdrop: { ...StyleSheet.absoluteFill },
   drawerPanel: {
     position: 'absolute',

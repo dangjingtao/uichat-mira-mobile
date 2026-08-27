@@ -19,7 +19,6 @@ import {
   Grid3x3,
   Image as ImageIcon,
   Monitor,
-  Pin,
   Search,
   SquarePen,
 } from 'lucide-react-native';
@@ -28,6 +27,10 @@ import type { Session } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import {
+  getSessionLoadErrorMessage,
+  resolveSessionCollectionState,
+} from '../screens/sessionCollectionState';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 const miraLogo = require('../../assets/branding/mira-logo-square.png');
@@ -58,13 +61,17 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list.slice(0, 20));
-    } catch {
-      // Connection state and authorization are surfaced elsewhere.
+    } catch (error) {
+      setSessions([]);
+      setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -73,6 +80,12 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   React.useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  const collectionState = resolveSessionCollectionState(
+    loading,
+    loadError,
+    sessions.length,
+  );
 
   const handleOpenSession = (session: Session) => {
     onClose();
@@ -145,29 +158,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
           ))}
         </View>
 
-        {sessions.length > 0 ? (
-          <>
-            <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>已置顶</Text>
-            <Pressable
-              style={[styles.pinnedItem, { backgroundColor: colors.bg.card }]}
-              onPress={() => handleOpenSession(sessions[0])}
-            >
-              <Pin size={18} color={colors.primary} />
-              <Text
-                style={[styles.pinnedLabel, { color: colors.text.ink }]}
-                numberOfLines={1}
-              >
-                {sessions[0].title}
-              </Text>
-            </Pressable>
-          </>
-        ) : null}
-
-        {sessions.length > 1 ? (
+        {collectionState === 'data' ? (
           <>
             <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>最近</Text>
             <FlatList
-              data={sessions.slice(1)}
+              data={sessions}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
               renderItem={({ item }) => (
@@ -198,8 +193,30 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
           </>
         ) : null}
 
-        {loading && sessions.length === 0 ? (
+        {collectionState === 'loading' ? (
           <Text style={[styles.emptyHint, { color: colors.text.soft }]}>加载中...</Text>
+        ) : null}
+
+        {collectionState === 'empty' ? (
+          <Text style={[styles.emptyHint, { color: colors.text.soft }]}>暂无会话</Text>
+        ) : null}
+
+        {collectionState === 'error' ? (
+          <View style={styles.errorState}>
+            <Text style={[styles.errorTitle, { color: colors.text.ink }]}>加载会话失败</Text>
+            <Text style={[styles.errorText, { color: colors.text.soft }]}>{loadError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试加载会话"
+              onPress={() => void loadSessions()}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
         ) : null}
       </ScrollView>
 
@@ -299,20 +316,31 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 6,
   },
-  pinnedItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 12,
-  },
-  pinnedLabel: { fontSize: 15, fontWeight: '600', flex: 1 },
   recentItem: { paddingHorizontal: 20, paddingVertical: 14 },
   recentLabel: { fontSize: 15 },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 20 },
   emptyHint: { textAlign: 'center', marginTop: 40, fontSize: 14 },
+  errorState: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.section,
+  },
+  errorTitle: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  errorText: {
+    marginTop: spacing.sm,
+    fontSize: fontSize.button,
+    textAlign: 'center',
+  },
+  retryButton: {
+    minHeight: sizing.touchTarget,
+    minWidth: 88,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLabel: { fontSize: fontSize.button, fontWeight: '600' },
   bottomBar: {
     minHeight: 72,
     flexDirection: 'row',

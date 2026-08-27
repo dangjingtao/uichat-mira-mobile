@@ -1,0 +1,30 @@
+import { RemoteHostError } from '../api/remoteHttp';
+import {
+  getSessionLoadErrorMessage,
+  resolveSessionCollectionState,
+} from './sessionCollectionState';
+
+describe('session collection truth state', () => {
+  it('keeps loading, error, empty and data states distinct', () => {
+    expect(resolveSessionCollectionState(true, null, 0)).toBe('loading');
+    expect(resolveSessionCollectionState(false, 'failed', 0)).toBe('error');
+    expect(resolveSessionCollectionState(false, null, 0)).toBe('empty');
+    expect(resolveSessionCollectionState(false, null, 2)).toBe('data');
+  });
+
+  it('distinguishes authorization failures from network failures', () => {
+    expect(
+      getSessionLoadErrorMessage(
+        new RemoteHostError('HTTP_401', 'unauthorized', 401),
+      ),
+    ).toBe('设备认证已失效，请重新连接 Mira Host');
+    expect(
+      getSessionLoadErrorMessage(new RemoteHostError('HTTP_403', 'forbidden', 403)),
+    ).toBe('当前设备没有读取会话的权限');
+    expect(
+      getSessionLoadErrorMessage(
+        new RemoteHostError('NETWORK_ERROR', 'offline'),
+      ),
+    ).toBe('无法连接 Mira Host，请检查网络后重试');
+  });
+});
