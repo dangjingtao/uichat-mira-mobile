@@ -114,9 +114,7 @@ export const markThreadMessagesRead = (
 ): ThreadReadProgress => {
   const observed = observeThreadMessages(current, messages, observedMessageCount);
   if (!observed.latestContentMessageId || !observed.latestContentAt) {
-    const { lastReadMessageId: _lastReadMessageId, lastReadAt: _lastReadAt, ...rest } =
-      observed;
-    return rest;
+    return { observedMessageCount: observed.observedMessageCount };
   }
   return {
     ...observed,
