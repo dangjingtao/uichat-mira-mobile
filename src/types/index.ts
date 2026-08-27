@@ -13,6 +13,8 @@ export interface Session {
   roleId?: string | null;
   agentEnabled?: boolean | null;
   status?: string;
+  /** Canonical Remote Thread message count, used only as a change probe. */
+  messageCount?: number;
 }
 
 export interface ChatMessage {
