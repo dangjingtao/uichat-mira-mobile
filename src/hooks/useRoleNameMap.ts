@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   buildRoleNameMap,
@@ -14,9 +14,9 @@ const EMPTY_ROLE_NAMES: RoleNameMap = Object.freeze({});
  * not turn a valid Thread list into a false Thread error; callers fall back to
  * the existing type icon/title and never expose raw role ids.
  *
- * Refresh on screen focus and whenever Host connectivity changes while focused
- * so a transient launch/background outage does not leave role names stale until
- * the screen is remounted.
+ * Refresh whenever the screen gains focus, and retry after Host connectivity
+ * recovers so a transient launch/background outage does not leave role names
+ * stale until the screen is remounted.
  */
 export const useRoleNameMap = (): RoleNameMap => {
   const [roleNames, setRoleNames] = useState<RoleNameMap>(EMPTY_ROLE_NAMES);
@@ -32,9 +32,15 @@ export const useRoleNameMap = (): RoleNameMap => {
 
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [connectionStatus, load]),
+      load().catch(() => undefined);
+    }, [load]),
   );
+
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      load().catch(() => undefined);
+    }
+  }, [connectionStatus, load]);
 
   return roleNames;
 };
