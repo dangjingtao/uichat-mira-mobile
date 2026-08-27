@@ -1,25 +1,28 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 18:31（Asia/Shanghai）
+更新时间：2026-08-27 21:33（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
+旧 Remote / Relay / Tailscale 工程线已于 2026-08-27 归档；历史文档继续保留为协议与验收证据，但不再覆盖本台账的当前排期。
+
 ## 当前协作约定
 
-- 当前阶段为需求澄清与实施准备。
-- 在维护者明确授权实施前，代理只做代码、协议、数据覆盖和验收路径核对，不修改业务代码。
+- 当前阶段已进入受控实施；维护者已明确授权开始 MOB-001。
+- 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
 - 移动端只消费 Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
 - 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖，不在本仓库越界修改。
+- 当前施工分支：`feature/mob-001-session-contract`；草稿 PR：#23。
 
 ## 任务卡总览
 
 | ID | 任务卡 | 范围 | 状态 | 负责人 | 依赖 |
 |---|---|---|---|---|---|
-| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | 只读核对完成，等待 Host 决策与实施授权 | `mob_001_contract` | Host Remote 契约 |
+| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已实施并通过 typecheck/lint/Jest；Host Workspace/Role Remote 契约仍待决定 | `mob_001_contract` | Host Remote 契约 |
 | MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | 只读核对完成，等待 Host 契约与参考图 | `mob_002_workspace_list` | MOB-001 |
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 只读核对完成，等待 Host 契约与实施授权 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待 MOB-001～003 可实施 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
-| MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 只读核对完成，等待 Session 数据映射与实施授权 | `mob_005_visual_kinds` | MOB-001 |
+| MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 只读核对完成，等待 MOB-001 Mobile 字段映射合入与实施授权 | `mob_005_visual_kinds` | MOB-001 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 只读核对完成，等待实施授权与双端环境 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
 ## 已确认产品规则
@@ -38,20 +41,46 @@
 ### MOB-001：线程与项目数据契约确认
 
 - Host Thread 权威数据包含 `workspaceId`、`knowledgeBaseId`、`roleId`、`agentEnabled` 和 `status`，但没有互斥的 `threadType` / `kind`。
-- 移动端协议层已经解析这些字段，但 `RemoteThread -> Session` 映射和 `Session` 类型只保留 `id`、`title`、`updatedAt`，导致 UI 无法使用线程属性。
+- 移动端协议层已经解析这些字段；此前 `RemoteThread -> Session` 映射和 `Session` 类型只保留 `id`、`title`、`updatedAt`，导致 UI 无法使用线程属性。
 - `workspaceId` 是 Chat Workspace ID。Host 约束为 Agent Thread 必须绑定 Workspace；移动端只展示该关系，不自行修补异常数据。
 - 项目名称的权威来源是 Host `/chat-workspaces`，角色名称的权威来源是 Host `/roles`。
 - 当前配对设备 Remote Host V1 的 scope 和 manifest 均未开放 Workspace/Role 读取，这是项目名称和角色名称接入的硬依赖。
 - Host 当前没有线程已读/未读或置顶字段，也没有相应查询和持久化语义。
-- 实施建议：`Session` 保留上述线程属性；项目和角色使用独立规范化只读实体；`isUnread` / `isPinned` 暂不进入模型。
+- 实施原则：`Session` 保留上述线程属性；项目和角色使用独立规范化只读实体；`isUnread` / `isPinned` 暂不进入模型。
 
 主要证据：
 
 - 移动端解析：`src/protocol/remoteHostV1.ts`
-- 移动端丢字段映射：`src/api/miraHostClient.ts`
+- 移动端 Adapter：`src/api/miraHostClient.ts`
 - 移动端 Session：`src/types/index.ts`
 - Host Thread：`server/src/services/thread.service.ts`（Mira 主工程）
 - Remote 权限：`server/src/services/remote-device-auth.service.ts`、`server/src/routes/remote-access.ts`（Mira 主工程）
+
+### MOB-001：第二轮实施记录
+
+分支：`feature/mob-001-session-contract`  
+草稿 PR：#23
+
+已实施：
+
+- `Session` 增加 `workspaceId`、`knowledgeBaseId`、`roleId`、`agentEnabled`、`status`。
+- 为兼容现有集中 Mock / Story 数据，上述字段在 `Session` 类型层暂为 optional；真实 `RemoteThread -> Session` Adapter 会显式传入 Host 返回值，包括 `null`。
+- `listSessions()` 与 `getSession()` 共用映射，确保真实 Thread 属性不再在 Adapter 层丢失。
+- 原有 `miraHostClient` 测试全部保留，并新增列表与单线程映射测试。
+- 未新增 `isUnread`、`isPinned`、`threadKind`，未猜测 Workspace/Role 名称，未修改 Host / Desktop 仓库。
+
+自动化验证：
+
+- GitHub Actions `Mobile CI #240`：`Typecheck, lint and test` 成功。
+- `Typecheck`：success。
+- `Lint`：success。
+- `Test`：success。
+- Android / iOS 构建属于同一 CI 的平台验证项，不作为本轮数据映射完成的必要前提；结果单独按 CI 记录，不替代真机验收。
+
+当前剩余：
+
+- Host 侧决定 Workspace / Role 的 Mobile-safe 读取合同后，MOB-001 才能关闭 Host 依赖。
+- 在 Host 决策之前，不为项目名、角色名、未读或置顶制造客户端替代字段。
 
 ### MOB-002：项目列表页
 
@@ -66,7 +95,7 @@
 - 最小路由结构为：`WorkspaceList -> WorkspaceDetail({ workspaceId, workspaceName }) -> Chat({ sessionId, title })`。
 - 正常 Stack 导航可让 Chat 返回项目详情、项目详情返回项目列表；Chat 不需要自行猜测来源。
 - 项目详情只显示 `session.workspaceId === route.workspaceId` 的真实线程，并区分加载、空、错误重试和项目失效状态。
-- 当前硬阻塞：`Session` 丢失 `workspaceId`，且 Remote Host V1 尚未提供权威 Workspace 列表。
+- 当前硬阻塞：Remote Host V1 尚未提供权威 Workspace 列表；`Session.workspaceId` 的 Mobile 映射已在 MOB-001 分支补齐。
 
 ### MOB-004：项目线程层级导航
 
@@ -110,14 +139,14 @@
 
 ## 实施授权门槛
 
-- 维护者明确说“开始实施”。
-- MOB-001 的 Host Remote 契约方案得到确认，或明确允许先做不依赖项目/角色名称的最小移动端改动。
-- 项目列表和详情参考图重新提供，或维护者明确允许按现有移动端设计系统落地。
-- 明确本轮是否只处理移动端；默认不修改 Mira Host / 桌面端仓库。
+- MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已施工。
+- 涉及 Host Remote 契约的部分仍需 Host 方案得到确认，不因 Mobile 已开工而视为自动授权。
+- MOB-002/003 的项目列表和详情参考图需重新提供，或维护者明确允许按现有移动端设计系统落地。
+- 默认不修改 Mira Host / 桌面端仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
 
-1. MOB-001：补齐并验证 Session 属性映射；Host 契约另行确认，不猜接口。
+1. MOB-001：完成 Mobile 属性映射；等待并确认 Host Workspace/Role Remote 契约。
 2. MOB-006：移除假置顶/未读/假骨架，补齐真实错误状态与基础测试。
 3. MOB-005：统一三类线程图标和可访问性文案。
 4. MOB-002：在 Workspace Remote contract 可用后实现项目列表。
@@ -129,3 +158,6 @@
 - 2026-08-27：创建统一移动端工作台账。
 - 2026-08-27：真实派发 MOB-001 至 MOB-006；六张卡均完成只读现状核对，未修改业务代码、未提交、未推送。
 - 2026-08-27：记录 Remote Workspace/Role 合同、假置顶/未读状态、项目层级导航与双端验收阻塞。
+- 2026-08-27：旧 Remote / Relay / Tailscale 工程线归档，`docs/work-ledger.md` 升为当前工程任务主线。
+- 2026-08-27：在 `feature/mob-001-session-contract` 开始 MOB-001；补齐 Remote Thread 属性到 Session 的映射并增加回归测试。
+- 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 Mobile 侧最小实施验证完成，Host Workspace/Role 契约仍未关闭。
