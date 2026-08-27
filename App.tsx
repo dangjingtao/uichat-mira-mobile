@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionListScreen } from './src/screens/SessionListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { WorkspaceListScreen } from './src/screens/WorkspaceListScreen';
+import { WorkspaceDetailScreen } from './src/screens/WorkspaceDetailScreen';
 import { HostConfigScreen } from './src/screens/HostConfigScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
@@ -109,6 +110,7 @@ function AppInner() {
         <Stack.Screen name="SessionList" component={SessionListScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="WorkspaceList" component={WorkspaceListScreen} />
+        <Stack.Screen name="WorkspaceDetail" component={WorkspaceDetailScreen} />
         <Stack.Screen name="HostConfig" component={HostConfigScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'none' }} />
