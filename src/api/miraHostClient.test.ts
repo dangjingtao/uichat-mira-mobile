@@ -193,6 +193,7 @@ describe('PairedRemoteMiraHostClient session mapping', () => {
         roleId: 'role-1',
         agentEnabled: true,
         status: 'active',
+        messageCount: 7,
       },
     ]);
   });
@@ -206,6 +207,7 @@ describe('PairedRemoteMiraHostClient session mapping', () => {
       roleId: 'role-1',
       agentEnabled: true,
       status: 'active',
+      messageCount: 7,
     });
     expect(getThread).toHaveBeenCalledWith('thread-1');
   });
