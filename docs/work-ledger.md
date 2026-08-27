@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 21:33（Asia/Shanghai）
+更新时间：2026-08-27 22:18（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -8,22 +8,22 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权开始 MOB-001。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 与 MOB-006。
 - 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
 - 移动端只消费 Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
 - 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖，不在本仓库越界修改。
-- 当前施工分支：`feature/mob-001-session-contract`；草稿 PR：#23。
+- 当前施工分支：`dev`。
 
 ## 任务卡总览
 
 | ID | 任务卡 | 范围 | 状态 | 负责人 | 依赖 |
 |---|---|---|---|---|---|
-| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已实施并通过 typecheck/lint/Jest；Host Workspace/Role Remote 契约仍待决定 | `mob_001_contract` | Host Remote 契约 |
+| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Host Workspace/Role Remote 契约仍待决定 | `mob_001_contract` | Host Remote 契约 |
 | MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | 只读核对完成，等待 Host 契约与参考图 | `mob_002_workspace_list` | MOB-001 |
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 只读核对完成，等待 Host 契约与实施授权 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待 MOB-001～003 可实施 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
-| MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 只读核对完成，等待 MOB-001 Mobile 字段映射合入与实施授权 | `mob_005_visual_kinds` | MOB-001 |
-| MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 只读核对完成，等待实施授权与双端环境 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
+| MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | MOB-001 Mobile 字段映射已合入，等待实施授权 | `mob_005_visual_kinds` | MOB-001 |
+| MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 假置顶/未读/搜索假骨架已移除，加载状态与错误重试已实施并通过 typecheck/lint/Jest；设备视觉验收与 Chat 标题刷新仍待 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
 ## 已确认产品规则
 
@@ -58,8 +58,7 @@
 
 ### MOB-001：第二轮实施记录
 
-分支：`feature/mob-001-session-contract`  
-草稿 PR：#23
+实施结果已合入：`dev`。
 
 已实施：
 
@@ -95,7 +94,7 @@
 - 最小路由结构为：`WorkspaceList -> WorkspaceDetail({ workspaceId, workspaceName }) -> Chat({ sessionId, title })`。
 - 正常 Stack 导航可让 Chat 返回项目详情、项目详情返回项目列表；Chat 不需要自行猜测来源。
 - 项目详情只显示 `session.workspaceId === route.workspaceId` 的真实线程，并区分加载、空、错误重试和项目失效状态。
-- 当前硬阻塞：Remote Host V1 尚未提供权威 Workspace 列表；`Session.workspaceId` 的 Mobile 映射已在 MOB-001 分支补齐。
+- 当前硬阻塞：Remote Host V1 尚未提供权威 Workspace 列表；`Session.workspaceId` 的 Mobile 映射已在 MOB-001 合入 `dev`。
 
 ### MOB-004：项目线程层级导航
 
@@ -118,15 +117,28 @@
 
 ### MOB-006：真实线程状态与验收
 
-- 当前存在必须在实施阶段移除的假状态：
-  - `src/screens/SessionListScreen.tsx` 按 index 把首项硬编码为置顶和未读，并插入“置顶/最近对话”分组。
-  - `src/components/CustomDrawer.tsx` 把 `sessions[0]` 硬编码为“已置顶”。
-  - `src/components/ConversationMenu.tsx` 暴露尚无真实写契约的“置顶”等动作，容易造成已经执行的错觉。
-  - `src/screens/SearchScreen.tsx` 在空结果或失败后仍可能显示固定骨架，无法区分加载、空和错误。
-- Host 真实标题已贯通协议、Adapter、主列表、抽屉、搜索和 Chat；但 Chat 使用导航时的标题快照，Host 后续改名不会在页面内自动刷新。
-- 现有列表请求普遍吞掉错误，使失败被呈现为空状态或空白。实施时必须将 loading / success-empty / success-data / error 明确分离，并提供可操作重试。
-- 自动化验收覆盖协议、Adapter、三类 UI 映射、主列表、抽屉、搜索、Chat 和跨入口标题一致性。
-- 视觉验收至少覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack；Jest 不能替代设备验收。
+已实施到 `dev`：
+
+- `src/screens/SessionListScreen.tsx` 已移除按 index 伪造的未读点、置顶图标和“置顶/最近对话”假分组；列表只展示 Host 真实标题与更新时间。
+- `src/components/CustomDrawer.tsx` 不再把 `sessions[0]` 伪造成“已置顶”，真实会话统一按“最近”展示。
+- `src/components/ConversationMenu.tsx` 已移除无 Host 写契约的“置顶”入口；未新增 `isPinned` 或本地替代状态。
+- `src/screens/SearchScreen.tsx` 已将 loading / success-empty / success-data / error 明确分离；骨架不再承担空结果或失败状态。
+- 主列表、抽屉、搜索均提供真实错误状态和可操作重试；401、403、网络失败分别给出不同提示。
+- 新增 `sessionCollectionState.ts` 统一四态判定与错误映射，并增加基础 Jest 覆盖。
+
+自动化验证：
+
+- GitHub Actions `Mobile CI #244`：`Typecheck, lint and test` 成功。
+- `Typecheck`：success。
+- `Lint`：success。
+- `Test`：success。
+- Android / iOS 构建仍按同一 CI 独立运行；自动化构建不能替代真机视觉与网络验收。
+
+当前剩余：
+
+- Chat 当前仍使用导航参数中的标题快照；若 Host 在页面打开后改名，页面内不会自动刷新。该项保留为 MOB-006 后续最小修复，不在本次状态清理中伪造刷新语义。
+- 视觉验收仍需覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack。
+- Host 尚未定义线程已读/未读与置顶的持久化、多设备同步和写权限语义；在合同出现前 UI 继续零展示、零操作。
 
 ## Host 依赖与待维护者决定
 
@@ -139,15 +151,16 @@
 
 ## 实施授权门槛
 
-- MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已施工。
+- MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
+- MOB-006：已获得维护者明确实施授权；第一轮真实状态清理已合入 `dev`。
 - 涉及 Host Remote 契约的部分仍需 Host 方案得到确认，不因 Mobile 已开工而视为自动授权。
 - MOB-002/003 的项目列表和详情参考图需重新提供，或维护者明确允许按现有移动端设计系统落地。
 - 默认不修改 Mira Host / 桌面端仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
 
-1. MOB-001：完成 Mobile 属性映射；等待并确认 Host Workspace/Role Remote 契约。
-2. MOB-006：移除假置顶/未读/假骨架，补齐真实错误状态与基础测试。
+1. MOB-001：Mobile 属性映射已完成；等待并确认 Host Workspace/Role Remote 契约。
+2. MOB-006：第一轮假状态清理已完成；补 Chat 标题刷新并完成设备视觉验收。
 3. MOB-005：统一三类线程图标和可访问性文案。
 4. MOB-002：在 Workspace Remote contract 可用后实现项目列表。
 5. MOB-003：实现项目详情和项目线程过滤。
@@ -159,5 +172,7 @@
 - 2026-08-27：真实派发 MOB-001 至 MOB-006；六张卡均完成只读现状核对，未修改业务代码、未提交、未推送。
 - 2026-08-27：记录 Remote Workspace/Role 合同、假置顶/未读状态、项目层级导航与双端验收阻塞。
 - 2026-08-27：旧 Remote / Relay / Tailscale 工程线归档，`docs/work-ledger.md` 升为当前工程任务主线。
-- 2026-08-27：在 `feature/mob-001-session-contract` 开始 MOB-001；补齐 Remote Thread 属性到 Session 的映射并增加回归测试。
-- 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 Mobile 侧最小实施验证完成，Host Workspace/Role 契约仍未关闭。
+- 2026-08-27：开始 MOB-001；补齐 Remote Thread 属性到 Session 的映射并增加回归测试。
+- 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 合入 `dev`，Host Workspace/Role 契约仍未关闭。
+- 2026-08-27：开始 MOB-006；提交 `2d0c906` 到 `dev`，移除假置顶/未读/搜索假骨架，补齐 loading/empty/data/error 与重试、401/403/网络错误区分和基础测试。
+- 2026-08-27：Mobile CI #244 的 `Typecheck, lint and test` 通过；MOB-006 第一轮状态清理完成，Chat 标题刷新与真机视觉验收仍待。
