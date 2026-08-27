@@ -20,6 +20,7 @@ import {
   Grid3x3,
   Image as ImageIcon,
   Monitor,
+  Pin,
   Search,
   SquarePen,
 } from 'lucide-react-native';
@@ -28,6 +29,8 @@ import type { Session } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import { useThreadPinStore } from '../store/threadPinStore';
+import { isThreadPinned } from '../store/threadPinning';
 import {
   getSessionVisualKindLabel,
   SessionKindIcon,
@@ -65,6 +68,8 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
+  const hydratePins = useThreadPinStore((state) => state.hydrate);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -84,8 +89,9 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   }, []);
 
   React.useEffect(() => {
+    void hydratePins().catch(() => undefined);
     void loadSessions();
-  }, [loadSessions]);
+  }, [hydratePins, loadSessions]);
 
   const collectionState = resolveSessionCollectionState(
     loading,
@@ -204,10 +210,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                 const belongsToWorkspace =
                   typeof item.workspaceId === 'string' &&
                   item.workspaceId.trim().length > 0;
+                const pinned = isThreadPinned(pinnedAtByThreadId, item.id);
                 return (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}`}
+                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}`}
                     style={({ pressed }) => [
                       styles.recentItem,
                       pressed && { backgroundColor: colors.bg.soft },
@@ -226,6 +233,9 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                     >
                       {item.title}
                     </Text>
+                    {pinned ? (
+                      <Pin size={15} color={colors.primary} strokeWidth={2} />
+                    ) : null}
                     {belongsToWorkspace ? (
                       <FolderOpen size={16} color={colors.text.soft} strokeWidth={1.7} />
                     ) : null}

@@ -17,11 +17,17 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Menu,
   MessageSquare,
+  Pin,
   Settings as SettingsIcon,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
+import { useThreadPinStore } from '../store/threadPinStore';
+import {
+  isThreadPinned,
+  sortSessionsByLocalPin,
+} from '../store/threadPinning';
 import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
@@ -69,74 +75,102 @@ interface SessionRowProps {
   item: Session;
   connectionStatus: string;
   colors: ReturnType<typeof useTheme>['colors'];
+  isPinned: boolean;
   onOpen: () => void;
+  onTogglePin: () => void;
 }
 
 function SessionRow({
   item,
   connectionStatus,
   colors,
+  isPinned,
   onOpen,
+  onTogglePin,
 }: SessionRowProps) {
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
+  const preview = belongsToWorkspace
+    ? '项目会话 · 从项目中打开'
+    : connectionStatus === 'connected'
+      ? '继续与 Mira 对话'
+      : '连接 Mira Host 后继续对话';
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}`}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.sessionItem,
         {
           backgroundColor: colors.bg.canvas,
           borderColor: colors.border.soft,
         },
-        pressed && { backgroundColor: colors.bg.soft },
       ]}
-      onPress={onOpen}
     >
-      <View
-        style={[
-          styles.avatar,
-          {
-            backgroundColor: colors.bg.card,
-            borderColor: colors.border.default,
-          },
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}`}
+        style={({ pressed }) => [
+          styles.sessionOpen,
+          pressed && { backgroundColor: colors.bg.soft },
         ]}
+        onPress={onOpen}
       >
-        <SessionKindIcon
-          session={item}
-          size={22}
-          strokeWidth={1.7}
-          color={colors.primary}
-        />
-      </View>
-      <View style={styles.sessionContent}>
-        <View style={styles.sessionTopRow}>
-          <View style={styles.sessionTitleGroup}>
-            <Text
-              style={[styles.sessionTitle, { color: colors.text.ink }]}
-              numberOfLines={1}
-            >
-              {item.title}
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: colors.bg.card,
+              borderColor: colors.border.default,
+            },
+          ]}
+        >
+          <SessionKindIcon
+            session={item}
+            size={22}
+            strokeWidth={1.7}
+            color={colors.primary}
+          />
+        </View>
+        <View style={styles.sessionContent}>
+          <View style={styles.sessionTopRow}>
+            <View style={styles.sessionTitleGroup}>
+              <Text
+                style={[styles.sessionTitle, { color: colors.text.ink }]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+            </View>
+            <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
+              {formatTime(item.updatedAt)}
             </Text>
           </View>
-          <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
-            {formatTime(item.updatedAt)}
+          <Text
+            style={[styles.sessionPreview, { color: colors.text.muted }]}
+            numberOfLines={1}
+          >
+            {isPinned ? `本机置顶 · ${preview}` : preview}
           </Text>
         </View>
-        <Text
-          style={[styles.sessionPreview, { color: colors.text.muted }]}
-          numberOfLines={1}
-        >
-          {belongsToWorkspace
-            ? '项目会话 · 从项目中打开'
-            : connectionStatus === 'connected'
-              ? '继续与 Mira 对话'
-              : '连接 Mira Host 后继续对话'}
-        </Text>
-      </View>
-    </Pressable>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
+        accessibilityState={{ selected: isPinned }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={onTogglePin}
+        style={({ pressed }) => [
+          styles.pinButton,
+          pressed && { backgroundColor: colors.bg.soft },
+        ]}
+      >
+        <Pin
+          size={18}
+          strokeWidth={isPinned ? 2.2 : 1.7}
+          color={isPinned ? colors.primary : colors.text.soft}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -145,6 +179,10 @@ export function SessionListScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
   const { connectionStatus } = useHostStore();
+  const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
+  const hydratePins = useThreadPinStore((state) => state.hydrate);
+  const pinThread = useThreadPinStore((state) => state.pinThread);
+  const unpinThread = useThreadPinStore((state) => state.unpinThread);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,8 +238,14 @@ export function SessionListScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      void hydratePins().catch(() => undefined);
       void loadSessions();
-    }, [loadSessions]),
+    }, [hydratePins, loadSessions]),
+  );
+
+  const orderedSessions = useMemo(
+    () => sortSessionsByLocalPin(sessions, pinnedAtByThreadId),
+    [pinnedAtByThreadId, sessions],
   );
 
   const collectionState = resolveSessionCollectionState(
@@ -233,6 +277,18 @@ export function SessionListScreen() {
       sessionId: session.id,
       title: session.title,
     });
+  };
+
+  const togglePin = async (session: Session) => {
+    try {
+      if (isThreadPinned(pinnedAtByThreadId, session.id)) {
+        await unpinThread(session.id);
+      } else {
+        await pinThread(session.id);
+      }
+    } catch {
+      Alert.alert('置顶操作失败', '无法保存本机置顶状态，请重试。');
+    }
   };
 
   return (
@@ -273,7 +329,7 @@ export function SessionListScreen() {
       </View>
 
       <FlatList
-        data={sessions}
+        data={orderedSessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
         renderItem={({ item }) => (
@@ -281,7 +337,9 @@ export function SessionListScreen() {
             item={item}
             connectionStatus={connectionStatus}
             colors={colors}
+            isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
             onOpen={() => openSession(item)}
+            onTogglePin={() => void togglePin(item)}
           />
         )}
         ListEmptyComponent={() => {
@@ -408,12 +466,25 @@ const styles = StyleSheet.create({
   },
   listContent: { paddingHorizontal: spacing.lg },
   sessionItem: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sessionOpen: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 72,
-    paddingHorizontal: spacing.xs,
+    paddingLeft: spacing.xs,
     paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pinButton: {
+    width: sizing.touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    marginVertical: spacing.sm,
   },
   avatar: {
     width: 48,
