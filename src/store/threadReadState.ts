@@ -131,7 +131,7 @@ export const isThreadUnread = (progress: ThreadReadProgress | undefined): boolea
   const latestAt = Date.parse(progress.latestContentAt);
   const readAt = Date.parse(progress.lastReadAt);
   if (!Number.isNaN(latestAt) && !Number.isNaN(readAt)) {
-    return latestAt > readAt;
+    return latestAt >= readAt;
   }
   return true;
 };
