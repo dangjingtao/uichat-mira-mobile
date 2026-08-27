@@ -295,6 +295,8 @@ export function HostConfigScreen() {
               value={pairingUriInput}
               onChangeText={value => {
                 setPairingUriInput(value);
+                setPairingDescriptor(null);
+                setConnectivityHostUrl('');
                 if (pairingLinkError) setPairingLinkError(null);
               }}
               placeholder="mira://pair?..."
