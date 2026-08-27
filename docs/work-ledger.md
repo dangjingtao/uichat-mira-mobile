@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 23:38（Asia/Shanghai）
+更新时间：2026-08-28 00:15（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -9,8 +9,9 @@
 ## 当前协作约定
 
 - 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-006。
-- 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
-- 移动端只消费 Mira Desktop / Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
+- MOB-007 至 MOB-009 已完成任务卡定义并纳入总台账；当前仅派卡，尚未开始对应业务代码施工。
+- 移动端继续消费 Mira Desktop / Mira Host 的权威线程、项目和角色业务数据，不猜测远端接口字段。
+- 线程置顶与未读首轮明确为 Mobile **设备级本地 UI 状态**，分别由 MOB-007 / MOB-008 实现；不得把本机状态伪装成账户级或跨端统一状态。
 - 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖；未经维护者明确授权，不修改 Desktop / Host 代码。
 - 当前施工分支：`dev`。
 
@@ -23,7 +24,10 @@
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 代码实施完成并通过 typecheck/lint/Jest；真实 Workspace 行可进入详情，详情按 `workspaceId` 精确过滤真实线程 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | **有条件完成**：Mobile 侧代码已合入 `dev`，主列表、抽屉、搜索统一遵守项目层级，非法 Agent 不降级，typecheck/lint/Jest 通过；最终运行时闭环待 Desktop Issue #77 放行 Workspace Remote 读取并完成真机回归 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003, Desktop #77 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 代码实施完成并通过 typecheck/lint/Jest；三入口已统一视觉分类与可访问性文案 | `mob_005_visual_kinds` | MOB-001 |
-| MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
+| MOB-006 | 真实线程状态与验收 | 核对真实标题、错误态、状态真实性，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
+| MOB-007 | 本机线程置顶 | 以稳定线程 ID 持久化本机置顶，支持置顶/取消置顶与稳定排序，不写回 Remote Thread | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_007_local_pinning` | MOB-006 |
+| MOB-008 | 本机未读状态 | 持久化本机已读进度，以真实消息进度判定未读；仅表达当前设备是否读过 | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_008_device_unread` | MOB-006 |
+| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 移除主流程 Direct/Host 地址配置；保留扫码并增加 `mira://pair?...` 粘贴兜底 | 待实施；任务卡已创建；不修改 Desktop / Pairing V1 协议 | 待派工 | 现有 Remote Pairing V1 |
 
 ## 已确认产品规则
 
@@ -33,9 +37,12 @@
 - `roleId` 表示绑定角色的普通线程，界面需要体现角色身份。
 - 普通聊天使用默认气泡图标；角色聊天使用人物图标；Agent 聊天使用独立图标。
 - Agent 图标优先级高于角色图标；否则有 `roleId` 时使用人物图标，其余使用气泡图标。
-- 线程名称必须来自 Host 真实数据。
-- 没有权威已读/未读字段时不显示状态。
-- 没有权威置顶字段时不显示置顶状态；截图中的置顶仅是待实现设计。
+- 线程名称、归属、角色、Agent 等业务属性必须来自 Host 真实数据。
+- 线程置顶首轮为设备级本地状态：本机持久化，只影响当前手机排序与展示，不写回 Remote Thread。
+- 线程未读首轮为设备级本地状态：优先记录 `lastReadMessageId` / `lastReadAt` 或等价已读进度，只表达当前手机是否读过最新真实内容。
+- Desktop Issue #79 已关闭为 `not planned`；只有未来明确需要 Desktop ↔ Mobile / 多 Mobile 同步时，才另建账户级线程状态同步能力。
+- “连接桌面端”主流程只要求用户理解扫码/粘贴 Mira 配对链接、等待桌面授权和完成连接；Direct / Relay 是 transport 细节，不在主页面让用户配置或选择。
+- 扫码失败兜底输入只接受 Mira 配对 URI，例如 `mira://pair?...`，并必须与扫码复用同一套 `parsePairingUriV1()` / `loadPairingUri()` / `useRemotePairing()` 流程。
 
 ## 第一轮调查结论
 
@@ -45,8 +52,8 @@
 - 移动端协议层已经解析这些字段；此前 `RemoteThread -> Session` 映射和 `Session` 类型只保留 `id`、`title`、`updatedAt`，导致 UI 无法使用线程属性。
 - `workspaceId` 是 Chat Workspace ID。Host 约束为 Agent Thread 必须绑定 Workspace；移动端只展示该关系，不自行修补异常数据。
 - 项目名称的权威来源是 Desktop `ChatWorkspace` / `/chat-workspaces`，角色名称的权威来源是 Host `/roles`。
-- Host 当前没有线程已读/未读或置顶字段，也没有相应查询和持久化语义。
-- 实施原则：`Session` 保留上述线程属性；项目和角色使用独立规范化只读实体；`isUnread` / `isPinned` 暂不进入模型。
+- Host 当前没有账户级线程已读/未读或置顶字段，也没有相应查询和持久化语义。
+- 实施原则：`Session` 保留上述 Host 业务属性；项目和角色使用独立规范化只读实体；设备级置顶/未读由 MOB-007 / MOB-008 的本地 UI 状态层负责，不污染 Remote Thread 模型。
 
 主要证据：
 
@@ -66,7 +73,7 @@
 - 为兼容现有集中 Mock / Story 数据，上述字段在 `Session` 类型层暂为 optional；真实 `RemoteThread -> Session` Adapter 会显式传入 Host 返回值，包括 `null`。
 - `listSessions()` 与 `getSession()` 共用映射，确保真实 Thread 属性不再在 Adapter 层丢失。
 - 原有 `miraHostClient` 测试全部保留，并新增列表与单线程映射测试。
-- 未新增 `isUnread`、`isPinned`、`threadKind`，未猜测 Workspace/Role 名称。
+- 未新增 Host `isUnread`、`isPinned`、`threadKind`，未猜测 Workspace/Role 名称。
 
 自动化验证：
 
@@ -79,7 +86,7 @@
 
 - Role 的 Mobile-safe 读取合同仍未完成。
 - Workspace 的远程读取放行与安全投影转由 Desktop Issue #77 跟踪。
-- 在合同出现之前，不为角色名、未读或置顶制造客户端替代字段。
+- 角色名继续等待权威合同；置顶/未读不再等待 Host 合同，分别转由 MOB-007 / MOB-008 以设备级本地状态实现。
 
 ### MOB-002：项目列表页
 
@@ -200,7 +207,7 @@
 - Chat 历史读取失败不再显示空白：401、403、404、网络失败分别给出真实错误提示，并提供明确重试入口。
 - 新增 `chatSessionState.ts` 与 Jest 覆盖，验证 Host 权威标题读取和聊天历史错误映射。
 - `ConversationMenu` 中尚无真实合同/实现的会话动作统一呈现为 disabled，不再产生“点击即已执行”的假状态；顶部分享按钮同样在真实实现前禁用。
-- 未新增 `isUnread`、`isPinned` 或任何客户端自造线程状态。
+- MOB-006 本身仍不向 Remote `Session` 注入伪造 `isUnread` / `isPinned`；后续 MOB-007 / MOB-008 会在独立设备级本地 UI 状态层实现真实持久化状态。
 
 自动化验证：
 
@@ -213,15 +220,72 @@
 当前剩余验收：
 
 - 真机视觉/网络验收仍需覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack。
-- Host 尚未定义线程已读/未读与置顶的持久化、多设备同步和写权限语义；这不是 Mobile 可自行补齐的代码缺口。在合同出现前 UI 继续零展示、零操作。
+- 置顶/未读不再是 Desktop / Host 阻塞；其设备级实现分别进入 MOB-007 / MOB-008。
+
+### MOB-007：本机线程置顶
+
+**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-007-local-thread-pinning.md`。
+
+产品与实现边界：
+
+- 以稳定 `thread/session id` 为键持久化本机置顶；首轮可使用 `threadId -> pinnedAt`，不无故引入 `pinOrder`。
+- 置顶只影响当前手机的排序与展示，不写回 Remote Thread，不宣称 Desktop / 其他 Mobile 已同步。
+- 主列表支持置顶、取消置顶；置顶组优先，同组默认继续按 Host `updatedAt` 倒序。
+- Drawer / Search 如展示置顶标记，应复用同一状态源；Search 不因置顶修改搜索相关性排序。
+- Host 删除 / 404 的线程允许清理本机置顶记录，避免幽灵会话。
+- 本地 UI 状态不得塞入 `deviceCredentialStore` 等安全凭证存储。
+
+验收至少覆盖：App 重启后置顶保留、取消置顶恢复普通排序、多置顶稳定排序、Host 刷新标题/更新时间不丢置顶，以及 typecheck / lint / Jest。
+
+### MOB-008：本机未读状态
+
+**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-008-device-local-unread.md`。
+
+产品与实现边界：
+
+- 未读是设备级 UI 状态，不进入 Remote Thread 真相模型。
+- 优先持久化已读进度，如 `threadId -> lastReadMessageId / lastReadAt` 或等价稳定方案，不只存一个容易漂移的 `isUnread`。
+- 打开 Chat 并成功读取当前线程权威消息后，才推进本机已读进度。
+- 拉取到比本机已读进度更新的真实 assistant / user 内容时显示未读；读取失败、离线、401/403 不得误清未读。
+- 主列表、Drawer、Search 如展示未读标记，必须复用同一状态源。
+- Desktop 上是否已读不会自动改变 Mobile 状态，这是当前设备级语义的预期行为。
+
+验收至少覆盖：新消息产生未读、成功打开后消除、App 重启后进度保留、慢网/断网/401/403 不误清、多线程互不串扰，以及 typecheck / lint / Jest。
+
+### MOB-009：简化桌面配对页与 Mira 链接兜底
+
+**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-009-pairing-screen-simplification.md`。
+
+当前 `HostConfigScreen.tsx` 仍把 transport 工程细节直接暴露在主流程，包括 `Tailscale Direct`、`Mira Host 地址`、手工 Host URL、Direct 状态卡和“重新检查 Direct”。本任务将主流程收回到：
+
+```text
+扫码配对
+  ↓
+桌面授权
+  ↓
+连接完成
+```
+
+实施边界：
+
+- 删除主页面整个 `Tailscale Direct` 卡片、Host 地址输入、Direct 状态框和重新检查按钮。
+- 保留“扫码配对”为第一主操作。
+- 扫码按钮下方增加“无法扫码？粘贴配对链接”兜底输入，只接受 `mira://pair?...`。
+- 粘贴与扫码必须复用现有 `parsePairingUriV1()`、`loadPairingUri()`、`PairingDescriptorV1` 和 `useRemotePairing()` 状态流。
+- 无效 Mira URI 显示协议解析错误，不进入 Host URL 探测逻辑。
+- Direct / Relay 底层 transport 可以继续存在，但不再要求用户理解、选择或配置。
+- 不修改 Desktop / Host，不修改 Remote Pairing V1 字段，不顺手重做网络诊断中心。
+
+完成后至少通过 typecheck / lint / Jest、Android / iOS 构建，并真机验证扫码、粘贴链接、等待批准、拒绝/过期、完成配对五条路径。
 
 ## 跨端依赖与待维护者决定
 
 1. Desktop Issue #77：为配对设备提供 `ChatWorkspace` 只读能力，并确保 Mobile-safe 响应不暴露 `rootPath`。
 2. Role 是否新增只读 scope / route，或在 Thread 中返回最小 `roleSummary`。
 3. 是否需要权威唯一 `threadKind`；若不需要，移动端继续只派生 UI 显示分类。
-4. 是否定义线程已读和置顶的持久化、多设备同步与写权限语义；未定义前 UI 零展示、零操作。
-5. 项目线程数量由 Desktop / Host 返回，还是首轮由移动端在完整线程列表中按 `workspaceId` 计算；需要同时考虑分页和数据量。
+4. 项目线程数量由 Desktop / Host 返回，还是首轮由移动端在完整线程列表中按 `workspaceId` 计算；需要同时考虑分页和数据量。
+
+线程已读 / 置顶已从跨端阻塞中移除：Desktop #79 已关闭为 `not planned`，当前由 MOB-007 / MOB-008 负责设备级本地实现。
 
 ## 实施授权门槛
 
@@ -231,16 +295,22 @@
 - MOB-004：已获得维护者明确实施授权；Mobile 侧三个全局线程入口的项目层级规则已完成并通过自动化代码级验证，任务状态为“有条件完成”；待 Desktop #77 完成并通过真机闭环回归后升级为完全完成。
 - MOB-005：已获得维护者明确实施授权；三类线程视觉映射与可访问性统一已完成并通过自动化代码级验证。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
+- MOB-007：已完成任务卡和产品边界定义；当前未开始业务代码施工。
+- MOB-008：已完成任务卡和产品边界定义；当前未开始业务代码施工。
+- MOB-009：已完成任务卡和产品边界定义；当前未开始业务代码施工。
 - 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
 
-1. MOB-001：Mobile 属性映射已完成；Role Remote 合同仍待处理，Workspace 合同由 #77 跟踪。
-2. MOB-006：代码实施完成；仅剩设备视觉/网络验收。
-3. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
-4. MOB-002：Mobile 真实项目列表代码已存在；跨端只读权限与 `rootPath` 安全投影等待 #77。
-5. MOB-003：代码实施完成；运行时项目读取依赖 #77。
-6. MOB-004：有条件完成；等待 #77 后执行真实设备项目层级闭环回归，通过后再标记完全完成。
+1. MOB-009：先把配对主流程从网络工程配置页收回为“扫码 / 粘贴 Mira 链接 -> 桌面授权”，解决当前真机直接可见的问题。
+2. MOB-007：实现本机线程置顶，恢复真实而非伪造的置顶交互。
+3. MOB-008：实现本机未读进度和判定，恢复真实而非伪造的未读提示。
+4. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009 完成后补相应回归。
+5. MOB-001：Mobile 属性映射已完成；Role Remote 合同仍待处理，Workspace 合同由 #77 跟踪。
+6. MOB-002：Mobile 真实项目列表代码已存在；跨端只读权限与 `rootPath` 安全投影等待 #77。
+7. MOB-003：代码实施完成；运行时项目读取依赖 #77。
+8. MOB-004：有条件完成；等待 #77 后执行真实设备项目层级闭环回归，通过后再标记完全完成。
+9. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
 
 ## 交付记录
 
@@ -264,3 +334,7 @@
 - 2026-08-27：开始 MOB-004；新增统一线程打开策略，收紧主列表、抽屉、搜索三个全局入口，并为项目线程补充 UI 层级提示与非法 Agent 契约异常处理。
 - 2026-08-27：Mobile CI #282 的 `Typecheck, lint and test` 通过；PR #25 squash 合入 `dev`，MOB-004 Mobile 侧代码实施完成。
 - 2026-08-27：MOB-004 标记为“有条件完成”；完全完成条件为 Desktop #77 放行 Workspace Remote 读取后完成真实设备项目层级闭环回归。
+- 2026-08-28：关闭 Desktop Issue #79 为 `not planned`；置顶与未读改由 Mobile 设备级本地状态实现，不再阻塞 Desktop / Host。
+- 2026-08-28：新增 MOB-007《本机线程置顶》和 MOB-008《本机未读状态》任务卡；仅派卡，未施工业务代码。
+- 2026-08-28：新增 MOB-009《简化桌面配对页与 Mira 链接兜底》任务卡；明确删除主流程 Direct/Host 地址工程配置，并以 Mira URI 粘贴作为扫码失败兜底；仅派卡，未施工业务代码。
+- 2026-08-28：MOB-007 至 MOB-009 正式并入 `docs/work-ledger.md` 总台账，旧编号与历史交付记录保持不变。
