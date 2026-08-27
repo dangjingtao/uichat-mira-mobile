@@ -9,7 +9,7 @@
 ## 当前协作约定
 
 - 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-007。
-- MOB-007 已完成并合入 `dev`；MOB-008 至 MOB-010 已完成任务卡定义并纳入总台账，当前尚未开始对应业务代码施工。
+- MOB-007 已完成并合入 `dev`；MOB-009 已完成代码施工与自动化平台验收并合入 `dev`，待真机五路径人工验收；MOB-008 / MOB-010 当前仍待实施。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威线程、项目和角色业务数据，不猜测远端接口字段。
 - Desktop #77 / #78 / #80 已完成合同实现并合入 Desktop `dev`；Mobile 通过 MOB-010 统一完成正式 Remote 合同适配和真实联调，不重开旧任务历史。
 - 线程置顶与未读首轮明确为 Mobile **设备级本地 UI 状态**，分别由 MOB-007 / MOB-008 实现；不得把本机状态伪装成账户级或跨端统一状态。
@@ -28,7 +28,7 @@
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、错误态、状态真实性，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 | MOB-007 | 本机线程置顶 | 以稳定线程 ID 持久化本机置顶，支持置顶/取消置顶与稳定排序，不写回 Remote Thread | **完成**：本机持久化、主列表置顶排序、Drawer/Search 同源展示已合入 `dev`；不写回 Remote Thread，不做跨端同步 | `mob_007_local_pinning` | MOB-006 |
 | MOB-008 | 本机未读状态 | 持久化本机已读进度，以真实消息进度判定未读；仅表达当前设备是否读过 | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_008_device_unread` | MOB-006 |
-| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 移除主流程 Direct/Host 地址配置；保留扫码并增加 `mira://pair?...` 粘贴兜底 | 待实施；任务卡已创建；不修改 Desktop / Pairing V1 协议 | 待派工 | 现有 Remote Pairing V1 |
+| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 移除主流程 Direct/Host 地址配置；保留扫码并增加 `mira://pair?...` 粘贴兜底 | **有条件完成**：PR #27 已合入 `dev`；typecheck/lint/Jest、Android debug APK、iOS Simulator 与 unsigned iPhone/IPA 构建通过；待真机五路径人工验收 | `mob_009_pairing_screen` | 现有 Remote Pairing V1 |
 | MOB-010 | Desktop Remote 合同接入收口 | 对齐 `/remote/v1/workspaces`、`/remote/v1/roles`、Workspace Thread 权威分页，完成 #77/#78/#80 Mobile 联调验收 | 待实施；Desktop 正式合同已交付并合入 `dev` | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
 
 ## 已确认产品规则
@@ -269,29 +269,35 @@
 
 ### MOB-009：简化桌面配对页与 Mira 链接兜底
 
-**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-009-pairing-screen-simplification.md`。
+**状态：有条件完成。** 代码与自动化构建已完成并合入 `dev`；任务卡：`docs/task-cards/MOB-009-pairing-screen-simplification.md`。升级为“完全完成”的条件是完成真实 Mira Desktop + Mobile 的五路径人工验收。
 
-当前 `HostConfigScreen.tsx` 仍把 transport 工程细节直接暴露在主流程，包括 `Tailscale Direct`、`Mira Host 地址`、手工 Host URL、Direct 状态卡和“重新检查 Direct”。本任务将主流程收回到：
+实施结果：
 
-```text
-扫码配对
-  ↓
-桌面授权
-  ↓
-连接完成
-```
+- PR #27 `feat: simplify Mira Mobile pairing screen` 已 squash 合入 `dev`，merge SHA `7fae64189aadda6bf7e59230d49a201e1d108b82`。
+- `HostConfigScreen.tsx` 已删除用户侧 `Tailscale Direct` 卡片、`Mira Host 地址`、Host URL 输入、Direct 状态卡、`重新检查 Direct` 和 Relay transport 配置展示。
+- “扫码配对”继续作为第一主入口；新增“无法扫码？粘贴配对链接”，只接受 `mira://pair?...`。
+- 扫码与粘贴统一复用 `parsePairingUriV1()` -> `loadPairingUri()` -> `PairingDescriptorV1` -> `useRemotePairing()`。
+- 配对授权不再被 UI 层 Direct probe 状态门控；可用 transport 的最终选择继续由 `RemoteMiraHostClient` 负责。
+- 用户编辑粘贴链接时会清除旧 `PairingDescriptorV1`，避免 stale request 被误提交。
+- `remotePairingV1.test.ts` 已补普通 HTTP(S) 输入与缺必要字段 Mira URI 的拒绝回归。
+- 未修改 Desktop / Host、Remote Pairing V1 字段、设备凭据领取、批准轮询或 Direct / Relay transport 能力。
 
-实施边界：
+自动化验证已通过：
 
-- 删除主页面整个 `Tailscale Direct` 卡片、Host 地址输入、Direct 状态框和重新检查按钮。
-- 保留“扫码配对”为第一主操作。
-- 扫码按钮下方增加“无法扫码？粘贴配对链接”兜底输入，只接受 `mira://pair?...`。
-- 粘贴与扫码必须复用现有 `parsePairingUriV1()`、`loadPairingUri()`、`PairingDescriptorV1` 和 `useRemotePairing()` 状态流。
-- 无效 Mira URI 显示协议解析错误，不进入 Host URL 探测逻辑。
-- Direct / Relay 底层 transport 可以继续存在，但不再要求用户理解、选择或配置。
-- 不修改 Desktop / Host，不修改 Remote Pairing V1 字段，不顺手重做网络诊断中心。
+- typecheck / lint / Jest：success。
+- Android debug APK：构建与 artifact 上传 success。
+- iOS Simulator：构建与 artifact 上传 success。
+- unsigned iPhone：构建 success；IPA 打包校验与 artifact 上传 success。
 
-完成后至少通过 typecheck / lint / Jest、Android / iOS 构建，并真机验证扫码、粘贴链接、等待批准、拒绝/过期、完成配对五条路径。
+当前剩余验收：
+
+1. 真机扫码配对。
+2. 真机粘贴同一 Mira 链接配对。
+3. Desktop 待批准状态。
+4. Desktop 拒绝 / 请求过期。
+5. Desktop 批准并完成配对。
+
+自动化构建不替代上述真机验收；五条路径通过后再标记“完全完成”。
 
 ### MOB-010：Desktop Remote 合同接入收口
 
@@ -331,14 +337,14 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
 - MOB-007：已获得维护者明确实施授权；本机线程置顶代码已完成并通过 PR #28 squash 合入 `dev`。
 - MOB-008：已完成任务卡和产品边界定义；当前未开始业务代码施工。
-- MOB-009：已完成任务卡和产品边界定义；当前未开始业务代码施工。
+- MOB-009：已完成代码施工与自动化平台验收并合入 `dev`；当前仅剩真机五路径人工验收，不再安排产品层代码施工。
 - MOB-010：已完成任务卡和 Desktop 正式合同核对；当前未开始业务代码施工。
 - 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
 
 1. MOB-010：优先接住 Desktop 0.99.11 已交付的 #77/#78/#80，避免 Mobile 继续依赖已经过时的 `/chat-workspaces` 与全量 Thread 本地过滤方式。
-2. MOB-009：把配对主流程从网络工程配置页收回为“扫码 / 粘贴 Mira 链接 -> 桌面授权”，解决当前真机直接可见的问题。
+2. MOB-009：仅完成真机扫码、粘贴、待批准、拒绝/过期、批准完成五路径验收；代码施工已结束。
 3. MOB-008：实现本机未读进度和判定，恢复真实而非伪造的未读提示。
 4. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009/010 完成后补相应回归。
 5. MOB-004：MOB-010 接入完成后执行真实设备项目层级闭环回归，通过后标记完全完成。
@@ -374,3 +380,5 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - 2026-08-28：MOB-010 正式并入总台账；旧 MOB-002 / MOB-003 / MOB-005 完成记录保留，正式 Remote 合同增量适配不通过“重开旧卡”改写历史。
 - 2026-08-28：开始 MOB-007；实现设备级本机线程置顶、主列表稳定排序、Drawer/Search 同源标记和独立本地持久化，不修改 Desktop / Host。
 - 2026-08-28：PR #28 squash 合入 `dev`，提交 `90ecf42ad6ba1b23aaa17e1735b168bacc891046`；按维护者决定不等待最终平台构建，MOB-007 标记完成；置顶 hydrate 失败缺少显式错误/重试入口记录为 P2 技术债。
+- 2026-08-28：MOB-009 开始并完成产品层代码施工；移除 Direct/Host/Relay 工程配置 UI，新增 `mira://pair?...` 粘贴兜底，并补输入解析与 stale pairing request 回归。
+- 2026-08-28：MOB-009 同一 HEAD 的 typecheck / lint / Jest、Android debug APK、iOS Simulator、unsigned iPhone / IPA 构建全部通过；PR #27 squash 合入 `dev`，merge `7fae64189aadda6bf7e59230d49a201e1d108b82`。任务标记为“有条件完成”，保留真机五路径人工验收。
