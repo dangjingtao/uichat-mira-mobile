@@ -30,6 +30,8 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
+import { RemoteHostError } from '../api/remoteHttp';
+import { useThreadReadStore } from '../store/threadReadStore';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
@@ -186,6 +188,8 @@ export function ChatScreen() {
   const { sessionId, title: routeTitle } = route.params;
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
+  const markThreadRead = useThreadReadStore((state) => state.markThreadRead);
+  const clearThreadRead = useThreadReadStore((state) => state.clearThread);
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
@@ -229,12 +233,21 @@ export function ChatScreen() {
     try {
       const canonicalMessages = await miraHostClient.getMessages(sessionId);
       setMessages(canonicalMessages);
+      try {
+        await markThreadRead(sessionId, canonicalMessages, canonicalMessages.length);
+      } catch {
+        // A local persistence failure must not turn a valid Host history read
+        // into a fake chat error or falsely clear the unread state.
+      }
       return canonicalMessages;
     } catch (error) {
+      if (error instanceof RemoteHostError && error.status === 404) {
+        void clearThreadRead(sessionId).catch(() => undefined);
+      }
       setHistoryError(getChatHistoryErrorMessage(error));
       return null;
     }
-  }, [sessionId]);
+  }, [clearThreadRead, markThreadRead, sessionId]);
 
   useFocusEffect(
     useCallback(() => {
