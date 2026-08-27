@@ -21,6 +21,11 @@ const threadToSession = (thread: RemoteThread): Session => ({
   id: thread.id,
   title: thread.title,
   updatedAt: new Date(thread.updatedAt),
+  workspaceId: thread.workspaceId,
+  knowledgeBaseId: thread.knowledgeBaseId,
+  roleId: thread.roleId,
+  agentEnabled: thread.agentEnabled,
+  status: thread.status,
 });
 
 const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
