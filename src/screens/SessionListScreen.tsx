@@ -183,7 +183,6 @@ export function SessionListScreen() {
   const hydratePins = useThreadPinStore((state) => state.hydrate);
   const pinThread = useThreadPinStore((state) => state.pinThread);
   const unpinThread = useThreadPinStore((state) => state.unpinThread);
-  const pruneToThreadIds = useThreadPinStore((state) => state.pruneToThreadIds);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -229,14 +228,13 @@ export function SessionListScreen() {
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
-      void pruneToThreadIds(list.map((session) => session.id)).catch(() => undefined);
     } catch (error) {
       setSessions([]);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
-  }, [pruneToThreadIds]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
