@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 22:45（Asia/Shanghai）
+更新时间：2026-08-27 23:05（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -8,7 +8,7 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权 MOB-001、MOB-006 与 MOB-005。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001、MOB-006、MOB-005 与 MOB-002。
 - 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
 - 移动端只消费 Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
 - 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖，不在本仓库越界修改。
@@ -19,7 +19,7 @@
 | ID | 任务卡 | 范围 | 状态 | 负责人 | 依赖 |
 |---|---|---|---|---|---|
 | MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Host Workspace/Role Remote 契约仍待决定 | `mob_001_contract` | Host Remote 契约 |
-| MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | 只读核对完成，等待 Host 契约与参考图 | `mob_002_workspace_list` | MOB-001 |
+| MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | Mobile 项目入口与真实阻塞态已完成并通过 typecheck/lint/Jest；真实项目名称/列表等待 Host Workspace Remote 契约 | `mob_002_workspace_list` | MOB-001, Host Workspace Remote 契约 |
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 只读核对完成，等待 Host 契约与实施授权 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待 MOB-001～003 可实施 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 代码实施完成并通过 typecheck/lint/Jest；三入口已统一视觉分类与可访问性文案 | `mob_005_visual_kinds` | MOB-001 |
@@ -83,11 +83,35 @@
 
 ### MOB-002：项目列表页
 
-- 产品“项目”对应 Host Chat Workspace，但移动端 API 和配对设备 Remote contract 当前都没有 Workspace 列表能力。
-- 当前可确认的项目字段为 `id`、`name`、`rootPath`、`status`、`createdAt`、`updatedAt`；其中 `rootPath` 是 Host 本机路径，默认不应投影到移动端 UI。
-- 没有项目置顶、创建者、共享状态、成员、线程数、封面或描述的权威字段。设计中存在这些内容时，本轮隐藏，不模拟。
-- 首轮最小页面只展示真实项目名和可选更新时间，并严格区分加载、空列表、错误重试和成功状态。
-- 仓库中未找到用户提及的项目列表/详情参考图；实施视觉稿前需要重新提供图 1、图 2。
+第一轮合同核对：
+
+- 产品“项目”对应 Host Chat Workspace。Host `dev` 已存在 `GET /chat-workspaces`，权威字段为 `id`、`name`、`rootPath`、`isDefault`、`status`、`createdAt`、`updatedAt`。
+- `rootPath` 是 Host 本机路径，默认不应投影到移动端 UI；没有项目置顶、创建者、共享状态、成员、线程数、封面或描述的权威字段。
+- 当前 Remote Host V1 manifest 只声明 threads / messages / agent / artifacts，没有 Workspace route。
+- 当前 Remote device scope 只包含 `threads:read`、messages、agent、artifacts，没有 Workspace/Project 读取 scope。
+- Remote credential 只允许 `getRequiredRemoteScope()` 明确登记的路由；`GET /chat-workspaces` 当前不在登记表内，因此配对设备直接访问会被拒绝为 403，而不是“接口其实可用只是 Mobile 没接”。
+
+第二轮 Mobile 实施已合入 `dev`：
+
+- 新增 `WorkspaceList` Stack 路由和 `WorkspaceListScreen`；抽屉“项目”不再是无行为占位，已经成为真实可进入入口。
+- 在 Host 尚未开放 Workspace 读取期间，页面通过现有权威 Thread 数据统计不同 `workspaceId` 的真实归属数量，仅用于说明“已有项目归属”，不将 ID 当成项目名。
+- 页面不展示裸 `workspaceId`、不模拟项目名、不投影 `rootPath`，并明确显示“Host 尚未开放项目读取”。
+- 线程读取失败时沿用真实 401 / 403 / 网络错误映射并提供重试，不把失败呈现成空项目列表。
+- 新增 `workspaceListState.ts` 与 Jest 覆盖，验证重复、空白和缺省 `workspaceId` 的去重计数。
+- 未新增不存在的 `/remote/v1/workspaces`，未修改 Mira Host / Desktop 仓库。
+
+自动化验证：
+
+- GitHub Actions `Mobile CI #263`：`Typecheck, lint and test` 成功。
+- `Typecheck`：success。
+- `Lint`：success。
+- `Test`：success。
+- Android / iOS 平台构建由同一 CI 独立继续执行；本轮代码级完成不替代真实 Workspace contract 和设备视觉验收。
+
+当前剩余：
+
+- 真实项目列表仍硬阻塞于 Host Workspace Mobile-safe 只读合同。Host 必须明确：新增只读 scope、复用安全 scope，或在 Remote Thread 中投影最小 Workspace summary。
+- 合同出现后，Mobile 才展示权威项目名称和可选更新时间；在此之前不继续扩写假项目卡片。
 
 ### MOB-003：项目详情页
 
@@ -168,10 +192,11 @@
 ## 实施授权门槛
 
 - MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
+- MOB-002：已获得维护者明确实施授权；Mobile 项目入口、真实阻塞态和归属计数已完成并通过自动化代码级验证；真实项目列表继续等待 Host Workspace Remote 契约。
 - MOB-005：已获得维护者明确实施授权；三类线程视觉映射与可访问性统一已完成并通过自动化代码级验证。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
 - 涉及 Host Remote 契约的部分仍需 Host 方案得到确认，不因 Mobile 已开工而视为自动授权。
-- MOB-002/003 的项目列表和详情参考图需重新提供，或维护者明确允许按现有移动端设计系统落地。
+- MOB-003 的项目详情需等待真实 Workspace 名称/列表合同；若后续有参考图，以参考图为视觉验收依据，否则沿用现有移动端设计系统。
 - 默认不修改 Mira Host / 桌面端仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
@@ -179,9 +204,9 @@
 1. MOB-001：Mobile 属性映射已完成；等待并确认 Host Workspace/Role Remote 契约。
 2. MOB-006：代码实施完成；仅剩设备视觉/网络验收。
 3. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
-4. MOB-002：在 Workspace Remote contract 可用后实现项目列表。
-5. MOB-003：实现项目详情和项目线程过滤。
-6. MOB-004：收紧所有 Chat 入口和完整返回路径。
+4. MOB-002：Mobile 项目入口与真实阻塞态已完成；真实列表等待 Host Workspace Remote contract。
+5. MOB-003：真实 Workspace contract 可用后实现项目详情和项目线程过滤。
+6. MOB-004：在 MOB-002/003 实际可用后收紧所有 Chat 入口和完整返回路径。
 
 ## 交付记录
 
@@ -197,3 +222,5 @@
 - 2026-08-27：Mobile CI #249 的 `Typecheck, lint and test` 通过；MOB-006 代码实施完成，后续只保留自动化平台构建结果与真机视觉/网络验收记录。
 - 2026-08-27：开始 MOB-005；新增共享线程视觉分类与 `SessionKindIcon`，主列表、抽屉、搜索统一普通/角色/Agent 图标和可访问性文案。
 - 2026-08-27：Mobile CI #255 的 `Typecheck, lint and test` 通过；MOB-005 代码实施完成，设备视觉覆盖并入 MOB-006。
+- 2026-08-27：开始 MOB-002；核对 Host `GET /chat-workspaces` 与 Remote auth，确认配对设备当前没有 Workspace route/scope，直接访问会被 403。
+- 2026-08-27：MOB-002 在 `dev` 增加真实“项目”入口、Workspace 阻塞页、项目归属计数与测试；Mobile CI #263 的 `Typecheck, lint and test` 通过，真实项目列表等待 Host Workspace Remote 契约。
