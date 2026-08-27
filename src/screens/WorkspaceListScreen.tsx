@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   StyleSheet,
   Text,
@@ -11,11 +12,22 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft, FolderOpen } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
-import { miraHostClient } from '../api/miraHostClient';
+import { workspaceApi, type ChatWorkspace } from '../api/workspaceApi';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
-import { getSessionLoadErrorMessage } from './sessionCollectionState';
-import { countDistinctWorkspaceIds } from './workspaceListState';
+import {
+  getWorkspaceLoadErrorMessage,
+  resolveWorkspaceCollectionState,
+} from './workspaceListState';
+
+const formatUpdatedAt = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export function WorkspaceListScreen() {
   const navigation =
@@ -23,17 +35,16 @@ export function WorkspaceListScreen() {
   const { colors } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [workspaceCount, setWorkspaceCount] = useState(0);
+  const [workspaces, setWorkspaces] = useState<ChatWorkspace[]>([]);
 
-  const loadWorkspaceEvidence = useCallback(async () => {
+  const loadWorkspaces = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const sessions = await miraHostClient.listSessions();
-      setWorkspaceCount(countDistinctWorkspaceIds(sessions));
+      setWorkspaces(await workspaceApi.listChatWorkspaces());
     } catch (error) {
-      setWorkspaceCount(0);
-      setLoadError(getSessionLoadErrorMessage(error));
+      setWorkspaces([]);
+      setLoadError(getWorkspaceLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -41,9 +52,17 @@ export function WorkspaceListScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadWorkspaceEvidence();
-    }, [loadWorkspaceEvidence]),
+      void loadWorkspaces();
+    }, [loadWorkspaces]),
   );
+
+  const collectionState = resolveWorkspaceCollectionState(
+    isLoading,
+    loadError,
+    workspaces.length,
+  );
+
+  const data = useMemo(() => workspaces, [workspaces]);
 
   return (
     <SafeAreaView
@@ -75,56 +94,125 @@ export function WorkspaceListScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <View style={styles.content}>
-        {isLoading ? (
-          <View
-            style={styles.centerState}
-            accessibilityRole="progressbar"
-            accessibilityLabel="正在核对项目读取能力"
+      {collectionState === 'loading' ? (
+        <View
+          style={styles.centerState}
+          accessibilityRole="progressbar"
+          accessibilityLabel="正在加载项目"
+        >
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      ) : null}
+
+      {collectionState === 'error' ? (
+        <View style={styles.centerState}>
+          <Text style={[styles.stateTitle, { color: colors.text.ink }]}>无法加载项目</Text>
+          <Text style={[styles.stateBody, { color: colors.text.soft }]}>{loadError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="重试加载项目"
+            onPress={() => void loadWorkspaces()}
+            style={({ pressed }) => [
+              styles.retryButton,
+              { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+            ]}
           >
-            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {collectionState === 'empty' ? (
+        <View style={styles.centerState}>
+          <View
+            style={[
+              styles.emptyIcon,
+              {
+                backgroundColor: colors.bg.card,
+                borderColor: colors.border.default,
+              },
+            ]}
+          >
+            <FolderOpen size={38} strokeWidth={1.5} color={colors.primary} />
           </View>
-        ) : loadError ? (
-          <View style={styles.centerState}>
-            <Text style={[styles.title, { color: colors.text.ink }]}>无法核对项目状态</Text>
-            <Text style={[styles.body, { color: colors.text.soft }]}>{loadError}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="重试核对项目状态"
-              onPress={() => void loadWorkspaceEvidence()}
-              style={({ pressed }) => [
-                styles.retryButton,
-                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-              ]}
-            >
-              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.centerState}>
-            <View
-              style={[
-                styles.iconWrap,
-                {
-                  backgroundColor: colors.bg.card,
-                  borderColor: colors.border.default,
-                },
-              ]}
-            >
-              <FolderOpen size={42} strokeWidth={1.5} color={colors.primary} />
-            </View>
-            <Text style={[styles.title, { color: colors.text.ink }]}>Host 尚未开放项目读取</Text>
-            <Text style={[styles.body, { color: colors.text.soft }]}>
-              {workspaceCount > 0
-                ? `已从真实线程检测到 ${workspaceCount} 个项目归属，但当前配对设备只能读取 workspaceId，不能读取项目名称。`
-                : '当前 Remote Host 合同只能读取线程，尚不能读取项目名称。'}
-            </Text>
-            <Text style={[styles.note, { color: colors.text.muted }]}>
-              Mobile 不展示裸 workspaceId，也不会模拟项目名或 Host 本机路径。待 Host 明确开放 Workspace 只读能力后，这里再接真实项目列表。
-            </Text>
-          </View>
-        )}
-      </View>
+          <Text style={[styles.stateTitle, { color: colors.text.ink }]}>暂无项目</Text>
+          <Text style={[styles.stateBody, { color: colors.text.soft }]}>Desktop 当前没有可显示的工作空间</Text>
+        </View>
+      ) : null}
+
+      {collectionState === 'data' ? (
+        <FlatList
+          data={data}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => (
+            <View style={[styles.separator, { backgroundColor: colors.border.soft }]} />
+          )}
+          renderItem={({ item }) => {
+            const updatedAt = formatUpdatedAt(item.updatedAt);
+            return (
+              <View
+                style={styles.workspaceRow}
+                accessible
+                accessibilityLabel={`${item.name}${item.isDefault ? '，默认项目' : ''}${item.status === 'archived' ? '，已归档' : ''}`}
+              >
+                <View
+                  style={[
+                    styles.workspaceIcon,
+                    {
+                      backgroundColor: colors.bg.card,
+                      borderColor: colors.border.default,
+                    },
+                  ]}
+                >
+                  <FolderOpen size={22} strokeWidth={1.7} color={colors.primary} />
+                </View>
+                <View style={styles.workspaceText}>
+                  <View style={styles.titleRow}>
+                    <Text
+                      style={[styles.workspaceName, { color: colors.text.ink }]}
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </Text>
+                    {item.isDefault ? (
+                      <Text
+                        style={[
+                          styles.badge,
+                          {
+                            color: colors.primary,
+                            borderColor: colors.border.default,
+                            backgroundColor: colors.bg.card,
+                          },
+                        ]}
+                      >
+                        默认
+                      </Text>
+                    ) : null}
+                    {item.status === 'archived' ? (
+                      <Text
+                        style={[
+                          styles.badge,
+                          {
+                            color: colors.text.muted,
+                            borderColor: colors.border.default,
+                            backgroundColor: colors.bg.card,
+                          },
+                        ]}
+                      >
+                        已归档
+                      </Text>
+                    ) : null}
+                  </View>
+                  {updatedAt ? (
+                    <Text style={[styles.meta, { color: colors.text.soft }]}>更新于 {updatedAt}</Text>
+                  ) : null}
+                </View>
+              </View>
+            );
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -152,7 +240,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   headerSpacer: { width: sizing.touchTarget },
-  content: { flex: 1 },
   centerState: {
     flex: 1,
     alignItems: 'center',
@@ -160,30 +247,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.section,
     paddingBottom: spacing.section,
   },
-  iconWrap: {
-    width: 96,
-    height: 96,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
-  },
-  title: {
+  stateTitle: {
     fontSize: fontSize.titleLg,
     fontWeight: '600',
     textAlign: 'center',
   },
-  body: {
+  stateBody: {
     marginTop: spacing.md,
     fontSize: fontSize.bodyMd,
     lineHeight: 24,
-    textAlign: 'center',
-  },
-  note: {
-    marginTop: spacing.lg,
-    fontSize: fontSize.button,
-    lineHeight: 21,
     textAlign: 'center',
   },
   retryButton: {
@@ -196,4 +268,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryLabel: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  emptyIcon: {
+    width: 88,
+    height: 88,
+    marginBottom: spacing.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listContent: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  workspaceRow: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  workspaceIcon: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workspaceText: { flex: 1, minWidth: 0 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  workspaceName: {
+    flexShrink: 1,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '600',
+  },
+  badge: {
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  meta: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.button,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 56,
+  },
 });

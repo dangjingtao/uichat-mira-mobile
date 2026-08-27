@@ -1,27 +1,27 @@
-import { countDistinctWorkspaceIds } from './workspaceListState';
-import type { Session } from '../types';
+import { RemoteHostError } from '../api/remoteHttp';
+import {
+  getWorkspaceLoadErrorMessage,
+  resolveWorkspaceCollectionState,
+} from './workspaceListState';
 
-const session = (id: string, workspaceId?: string | null): Session => ({
-  id,
-  title: id,
-  updatedAt: new Date('2026-08-27T00:00:00.000Z'),
-  workspaceId,
-});
-
-describe('countDistinctWorkspaceIds', () => {
-  it('counts unique non-empty workspace ownership without exposing ids', () => {
-    expect(
-      countDistinctWorkspaceIds([
-        session('a', 'workspace-a'),
-        session('b', 'workspace-a'),
-        session('c', ' workspace-b '),
-        session('d', null),
-        session('e', '   '),
-      ]),
-    ).toBe(2);
+describe('workspaceListState', () => {
+  it('keeps loading, error, empty and data states separate', () => {
+    expect(resolveWorkspaceCollectionState(true, null, 0)).toBe('loading');
+    expect(resolveWorkspaceCollectionState(false, 'failed', 0)).toBe('error');
+    expect(resolveWorkspaceCollectionState(false, null, 0)).toBe('empty');
+    expect(resolveWorkspaceCollectionState(false, null, 2)).toBe('data');
   });
 
-  it('returns zero when no thread has workspace ownership', () => {
-    expect(countDistinctWorkspaceIds([session('a'), session('b', null)])).toBe(0);
+  it('describes transport permission errors without redefining projects', () => {
+    expect(
+      getWorkspaceLoadErrorMessage(
+        new RemoteHostError('HTTP_403', 'forbidden', 403),
+      ),
+    ).toBe('当前远程连接没有读取项目的权限');
+    expect(
+      getWorkspaceLoadErrorMessage(
+        new RemoteHostError('NETWORK_ERROR', 'offline'),
+      ),
+    ).toBe('无法连接 Mira Desktop，请检查网络后重试');
   });
 });
