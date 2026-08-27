@@ -21,6 +21,10 @@ import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { useThreadPinStore } from '../store/threadPinStore';
 import { isThreadPinned } from '../store/threadPinning';
 import {
+  selectThreadUnread,
+  useThreadReadStore,
+} from '../store/threadReadStore';
+import {
   getSessionVisualKindLabel,
   SessionKindIcon,
 } from '../components/SessionKindIcon';
@@ -45,6 +49,9 @@ export function SearchScreen() {
   const { colors } = useTheme();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
+  const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
+  const hydrateReads = useThreadReadStore((state) => state.hydrate);
+  const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('all');
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -55,19 +62,22 @@ export function SearchScreen() {
     setLoading(true);
     setLoadError(null);
     try {
-      setSessions(await miraHostClient.listSessions());
+      const list = await miraHostClient.listSessions();
+      setSessions(list);
+      void syncUnreadSessions(list).catch(() => undefined);
     } catch (error) {
       setSessions([]);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncUnreadSessions]);
 
   useEffect(() => {
     void hydratePins().catch(() => undefined);
+    void hydrateReads().catch(() => undefined);
     void loadSessions();
-  }, [hydratePins, loadSessions]);
+  }, [hydratePins, hydrateReads, loadSessions]);
 
   const results = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -169,11 +179,12 @@ export function SearchScreen() {
               typeof session.workspaceId === 'string' &&
               session.workspaceId.trim().length > 0;
             const pinned = isThreadPinned(pinnedAtByThreadId, session.id);
+            const unread = selectThreadUnread(progressByThreadId, session.id);
             return (
               <Pressable
                 key={session.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}`}
+                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
                 style={styles.result}
                 onPress={() => openSession(session)}
               >
@@ -193,6 +204,12 @@ export function SearchScreen() {
                     >
                       {session.title}
                     </Text>
+                    {unread ? (
+                      <View
+                        accessibilityElementsHidden
+                        style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+                      />
+                    ) : null}
                     {pinned ? (
                       <Pin size={14} color={colors.primary} strokeWidth={2} />
                     ) : null}
@@ -309,6 +326,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   resultTitle: { flex: 1, fontSize: fontSize.bodyMd },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+  },
   projectHint: {
     marginTop: 2,
     flexDirection: 'row',
