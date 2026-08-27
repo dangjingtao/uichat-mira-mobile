@@ -33,6 +33,8 @@ import {
   useThreadReadStore,
 } from '../store/threadReadStore';
 import { miraHostClient } from '../api/miraHostClient';
+import { getSessionRoleName } from '../api/roleApi';
+import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
@@ -77,6 +79,7 @@ function getStatusColor(
 
 interface SessionRowProps {
   item: Session;
+  roleName: string | null;
   connectionStatus: string;
   colors: ReturnType<typeof useTheme>['colors'];
   isPinned: boolean;
@@ -87,6 +90,7 @@ interface SessionRowProps {
 
 function SessionRow({
   item,
+  roleName,
   connectionStatus,
   colors,
   isPinned,
@@ -97,10 +101,12 @@ function SessionRow({
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
   const preview = belongsToWorkspace
-    ? '项目会话 · 从项目中打开'
-    : connectionStatus === 'connected'
-      ? '继续与 Mira 对话'
-      : '连接 Mira Host 后继续对话';
+    ? `项目会话${roleName ? ` · ${roleName}` : ''} · 从项目中打开`
+    : roleName
+      ? `角色 · ${roleName}`
+      : connectionStatus === 'connected'
+        ? '继续与 Mira 对话'
+        : '连接 Mira Host 后继续对话';
 
   return (
     <View
@@ -114,7 +120,7 @@ function SessionRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
+        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
         style={({ pressed }) => [
           styles.sessionOpen,
           pressed && { backgroundColor: colors.bg.soft },
@@ -191,6 +197,7 @@ export function SessionListScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
   const { connectionStatus } = useHostStore();
+  const roleNames = useRoleNameMap();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
   const pinThread = useThreadPinStore((state) => state.pinThread);
@@ -352,6 +359,7 @@ export function SessionListScreen() {
         renderItem={({ item }) => (
           <SessionRow
             item={item}
+            roleName={getSessionRoleName(item, roleNames)}
             connectionStatus={connectionStatus}
             colors={colors}
             isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
@@ -413,7 +421,7 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}> 
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
                 Remote Host V1 当前只展示桌面端已有会话
               </Text>
             </View>

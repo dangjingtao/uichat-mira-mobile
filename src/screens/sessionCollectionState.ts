@@ -21,6 +21,9 @@ export const getSessionLoadErrorMessage = (error: unknown): string => {
     if (error.status === 403) {
       return '当前设备没有读取会话的权限';
     }
+    if (error.status === 404) {
+      return '目标会话或项目不存在，或当前设备无法访问';
+    }
     if (error.code === 'NETWORK_ERROR') {
       return '无法连接 Mira Host，请检查网络后重试';
     }

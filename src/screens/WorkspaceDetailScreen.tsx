@@ -18,7 +18,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ChevronLeft } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
-import { miraHostClient } from '../api/miraHostClient';
+import { workspaceApi } from '../api/workspaceApi';
+import { getSessionRoleName } from '../api/roleApi';
+import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import {
@@ -29,11 +31,9 @@ import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
-import {
-  filterWorkspaceSessions,
-  getWorkspaceDetailContractError,
-} from './workspaceDetailState';
+import { getWorkspaceDetailContractError } from './workspaceDetailState';
 
+const PAGE_LIMIT = 50;
 const twoDigits = (value: number) => String(value).padStart(2, '0');
 
 function formatUpdatedAt(date: Date): string {
@@ -48,35 +48,79 @@ export function WorkspaceDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'WorkspaceDetail'>>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const roleNames = useRoleNameMap();
   const { workspaceId, workspaceName } = route.params;
   const contractError = getWorkspaceDetailContractError(
     workspaceId,
     workspaceName,
   );
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(contractError === null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const loadWorkspaceSessions = useCallback(async () => {
     if (contractError) {
       setSessions([]);
+      setTotal(0);
+      setNextCursor(null);
       setLoadError(null);
+      setLoadMoreError(null);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     setLoadError(null);
+    setLoadMoreError(null);
     try {
-      const allSessions = await miraHostClient.listSessions();
-      setSessions(filterWorkspaceSessions(allSessions, workspaceId));
+      const page = await workspaceApi.listWorkspaceThreads(workspaceId, {
+        status: 'active',
+        limit: PAGE_LIMIT,
+      });
+      setSessions(page.items);
+      setTotal(page.total);
+      setNextCursor(page.nextCursor);
     } catch (error) {
       setSessions([]);
+      setTotal(0);
+      setNextCursor(null);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   }, [contractError, workspaceId]);
+
+  const loadMore = useCallback(async () => {
+    if (contractError || !nextCursor || isLoading || isLoadingMore) return;
+
+    const cursor = nextCursor;
+    setIsLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const page = await workspaceApi.listWorkspaceThreads(workspaceId, {
+        status: 'active',
+        limit: PAGE_LIMIT,
+        cursor,
+      });
+      setSessions(current => {
+        const knownIds = new Set(current.map(item => item.id));
+        return [
+          ...current,
+          ...page.items.filter(item => !knownIds.has(item.id)),
+        ];
+      });
+      setTotal(page.total);
+      setNextCursor(page.nextCursor);
+    } catch (error) {
+      setLoadMoreError(getSessionLoadErrorMessage(error));
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [contractError, isLoading, isLoadingMore, nextCursor, workspaceId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,7 +183,9 @@ export function WorkspaceDetailScreen() {
             {contractError ? '项目' : workspaceName}
           </Text>
           {!contractError ? (
-            <Text style={[styles.headerCaption, { color: colors.text.soft }]}>项目会话</Text>
+            <Text style={[styles.headerCaption, { color: colors.text.soft }]}>
+              项目会话{!isLoading && !loadError ? ` · ${total}` : ''}
+            </Text>
           ) : null}
         </View>
         <View style={styles.headerSpacer} />
@@ -155,49 +201,64 @@ export function WorkspaceDetailScreen() {
           data={sessions}
           keyExtractor={(item) => item.id}
           contentContainerStyle={listContentStyle}
-          renderItem={({ item }) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}`}
-              onPress={() => openSession(item)}
-              style={({ pressed }) => [
-                styles.sessionRow,
-                {
-                  backgroundColor: colors.bg.canvas,
-                  borderColor: colors.border.soft,
-                },
-                pressed && { backgroundColor: colors.bg.soft },
-              ]}
-            >
-              <View
-                style={[
-                  styles.sessionIcon,
+          onEndReached={() => void loadMore()}
+          onEndReachedThreshold={0.35}
+          renderItem={({ item }) => {
+            const roleName = getSessionRoleName(item, roleNames);
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}`}
+                onPress={() => openSession(item)}
+                style={({ pressed }) => [
+                  styles.sessionRow,
                   {
-                    backgroundColor: colors.bg.card,
-                    borderColor: colors.border.default,
+                    backgroundColor: colors.bg.canvas,
+                    borderColor: colors.border.soft,
                   },
+                  pressed && { backgroundColor: colors.bg.soft },
                 ]}
               >
-                <SessionKindIcon
-                  session={item}
-                  size={21}
-                  strokeWidth={1.7}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.sessionContent}>
-                <Text
-                  style={[styles.sessionTitle, { color: colors.text.ink }]}
-                  numberOfLines={1}
+                <View
+                  style={[
+                    styles.sessionIcon,
+                    {
+                      backgroundColor: colors.bg.card,
+                      borderColor: colors.border.default,
+                    },
+                  ]}
                 >
-                  {item.title}
-                </Text>
-                <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
-                  {formatUpdatedAt(item.updatedAt)}
-                </Text>
-              </View>
-            </Pressable>
-          )}
+                  <SessionKindIcon
+                    session={item}
+                    size={21}
+                    strokeWidth={1.7}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.sessionContent}>
+                  <Text
+                    style={[styles.sessionTitle, { color: colors.text.ink }]}
+                    numberOfLines={1}
+                  >
+                    {item.title}
+                  </Text>
+                  <View style={styles.sessionMetaRow}>
+                    {roleName ? (
+                      <Text
+                        style={[styles.sessionRole, { color: colors.primary }]}
+                        numberOfLines={1}
+                      >
+                        {roleName}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
+                      {formatUpdatedAt(item.updatedAt)}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          }}
           ListEmptyComponent={
             collectionState === 'loading' ? (
               <View
@@ -233,6 +294,44 @@ export function WorkspaceDetailScreen() {
                 <Text style={[styles.stateBody, { color: colors.text.soft }]}>这个项目当前没有可读取的活跃会话。</Text>
               </View>
             )
+          }
+          ListFooterComponent={
+            sessions.length === 0 ? null : isLoadingMore ? (
+              <View style={styles.footerState} accessibilityLabel="正在加载更多项目会话">
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : loadMoreError ? (
+              <View style={styles.footerState}>
+                <Text style={[styles.footerError, { color: colors.text.soft }]}>
+                  {loadMoreError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重试加载更多项目会话"
+                  onPress={() => void loadMore()}
+                  style={({ pressed }) => [
+                    styles.loadMoreButton,
+                    { backgroundColor: pressed ? colors.bg.soft : colors.bg.card },
+                  ]}
+                >
+                  <Text style={[styles.loadMoreLabel, { color: colors.primary }]}>重试加载更多</Text>
+                </Pressable>
+              </View>
+            ) : nextCursor ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="加载更多项目会话"
+                onPress={() => void loadMore()}
+                style={({ pressed }) => [
+                  styles.loadMoreButton,
+                  { backgroundColor: pressed ? colors.bg.soft : colors.bg.card },
+                ]}
+              >
+                <Text style={[styles.loadMoreLabel, { color: colors.primary }]}>加载更多</Text>
+              </Pressable>
+            ) : sessions.length < total ? (
+              <Text style={[styles.footerError, { color: colors.text.soft }]}>项目会话尚未完整加载</Text>
+            ) : null
           }
         />
       )}
@@ -317,5 +416,32 @@ const styles = StyleSheet.create({
   },
   sessionContent: { flex: 1, minWidth: 0 },
   sessionTitle: { fontSize: fontSize.bodyMd, fontWeight: '500' },
-  sessionTime: { marginTop: spacing.xs, fontSize: fontSize.caption },
+  sessionMetaRow: {
+    marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sessionRole: { flexShrink: 1, fontSize: fontSize.caption, fontWeight: '600' },
+  sessionTime: { flexShrink: 0, fontSize: fontSize.caption },
+  footerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+  },
+  footerError: {
+    paddingVertical: spacing.md,
+    fontSize: fontSize.caption,
+    textAlign: 'center',
+  },
+  loadMoreButton: {
+    minHeight: sizing.touchTarget,
+    marginVertical: spacing.sm,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  loadMoreLabel: { fontSize: fontSize.button, fontWeight: '600' },
 });
