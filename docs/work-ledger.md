@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 23:05（Asia/Shanghai）
+更新时间：2026-08-27 23:31（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -8,25 +8,26 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权 MOB-001、MOB-006、MOB-005 与 MOB-002。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001、MOB-002、MOB-003、MOB-005 与 MOB-006。
 - 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
-- 移动端只消费 Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
-- 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖，不在本仓库越界修改。
+- 移动端只消费 Mira Desktop / Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
+- 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖；未经维护者明确授权，不修改 Desktop / Host 代码。
 - 当前施工分支：`dev`。
 
 ## 任务卡总览
 
 | ID | 任务卡 | 范围 | 状态 | 负责人 | 依赖 |
 |---|---|---|---|---|---|
-| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Host Workspace/Role Remote 契约仍待决定 | `mob_001_contract` | Host Remote 契约 |
-| MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | Mobile 项目入口与真实阻塞态已完成并通过 typecheck/lint/Jest；真实项目名称/列表等待 Host Workspace Remote 契约 | `mob_002_workspace_list` | MOB-001, Host Workspace Remote 契约 |
-| MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 只读核对完成，等待 Host 契约与实施授权 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
-| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待 MOB-001～003 可实施 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
+| MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Workspace/Role 远程读取合同仍分别处理 | `mob_001_contract` | Remote contract |
+| MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | Mobile 已按 Desktop `ChatWorkspace` 接真实项目列表读取并通过代码级验证；远程只读放行与 `rootPath` 安全投影由 Desktop Issue #77 跟踪 | `mob_002_workspace_list` | MOB-001, Desktop #77 |
+| MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 代码实施完成并通过 typecheck/lint/Jest；真实 Workspace 行可进入详情，详情按 `workspaceId` 精确过滤真实线程 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
+| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待实施授权 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 代码实施完成并通过 typecheck/lint/Jest；三入口已统一视觉分类与可访问性文案 | `mob_005_visual_kinds` | MOB-001 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
 ## 已确认产品规则
 
+- Mobile 的“项目”与 Mira Desktop 现有 `ChatWorkspace` 是同一实体，不新增第二套 Project 模型。
 - `workspaceId` 线程必须保留项目归属，并通过项目层级进入具体线程。
 - `agentEnabled=true` 的合法 PC 数据必须绑定 `workspaceId`；Agent 完整接入和交互暂不在本轮。
 - `roleId` 表示绑定角色的普通线程，界面需要体现角色身份。
@@ -43,8 +44,7 @@
 - Host Thread 权威数据包含 `workspaceId`、`knowledgeBaseId`、`roleId`、`agentEnabled` 和 `status`，但没有互斥的 `threadType` / `kind`。
 - 移动端协议层已经解析这些字段；此前 `RemoteThread -> Session` 映射和 `Session` 类型只保留 `id`、`title`、`updatedAt`，导致 UI 无法使用线程属性。
 - `workspaceId` 是 Chat Workspace ID。Host 约束为 Agent Thread 必须绑定 Workspace；移动端只展示该关系，不自行修补异常数据。
-- 项目名称的权威来源是 Host `/chat-workspaces`，角色名称的权威来源是 Host `/roles`。
-- 当前配对设备 Remote Host V1 的 scope 和 manifest 均未开放 Workspace/Role 读取，这是项目名称和角色名称接入的硬依赖。
+- 项目名称的权威来源是 Desktop `ChatWorkspace` / `/chat-workspaces`，角色名称的权威来源是 Host `/roles`。
 - Host 当前没有线程已读/未读或置顶字段，也没有相应查询和持久化语义。
 - 实施原则：`Session` 保留上述线程属性；项目和角色使用独立规范化只读实体；`isUnread` / `isPinned` 暂不进入模型。
 
@@ -53,8 +53,8 @@
 - 移动端解析：`src/protocol/remoteHostV1.ts`
 - 移动端 Adapter：`src/api/miraHostClient.ts`
 - 移动端 Session：`src/types/index.ts`
+- Desktop Workspace：`desktop/src/shared/api/thread.ts`、`desktop/src/features/chat/components/UChatThreadListSidebar.tsx`（Mira 主工程）
 - Host Thread：`server/src/services/thread.service.ts`（Mira 主工程）
-- Remote 权限：`server/src/services/remote-device-auth.service.ts`、`server/src/routes/remote-access.ts`（Mira 主工程）
 
 ### MOB-001：第二轮实施记录
 
@@ -66,7 +66,7 @@
 - 为兼容现有集中 Mock / Story 数据，上述字段在 `Session` 类型层暂为 optional；真实 `RemoteThread -> Session` Adapter 会显式传入 Host 返回值，包括 `null`。
 - `listSessions()` 与 `getSession()` 共用映射，确保真实 Thread 属性不再在 Adapter 层丢失。
 - 原有 `miraHostClient` 测试全部保留，并新增列表与单线程映射测试。
-- 未新增 `isUnread`、`isPinned`、`threadKind`，未猜测 Workspace/Role 名称，未修改 Host / Desktop 仓库。
+- 未新增 `isUnread`、`isPinned`、`threadKind`，未猜测 Workspace/Role 名称。
 
 自动化验证：
 
@@ -74,51 +74,65 @@
 - `Typecheck`：success。
 - `Lint`：success。
 - `Test`：success。
-- Android / iOS 构建属于同一 CI 的平台验证项，不作为本轮数据映射完成的必要前提；结果单独按 CI 记录，不替代真机验收。
 
 当前剩余：
 
-- Host 侧决定 Workspace / Role 的 Mobile-safe 读取合同后，MOB-001 才能关闭 Host 依赖。
-- 在 Host 决策之前，不为项目名、角色名、未读或置顶制造客户端替代字段。
+- Role 的 Mobile-safe 读取合同仍未完成。
+- Workspace 的远程读取放行与安全投影转由 Desktop Issue #77 跟踪。
+- 在合同出现之前，不为角色名、未读或置顶制造客户端替代字段。
 
 ### MOB-002：项目列表页
 
-第一轮合同核对：
+产品与 Desktop 事实源：
 
-- 产品“项目”对应 Host Chat Workspace。Host `dev` 已存在 `GET /chat-workspaces`，权威字段为 `id`、`name`、`rootPath`、`isDefault`、`status`、`createdAt`、`updatedAt`。
-- `rootPath` 是 Host 本机路径，默认不应投影到移动端 UI；没有项目置顶、创建者、共享状态、成员、线程数、封面或描述的权威字段。
-- 当前 Remote Host V1 manifest 只声明 threads / messages / agent / artifacts，没有 Workspace route。
-- 当前 Remote device scope 只包含 `threads:read`、messages、agent、artifacts，没有 Workspace/Project 读取 scope。
-- Remote credential 只允许 `getRequiredRemoteScope()` 明确登记的路由；`GET /chat-workspaces` 当前不在登记表内，因此配对设备直接访问会被拒绝为 403，而不是“接口其实可用只是 Mobile 没接”。
+- Mobile 的“项目”对应 Desktop `ChatWorkspace`，字段为 `id`、`name`、`rootPath`、`isDefault`、`status`、`createdAt`、`updatedAt`。
+- Desktop 已有 `listChatWorkspaces() -> GET /chat-workspaces`，Desktop 现有侧边栏也是先读取 Workspace，再按 `thread.workspaceId === workspace.id` 组织线程。
+- `rootPath` 是 Desktop / Host 本机路径，不属于 Mobile UI 所需字段；Mobile-safe 投影应排除它。
+- 没有项目置顶、创建者、共享状态、成员、线程数、封面或描述的权威字段；本轮不模拟。
 
-第二轮 Mobile 实施已合入 `dev`：
+当前 Mobile `dev` 已存在真实 Workspace 读取实现：
 
-- 新增 `WorkspaceList` Stack 路由和 `WorkspaceListScreen`；抽屉“项目”不再是无行为占位，已经成为真实可进入入口。
-- 在 Host 尚未开放 Workspace 读取期间，页面通过现有权威 Thread 数据统计不同 `workspaceId` 的真实归属数量，仅用于说明“已有项目归属”，不将 ID 当成项目名。
-- 页面不展示裸 `workspaceId`、不模拟项目名、不投影 `rootPath`，并明确显示“Host 尚未开放项目读取”。
-- 线程读取失败时沿用真实 401 / 403 / 网络错误映射并提供重试，不把失败呈现成空项目列表。
-- 新增 `workspaceListState.ts` 与 Jest 覆盖，验证重复、空白和缺省 `workspaceId` 的去重计数。
-- 未新增不存在的 `/remote/v1/workspaces`，未修改 Mira Host / Desktop 仓库。
+- `src/api/workspaceApi.ts` 按 Desktop `ChatWorkspace` 合同读取 `/chat-workspaces`，负责 Direct / Relay 传输，不另造 Project 模型。
+- `WorkspaceListScreen` 已展示真实 `name`、`isDefault`、`status` 与更新时间，并区分 loading / empty / error / data。
+- 项目列表不显示裸 `workspaceId`，不制造项目名。
+- 当前 `workspaceApi` 仍按 Desktop 原始响应解析 `rootPath`；虽然 UI 不展示，但 Mobile-safe 合同仍应在传输边界排除该字段。此项由 Desktop Issue #77 跟踪，不在 Mobile 侧偷偷修改 Desktop。
 
 自动化验证：
 
-- GitHub Actions `Mobile CI #263`：`Typecheck, lint and test` 成功。
-- `Typecheck`：success。
-- `Lint`：success。
-- `Test`：success。
-- Android / iOS 平台构建由同一 CI 独立继续执行；本轮代码级完成不替代真实 Workspace contract 和设备视觉验收。
+- GitHub Actions `Mobile CI #263`：早期项目入口/状态实现的 `Typecheck, lint and test` 成功。
+- 后续真实 Workspace 读取代码已进入 `dev`，与 MOB-003 最终提交一起继续接受 Mobile CI 验证。
 
 当前剩余：
 
-- 真实项目列表仍硬阻塞于 Host Workspace Mobile-safe 只读合同。Host 必须明确：新增只读 scope、复用安全 scope，或在 Remote Thread 中投影最小 Workspace summary。
-- 合同出现后，Mobile 才展示权威项目名称和可选更新时间；在此之前不继续扩写假项目卡片。
+- Desktop Issue #77：为已配对 Mobile Device 提供 `ChatWorkspace` 只读能力，并明确 Mobile-safe 响应不暴露 `rootPath`。
+- 在 #77 完成前，真实设备通过当前 Remote credential 访问 `/chat-workspaces` 仍可能收到 401/403；这属于传输合同，不改变“项目 = ChatWorkspace”的产品定义。
 
 ### MOB-003：项目详情页
 
-- 最小路由结构为：`WorkspaceList -> WorkspaceDetail({ workspaceId, workspaceName }) -> Chat({ sessionId, title })`。
-- 正常 Stack 导航可让 Chat 返回项目详情、项目详情返回项目列表；Chat 不需要自行猜测来源。
-- 项目详情只显示 `session.workspaceId === route.workspaceId` 的真实线程，并区分加载、空、错误重试和项目失效状态。
-- 当前硬阻塞：Remote Host V1 尚未提供权威 Workspace 列表；`Session.workspaceId` 的 Mobile 映射已在 MOB-001 合入 `dev`。
+代码实施已完成并合入 `dev`：
+
+- 新增 `WorkspaceDetail` Stack 路由，唯一输入为 `{ workspaceId, workspaceName }`；两项都必须来自真实 Workspace，不接受客户端猜测。
+- 新增 `WorkspaceDetailScreen`。进入或重新聚焦页面时读取真实 Session 列表，只保留 `session.workspaceId === workspaceId` 的线程，并按 `updatedAt` 倒序展示。
+- 项目详情复用 MOB-005 的 `SessionKindIcon`，项目内普通 / 角色 / Agent 线程继续保持统一视觉分类和可访问性文案。
+- 项目详情明确区分 loading / empty / error / data；读取失败沿用真实会话错误映射并提供重试。
+- 路由参数缺少真实 `workspaceId` 或 `workspaceName` 时显示“项目数据无效”，不展示裸 ID、不生成替代项目名。
+- `WorkspaceListScreen` 的真实 Workspace 行已改为可点击，并传真实 `item.id + item.name` 进入 `WorkspaceDetail`。
+- 项目详情点击真实线程后进入 `Chat({ sessionId, title })`；标准 Stack 返回顺序为 Chat -> WorkspaceDetail -> WorkspaceList。
+- 新增 `workspaceDetailState.ts` 与 Jest 覆盖，验证 Workspace 参数合同、按 `workspaceId` 精确过滤及更新时间排序。
+- 本轮未修改 Mira Desktop / Host 代码。
+
+自动化验证：
+
+- GitHub Actions `Mobile CI #273`：`Typecheck, lint and test` 成功。
+- `Typecheck`：success。
+- `Lint`：success。
+- `Test`：success。
+- Android / iOS 平台构建由同一 CI 独立执行；MOB-003 的代码级完成不以平台构建替代真机验收。
+
+当前剩余：
+
+- `WorkspaceList -> WorkspaceDetail` 的运行时可用性仍依赖 Desktop #77 是否允许配对设备读取 Workspace；003 自身不需要再修改 Desktop。
+- 全局其它 Chat 入口是否必须经过项目层级，属于 MOB-004，不在 MOB-003 偷做。
 
 ### MOB-004：项目线程层级导航
 
@@ -149,7 +163,7 @@
 - `Typecheck`：success。
 - `Lint`：success。
 - `Test`：success。
-- Android / iOS 平台构建由同一 CI 独立继续执行；MOB-005 的代码级完成以共享映射和自动化验证为准，设备视觉验收统一进入 MOB-006 验收范围。
+- 设备视觉覆盖并入 MOB-006。
 
 ### MOB-006：真实线程状态与验收
 
@@ -173,40 +187,38 @@
 - `Typecheck`：success。
 - `Lint`：success。
 - `Test`：success。
-- Android / iOS 自动化构建由 CI #249 独立继续执行；其结果属于平台构建证据，不能替代真机视觉与网络验收。
 
 当前剩余验收：
 
 - 真机视觉/网络验收仍需覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack。
 - Host 尚未定义线程已读/未读与置顶的持久化、多设备同步和写权限语义；这不是 Mobile 可自行补齐的代码缺口。在合同出现前 UI 继续零展示、零操作。
 
-## Host 依赖与待维护者决定
+## 跨端依赖与待维护者决定
 
-1. 配对设备是否新增 Workspace/Role 只读 scope，或通过现有 scope 提供安全投影。
-2. Remote manifest 是否新增 `/chat-workspaces`、`/roles`，或由 `/threads` 返回最小 `workspaceName` / `roleSummary`。
-3. Mobile-safe Workspace 响应是否明确排除 Host 本机 `rootPath`。
-4. 是否需要权威唯一 `threadKind`；若不需要，移动端继续只派生 UI 显示分类。
-5. 是否定义线程已读和置顶的持久化、多设备同步与写权限语义；未定义前 UI 零展示、零操作。
-6. 项目线程数量由 Host 返回，还是首轮由移动端在完整线程列表中按 `workspaceId` 计算；需要同时考虑分页和数据量。
+1. Desktop Issue #77：为配对设备提供 `ChatWorkspace` 只读能力，并确保 Mobile-safe 响应不暴露 `rootPath`。
+2. Role 是否新增只读 scope / route，或在 Thread 中返回最小 `roleSummary`。
+3. 是否需要权威唯一 `threadKind`；若不需要，移动端继续只派生 UI 显示分类。
+4. 是否定义线程已读和置顶的持久化、多设备同步与写权限语义；未定义前 UI 零展示、零操作。
+5. 项目线程数量由 Desktop / Host 返回，还是首轮由移动端在完整线程列表中按 `workspaceId` 计算；需要同时考虑分页和数据量。
 
 ## 实施授权门槛
 
 - MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
-- MOB-002：已获得维护者明确实施授权；Mobile 项目入口、真实阻塞态和归属计数已完成并通过自动化代码级验证；真实项目列表继续等待 Host Workspace Remote 契约。
+- MOB-002：已获得维护者明确实施授权；Mobile 已按 Desktop `ChatWorkspace` 落真实列表读取；跨端只读权限与安全投影由 #77 跟踪。
+- MOB-003：已获得维护者明确实施授权；项目详情、真实线程过滤、WorkspaceList -> WorkspaceDetail -> Chat 路径已完成并通过自动化代码级验证。
 - MOB-005：已获得维护者明确实施授权；三类线程视觉映射与可访问性统一已完成并通过自动化代码级验证。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
-- 涉及 Host Remote 契约的部分仍需 Host 方案得到确认，不因 Mobile 已开工而视为自动授权。
-- MOB-003 的项目详情需等待真实 Workspace 名称/列表合同；若后续有参考图，以参考图为视觉验收依据，否则沿用现有移动端设计系统。
-- 默认不修改 Mira Host / 桌面端仓库；任何跨仓修改必须再次明确授权。
+- MOB-004 尚未获得实施授权，不提前收紧其它 Chat 入口。
+- 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
 
-1. MOB-001：Mobile 属性映射已完成；等待并确认 Host Workspace/Role Remote 契约。
+1. MOB-001：Mobile 属性映射已完成；Role Remote 合同仍待处理，Workspace 合同由 #77 跟踪。
 2. MOB-006：代码实施完成；仅剩设备视觉/网络验收。
 3. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
-4. MOB-002：Mobile 项目入口与真实阻塞态已完成；真实列表等待 Host Workspace Remote contract。
-5. MOB-003：真实 Workspace contract 可用后实现项目详情和项目线程过滤。
-6. MOB-004：在 MOB-002/003 实际可用后收紧所有 Chat 入口和完整返回路径。
+4. MOB-002：Mobile 真实项目列表代码已存在；跨端只读权限与 `rootPath` 安全投影等待 #77。
+5. MOB-003：代码实施完成；运行时项目读取依赖 #77。
+6. MOB-004：获得授权后，收紧主列表 / 抽屉 / 搜索中的项目线程入口并完整验证返回路径。
 
 ## 交付记录
 
@@ -215,12 +227,15 @@
 - 2026-08-27：记录 Remote Workspace/Role 合同、假置顶/未读状态、项目层级导航与双端验收阻塞。
 - 2026-08-27：旧 Remote / Relay / Tailscale 工程线归档，`docs/work-ledger.md` 升为当前工程任务主线。
 - 2026-08-27：开始 MOB-001；补齐 Remote Thread 属性到 Session 的映射并增加回归测试。
-- 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 合入 `dev`，Host Workspace/Role 契约仍未关闭。
+- 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 合入 `dev`。
 - 2026-08-27：开始 MOB-006；提交 `2d0c906` 到 `dev`，移除假置顶/未读/搜索假骨架，补齐 loading/empty/data/error 与重试、401/403/网络错误区分和基础测试。
 - 2026-08-27：Mobile CI #244 的 `Typecheck, lint and test` 通过；MOB-006 第一轮状态清理完成。
 - 2026-08-27：继续 MOB-006；补 Host 权威 Chat 标题刷新、聊天历史错误/重试、`chatSessionState` 测试，并禁用未接入的会话动作。
-- 2026-08-27：Mobile CI #249 的 `Typecheck, lint and test` 通过；MOB-006 代码实施完成，后续只保留自动化平台构建结果与真机视觉/网络验收记录。
+- 2026-08-27：Mobile CI #249 的 `Typecheck, lint and test` 通过；MOB-006 代码实施完成。
 - 2026-08-27：开始 MOB-005；新增共享线程视觉分类与 `SessionKindIcon`，主列表、抽屉、搜索统一普通/角色/Agent 图标和可访问性文案。
-- 2026-08-27：Mobile CI #255 的 `Typecheck, lint and test` 通过；MOB-005 代码实施完成，设备视觉覆盖并入 MOB-006。
-- 2026-08-27：开始 MOB-002；核对 Host `GET /chat-workspaces` 与 Remote auth，确认配对设备当前没有 Workspace route/scope，直接访问会被 403。
-- 2026-08-27：MOB-002 在 `dev` 增加真实“项目”入口、Workspace 阻塞页、项目归属计数与测试；Mobile CI #263 的 `Typecheck, lint and test` 通过，真实项目列表等待 Host Workspace Remote 契约。
+- 2026-08-27：Mobile CI #255 的 `Typecheck, lint and test` 通过；MOB-005 代码实施完成。
+- 2026-08-27：开始 MOB-002；核对 Desktop `ChatWorkspace` 与 Remote 读取边界；后续 Mobile `dev` 已出现真实 `workspaceApi` / WorkspaceList 读取实现。
+- 2026-08-27：向 Mira Desktop 提交 Issue #77，请求配对设备 ChatWorkspace 只读能力与不暴露 `rootPath` 的 Mobile-safe 投影；不修改 Desktop 代码。
+- 2026-08-27：开始 MOB-003；新增 `WorkspaceDetail` 路由、真实 Workspace 参数合同、按 `workspaceId` 精确过滤的项目线程列表、loading/empty/error/retry 和回归测试。
+- 2026-08-27：WorkspaceList 真实项目行接入 `WorkspaceDetail({ workspaceId, workspaceName })`；详情线程进入 Chat，形成项目列表 -> 项目详情 -> Chat 的可运行 Mobile 路径。
+- 2026-08-27：Mobile CI #273 的 `Typecheck, lint and test` 通过；MOB-003 代码实施完成，Desktop / Host 未在本轮修改。

@@ -295,9 +295,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   workspaceIcon: {
     width: 44,
