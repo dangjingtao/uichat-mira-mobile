@@ -12,12 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { FolderOpen, Search, X } from 'lucide-react-native';
+import { FolderOpen, Pin, Search, X } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import { useThreadPinStore } from '../store/threadPinStore';
+import { isThreadPinned } from '../store/threadPinning';
 import {
   getSessionVisualKindLabel,
   SessionKindIcon,
@@ -41,6 +43,8 @@ type SearchTab = (typeof tabs)[number]['id'];
 export function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
+  const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
+  const hydratePins = useThreadPinStore((state) => state.hydrate);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('all');
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -61,8 +65,9 @@ export function SearchScreen() {
   }, []);
 
   useEffect(() => {
+    void hydratePins().catch(() => undefined);
     void loadSessions();
-  }, [loadSessions]);
+  }, [hydratePins, loadSessions]);
 
   const results = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -163,11 +168,12 @@ export function SearchScreen() {
             const belongsToWorkspace =
               typeof session.workspaceId === 'string' &&
               session.workspaceId.trim().length > 0;
+            const pinned = isThreadPinned(pinnedAtByThreadId, session.id);
             return (
               <Pressable
                 key={session.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}`}
+                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}`}
                 style={styles.result}
                 onPress={() => openSession(session)}
               >
@@ -180,17 +186,24 @@ export function SearchScreen() {
                   />
                 </View>
                 <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
-                  <Text
-                    style={[styles.resultTitle, { color: colors.text.ink }]}
-                    numberOfLines={1}
-                  >
-                    {session.title}
-                  </Text>
+                  <View style={styles.resultTitleRow}>
+                    <Text
+                      style={[styles.resultTitle, { color: colors.text.ink }]}
+                      numberOfLines={1}
+                    >
+                      {session.title}
+                    </Text>
+                    {pinned ? (
+                      <Pin size={14} color={colors.primary} strokeWidth={2} />
+                    ) : null}
+                  </View>
                   {belongsToWorkspace ? (
                     <View style={styles.projectHint}>
                       <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
                       <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
                     </View>
+                  ) : pinned ? (
+                    <Text style={[styles.projectHintText, { color: colors.text.soft }]}>本机置顶</Text>
                   ) : null}
                 </View>
               </Pressable>
@@ -289,7 +302,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
-  resultTitle: { fontSize: fontSize.bodyMd },
+  resultTitleRow: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  resultTitle: { flex: 1, fontSize: fontSize.bodyMd },
   projectHint: {
     marginTop: 2,
     flexDirection: 'row',
