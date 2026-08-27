@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 23:31（Asia/Shanghai）
+更新时间：2026-08-27 23:38（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -8,7 +8,7 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权 MOB-001、MOB-002、MOB-003、MOB-005 与 MOB-006。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-006。
 - 未获得对应任务授权前，其余任务卡仍只做必要的依赖核对，不越界修改业务代码。
 - 移动端只消费 Mira Desktop / Mira Host 的权威线程、项目和角色数据，不猜测接口字段，不伪造已读、未读或置顶状态。
 - 任何跨到 Mira 桌面端或服务端的协议问题，记录为依赖；未经维护者明确授权，不修改 Desktop / Host 代码。
@@ -21,7 +21,7 @@
 | MOB-001 | 线程与项目数据契约确认 | 核对 `workspaceId`、`roleId`、`agentEnabled`、项目/角色名称、读状态、置顶状态及可用接口 | Mobile 侧字段保留已合入 `dev` 并通过 typecheck/lint/Jest；Workspace/Role 远程读取合同仍分别处理 | `mob_001_contract` | Remote contract |
 | MOB-002 | 项目列表页 | 核对项目字段、筛选、真实置顶显示规则和缺省状态 | Mobile 已按 Desktop `ChatWorkspace` 接真实项目列表读取并通过代码级验证；远程只读放行与 `rootPath` 安全投影由 Desktop Issue #77 跟踪 | `mob_002_workspace_list` | MOB-001, Desktop #77 |
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 代码实施完成并通过 typecheck/lint/Jest；真实 Workspace 行可进入详情，详情按 `workspaceId` 精确过滤真实线程 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
-| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待实施授权 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
+| MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 代码实施完成并合入 `dev`；主列表、抽屉、搜索统一遵守项目层级，非法 Agent 不降级；typecheck/lint/Jest 通过 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 代码实施完成并通过 typecheck/lint/Jest；三入口已统一视觉分类与可访问性文案 | `mob_005_visual_kinds` | MOB-001 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
@@ -136,11 +136,30 @@
 
 ### MOB-004：项目线程层级导航
 
-- 当前直接进入 Chat 的入口有三个：主会话列表、抽屉线程列表、搜索结果；当前没有 Chat deep link，只有 `mira://pair`。
-- 实施后的统一规则：全局普通入口只允许无 `workspaceId` 的线程直接进入 Chat；任何带 `workspaceId` 的线程只能从对应 `WorkspaceDetail` 打开。
-- `roleId` 只影响视觉身份；若同时带 `workspaceId`，项目层级优先。
-- `agentEnabled=true` 同样走项目层级；若 Agent 缺少 `workspaceId`，作为契约异常处理，不降级为普通线程。
-- 未找到对应 Workspace 或权威名称时，不允许绕过项目层级直接进入 Chat。
+代码实施已完成并合入 `dev`：
+
+- 新增共享 `resolveSessionOpenTarget()`，主会话列表、抽屉最近会话、搜索结果三个全局入口统一消费同一层级规则。
+- 无有效 `workspaceId` 的普通 / 角色线程仍直接进入 `Chat`；`roleId` 不改变归属层级。
+- 任何带有效 `workspaceId` 的线程都不再从全局入口直接进入 `Chat`，而是先进入项目列表，再使用 MOB-003 的真实 Workspace 行进入 `WorkspaceDetail -> Chat`。
+- `agentEnabled=true` 且缺少有效 `workspaceId` 时按 Host 契约异常处理，显示明确错误，不降级为普通线程。
+- 主列表、抽屉和搜索结果对项目线程增加“项目会话 / 从项目中打开”提示；不展示裸 `workspaceId`，不猜项目名称。
+- 如果 `/chat-workspaces` 的 Mobile Remote 权限尚未放行，页面停留在项目层级展示真实 401/403/网络错误，不绕过层级进入 Chat。
+- 新增 `sessionNavigation.test.ts` 覆盖普通线程、Workspace 线程、Workspace Agent 与非法 Agent。
+- 本轮未修改 Mira Desktop / Host，也未新增或猜测 Remote API。
+
+自动化验证：
+
+- GitHub Actions `Mobile CI #282`：`Typecheck, lint and test` 成功。
+- `Typecheck`：success。
+- `Lint`：success。
+- `Test`：success。
+- PR #25 已 squash 合入 `dev`，提交 `ff0edfe`。
+- Android / iOS 平台构建由同一 CI 独立执行；MOB-004 为 JS/TS 导航层改动，代码级完成不以平台构建替代真机验收。
+
+当前剩余：
+
+- Desktop Issue #77 仍决定真实设备是否能读取 Workspace；该跨端依赖不再阻塞 Mobile 的层级 UI、路由规则和异常处理完成状态。
+- 真机返回路径与视觉覆盖并入 MOB-006 的设备验收清单。
 
 ### MOB-005：线程类型视觉区分
 
@@ -206,9 +225,9 @@
 - MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
 - MOB-002：已获得维护者明确实施授权；Mobile 已按 Desktop `ChatWorkspace` 落真实列表读取；跨端只读权限与安全投影由 #77 跟踪。
 - MOB-003：已获得维护者明确实施授权；项目详情、真实线程过滤、WorkspaceList -> WorkspaceDetail -> Chat 路径已完成并通过自动化代码级验证。
+- MOB-004：已获得维护者明确实施授权；三个全局线程入口的项目层级规则已完成并通过自动化代码级验证。
 - MOB-005：已获得维护者明确实施授权；三类线程视觉映射与可访问性统一已完成并通过自动化代码级验证。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
-- MOB-004 尚未获得实施授权，不提前收紧其它 Chat 入口。
 - 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
 
 ## 建议实施顺序
@@ -218,7 +237,7 @@
 3. MOB-005：代码实施完成；设备视觉覆盖并入 MOB-006。
 4. MOB-002：Mobile 真实项目列表代码已存在；跨端只读权限与 `rootPath` 安全投影等待 #77。
 5. MOB-003：代码实施完成；运行时项目读取依赖 #77。
-6. MOB-004：获得授权后，收紧主列表 / 抽屉 / 搜索中的项目线程入口并完整验证返回路径。
+6. MOB-004：代码实施完成；运行时 Workspace 读取依赖 #77，真机返回路径并入 MOB-006。
 
 ## 交付记录
 
@@ -239,3 +258,5 @@
 - 2026-08-27：开始 MOB-003；新增 `WorkspaceDetail` 路由、真实 Workspace 参数合同、按 `workspaceId` 精确过滤的项目线程列表、loading/empty/error/retry 和回归测试。
 - 2026-08-27：WorkspaceList 真实项目行接入 `WorkspaceDetail({ workspaceId, workspaceName })`；详情线程进入 Chat，形成项目列表 -> 项目详情 -> Chat 的可运行 Mobile 路径。
 - 2026-08-27：Mobile CI #273 的 `Typecheck, lint and test` 通过；MOB-003 代码实施完成，Desktop / Host 未在本轮修改。
+- 2026-08-27：开始 MOB-004；新增统一线程打开策略，收紧主列表、抽屉、搜索三个全局入口，并为项目线程补充 UI 层级提示与非法 Agent 契约异常处理。
+- 2026-08-27：Mobile CI #282 的 `Typecheck, lint and test` 通过；PR #25 squash 合入 `dev`，MOB-004 代码实施完成。
