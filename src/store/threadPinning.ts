@@ -17,6 +17,8 @@ const isValidPinMap = (value: unknown): value is ThreadPinMap => {
 };
 
 export class ThreadPinRepository {
+  private writeQueue: Promise<void> = Promise.resolve();
+
   constructor(private readonly storage: LocalKeyValueStore) {}
 
   async load(): Promise<ThreadPinMap> {
@@ -31,12 +33,19 @@ export class ThreadPinRepository {
     }
   }
 
-  async save(pins: ThreadPinMap): Promise<void> {
-    if (Object.keys(pins).length === 0) {
-      await this.storage.remove(STORAGE_KEY);
-      return;
-    }
-    await this.storage.set(STORAGE_KEY, JSON.stringify(pins));
+  save(pins: ThreadPinMap): Promise<void> {
+    const snapshot = { ...pins };
+    const operation = this.writeQueue.then(async () => {
+      if (Object.keys(snapshot).length === 0) {
+        await this.storage.remove(STORAGE_KEY);
+        return;
+      }
+      await this.storage.set(STORAGE_KEY, JSON.stringify(snapshot));
+    });
+
+    // Keep later writes ordered even when one persistence operation fails.
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
   }
 }
 
@@ -60,13 +69,3 @@ export const sortSessionsByLocalPin = (
       return left.index - right.index;
     })
     .map(({ session }) => session);
-
-export const pruneThreadPins = (
-  pins: ThreadPinMap,
-  validThreadIds: Iterable<string>,
-): ThreadPinMap => {
-  const validIds = new Set(validThreadIds);
-  return Object.fromEntries(
-    Object.entries(pins).filter(([threadId]) => validIds.has(threadId)),
-  );
-};
