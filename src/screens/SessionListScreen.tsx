@@ -337,7 +337,7 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}> 
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
                 Remote Host V1 当前只展示桌面端已有会话
               </Text>
             </View>
