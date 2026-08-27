@@ -99,6 +99,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     });
   };
 
+  const handleOpenWorkspaces = () => {
+    onClose();
+    navigation.navigate('WorkspaceList');
+  };
+
   const handleOpenRemoteConnection = () => {
     onClose();
     navigation.navigate('HostConfig');
@@ -141,25 +146,39 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.categories}>
-          {categories.map((cat) => (
-            <Pressable
-              key={cat.id}
-              style={({ pressed }) => [
-                styles.categoryItem,
-                pressed && { backgroundColor: colors.bg.soft },
-              ]}
-              onPress={cat.id === 'remote' ? handleOpenRemoteConnection : undefined}
-              accessibilityRole={cat.id === 'remote' ? 'button' : undefined}
-              accessibilityLabel={
-                cat.id === 'remote' ? 'Remote connection' : undefined
-              }
-            >
-              <cat.icon size={22} color={colors.text.muted} />
-              <Text style={[styles.categoryLabel, { color: colors.text.base }]}>
-                {cat.label}
-              </Text>
-            </Pressable>
-          ))}
+          {categories.map((cat) => {
+            const interactive = cat.id === 'remote' || cat.id === 'workspaces';
+            const onPress =
+              cat.id === 'remote'
+                ? handleOpenRemoteConnection
+                : cat.id === 'workspaces'
+                  ? handleOpenWorkspaces
+                  : undefined;
+            const accessibilityLabel =
+              cat.id === 'remote'
+                ? 'Remote connection'
+                : cat.id === 'workspaces'
+                  ? '项目'
+                  : undefined;
+
+            return (
+              <Pressable
+                key={cat.id}
+                style={({ pressed }) => [
+                  styles.categoryItem,
+                  pressed && interactive && { backgroundColor: colors.bg.soft },
+                ]}
+                onPress={onPress}
+                accessibilityRole={interactive ? 'button' : undefined}
+                accessibilityLabel={accessibilityLabel}
+              >
+                <cat.icon size={22} color={colors.text.muted} />
+                <Text style={[styles.categoryLabel, { color: colors.text.base }]}> 
+                  {cat.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {collectionState === 'data' ? (
