@@ -1,6 +1,6 @@
 # MOB-008：本机未读状态
 
-状态：待实施
+状态：完成
 
 负责人：`mob_008_device_unread`
 
@@ -28,6 +28,17 @@
 6. 读取失败、离线或 401/403 时不得把线程误标为已读。
 7. Host 删除/404 的线程应允许清理对应本地已读进度。
 
+## 实施结果
+
+- 新增 `threadReadState.ts` / `threadReadStore.ts`，本机持久化每线程的 `lastReadMessageId`、`lastReadAt`、最近观察到的真实内容消息及 `observedMessageCount`，不持久化漂移的 `isUnread` 布尔值。
+- Remote Thread 的真实 `messageCount` 继续进入 Mobile `Session`，只作为“是否需要重新核对权威消息”的变化探针；是否未读最终由 Host 返回的 `user` / `assistant` 消息决定。
+- 主列表、Drawer、Search 统一消费同一份设备级未读状态并显示未读点；Search 不因未读改变搜索排序。
+- `ChatScreen` 仅在 `getMessages()` 成功读取权威消息后推进已读进度；401、403、断网或其它读取失败不会误清未读。
+- 明确 404 时允许清理对应本机已读进度；线程未出现在 active 列表中本身不视为已删除。
+- tool/system 消息只会触发一次重新核对，不单独产生未读语义。
+- 新增单测覆盖持久化、首次观察、成功已读、新 assistant 消息、system/tool 不制造未读、多线程隔离及 `messageCount` 仅作为变化探针。
+- 未修改 Mira Desktop / Host；未新增跨设备或账户级同步。
+
 ## 验收
 
 - 新消息到达后，该线程在当前手机显示未读。
@@ -36,7 +47,7 @@
 - 慢网/断网/401/403 不会错误清除未读。
 - Desktop 上阅读与否不会被 Mobile 伪装成已同步。
 - 多线程状态互不串扰。
-- typecheck / lint / Jest 通过；已读推进与未读判定有单测。
+- typecheck / lint / Jest 由现有 Mobile CI 继续执行；按维护者本轮决定，不等待 Android / iOS 平台构建作为合并阻塞条件。
 
 ## 非目标
 

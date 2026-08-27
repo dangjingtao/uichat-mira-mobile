@@ -32,6 +32,10 @@ import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { useThreadPinStore } from '../store/threadPinStore';
 import { isThreadPinned } from '../store/threadPinning';
 import {
+  selectThreadUnread,
+  useThreadReadStore,
+} from '../store/threadReadStore';
+import {
   getSessionVisualKindLabel,
   SessionKindIcon,
 } from './SessionKindIcon';
@@ -70,6 +74,9 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const insets = useSafeAreaInsets();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
+  const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
+  const hydrateReads = useThreadReadStore((state) => state.hydrate);
+  const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -80,18 +87,20 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list.slice(0, 20));
+      void syncUnreadSessions(list.slice(0, 20)).catch(() => undefined);
     } catch (error) {
       setSessions([]);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncUnreadSessions]);
 
   React.useEffect(() => {
     void hydratePins().catch(() => undefined);
+    void hydrateReads().catch(() => undefined);
     void loadSessions();
-  }, [hydratePins, loadSessions]);
+  }, [hydratePins, hydrateReads, loadSessions]);
 
   const collectionState = resolveSessionCollectionState(
     loading,
@@ -211,10 +220,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                   typeof item.workspaceId === 'string' &&
                   item.workspaceId.trim().length > 0;
                 const pinned = isThreadPinned(pinnedAtByThreadId, item.id);
+                const unread = selectThreadUnread(progressByThreadId, item.id);
                 return (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}`}
+                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
                     style={({ pressed }) => [
                       styles.recentItem,
                       pressed && { backgroundColor: colors.bg.soft },
@@ -233,6 +243,12 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                     >
                       {item.title}
                     </Text>
+                    {unread ? (
+                      <View
+                        accessibilityElementsHidden
+                        style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+                      />
+                    ) : null}
                     {pinned ? (
                       <Pin size={15} color={colors.primary} strokeWidth={2} />
                     ) : null}
@@ -386,6 +402,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   recentLabel: { flex: 1, fontSize: 15 },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+  },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
   emptyHint: { textAlign: 'center', marginTop: 40, fontSize: 14 },
   errorState: {

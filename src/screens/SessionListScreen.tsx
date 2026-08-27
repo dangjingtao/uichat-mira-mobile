@@ -28,6 +28,10 @@ import {
   isThreadPinned,
   sortSessionsByLocalPin,
 } from '../store/threadPinning';
+import {
+  selectThreadUnread,
+  useThreadReadStore,
+} from '../store/threadReadStore';
 import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
@@ -76,6 +80,7 @@ interface SessionRowProps {
   connectionStatus: string;
   colors: ReturnType<typeof useTheme>['colors'];
   isPinned: boolean;
+  isUnread: boolean;
   onOpen: () => void;
   onTogglePin: () => void;
 }
@@ -85,6 +90,7 @@ function SessionRow({
   connectionStatus,
   colors,
   isPinned,
+  isUnread,
   onOpen,
   onTogglePin,
 }: SessionRowProps) {
@@ -108,7 +114,7 @@ function SessionRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}`}
+        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
         style={({ pressed }) => [
           styles.sessionOpen,
           pressed && { backgroundColor: colors.bg.soft },
@@ -140,6 +146,12 @@ function SessionRow({
               >
                 {item.title}
               </Text>
+              {isUnread ? (
+                <View
+                  accessibilityElementsHidden
+                  style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+                />
+              ) : null}
             </View>
             <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
               {formatTime(item.updatedAt)}
@@ -183,6 +195,9 @@ export function SessionListScreen() {
   const hydratePins = useThreadPinStore((state) => state.hydrate);
   const pinThread = useThreadPinStore((state) => state.pinThread);
   const unpinThread = useThreadPinStore((state) => state.unpinThread);
+  const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
+  const hydrateReads = useThreadReadStore((state) => state.hydrate);
+  const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -228,19 +243,21 @@ export function SessionListScreen() {
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
+      void syncUnreadSessions(list).catch(() => undefined);
     } catch (error) {
       setSessions([]);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncUnreadSessions]);
 
   useFocusEffect(
     useCallback(() => {
       void hydratePins().catch(() => undefined);
+      void hydrateReads().catch(() => undefined);
       void loadSessions();
-    }, [hydratePins, loadSessions]),
+    }, [hydratePins, hydrateReads, loadSessions]),
   );
 
   const orderedSessions = useMemo(
@@ -338,6 +355,7 @@ export function SessionListScreen() {
             connectionStatus={connectionStatus}
             colors={colors}
             isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
+            isUnread={selectThreadUnread(progressByThreadId, item.id)}
             onOpen={() => openSession(item)}
             onTogglePin={() => void togglePin(item)}
           />
@@ -395,7 +413,7 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}> 
                 Remote Host V1 当前只展示桌面端已有会话
               </Text>
             </View>
@@ -508,8 +526,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: spacing.sm,
+    gap: spacing.xs,
   },
   sessionTitle: { fontSize: fontSize.bodyMd, fontWeight: '600', flex: 1 },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+    flexShrink: 0,
+  },
   sessionTime: { fontSize: fontSize.xs },
   sessionPreview: { fontSize: fontSize.button },
   emptyState: {
