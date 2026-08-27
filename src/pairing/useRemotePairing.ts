@@ -176,7 +176,7 @@ export const useRemotePairing = (descriptor: PairingDescriptorV1 | null) => {
     setState({
       ...INITIAL_STATE,
       phase: 'claiming',
-      message: '正在检查可用传输。',
+      message: '正在连接桌面并提交设备申请。',
     });
 
     try {
@@ -199,10 +199,7 @@ export const useRemotePairing = (descriptor: PairingDescriptorV1 | null) => {
         pending,
         deviceId: null,
         scopes: [],
-        message:
-          claim.transport === 'relay'
-            ? '已通过 Mira Relay 提交设备申请，等待桌面确认。'
-            : '已通过 Tailscale Direct 提交设备申请，等待桌面确认。',
+        message: '已向桌面提交设备申请，等待桌面确认。',
       });
       beginPolling(pending);
     } catch (error) {
