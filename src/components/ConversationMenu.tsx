@@ -23,6 +23,7 @@ interface ConversationMenuItem {
   id: string;
   label: string;
   icon: MenuIcon;
+  enabled?: boolean;
   destructive?: boolean;
   hasChevron?: boolean;
   addTopSpacing?: boolean;
@@ -95,6 +96,7 @@ export function ConversationMenu({
             {title}
           </Text>
           {menuItems.map((item) => {
+            const disabled = item.enabled !== true;
             const itemColor = item.destructive
               ? colors.status.error
               : colors.text.ink;
@@ -103,12 +105,16 @@ export function ConversationMenu({
               <Pressable
                 key={item.id}
                 accessibilityRole="button"
-                accessibilityLabel={item.label}
-                onPress={onClose}
+                accessibilityLabel={
+                  disabled ? `${item.label}，暂不可用` : item.label
+                }
+                accessibilityState={{ disabled }}
+                disabled={disabled}
                 style={({ pressed }) => [
                   styles.item,
                   item.addTopSpacing && styles.itemWithTopSpacing,
-                  pressed && { backgroundColor: colors.bg.soft },
+                  disabled && styles.disabledItem,
+                  pressed && !disabled && { backgroundColor: colors.bg.soft },
                 ]}
               >
                 <Icon size={20} color={itemColor} strokeWidth={2.2} />
@@ -152,6 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.lg,
   },
+  disabledItem: { opacity: 0.45 },
   itemWithTopSpacing: { marginTop: spacing.sm },
   itemLabel: { flex: 1, fontSize: fontSize.bodyMd, lineHeight: 22 },
 });
