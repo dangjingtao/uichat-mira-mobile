@@ -28,6 +28,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import {
+  getSessionVisualKindLabel,
+  SessionKindIcon,
+} from './SessionKindIcon';
+import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from '../screens/sessionCollectionState';
@@ -167,12 +171,20 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
               scrollEnabled={false}
               renderItem={({ item }) => (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}`}
                   style={({ pressed }) => [
                     styles.recentItem,
                     pressed && { backgroundColor: colors.bg.soft },
                   ]}
                   onPress={() => handleOpenSession(item)}
                 >
+                  <SessionKindIcon
+                    session={item}
+                    size={18}
+                    strokeWidth={1.8}
+                    color={colors.text.muted}
+                  />
                   <Text
                     style={[styles.recentLabel, { color: colors.text.base }]}
                     numberOfLines={1}
@@ -316,9 +328,16 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 6,
   },
-  recentItem: { paddingHorizontal: 20, paddingVertical: 14 },
-  recentLabel: { fontSize: 15 },
-  separator: { height: StyleSheet.hairlineWidth, marginLeft: 20 },
+  recentItem: {
+    minHeight: sizing.touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  recentLabel: { flex: 1, fontSize: 15 },
+  separator: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
   emptyHint: { textAlign: 'center', marginTop: 40, fontSize: 14 },
   errorState: {
     alignItems: 'center',
