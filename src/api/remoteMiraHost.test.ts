@@ -1,6 +1,7 @@
 import type { RemoteJsonRequest } from './remoteHttp';
 import { RemoteHostError } from './remoteHttp';
 import { RemoteMiraHostClient, type PendingPairing } from './remoteMiraHost';
+import type { PostSseRequest, PostSseSession } from './postSse';
 import { MemoryDeviceCredentialStore } from '../security/deviceCredentialStore';
 import type { RemoteRelayEndpoint } from '../protocol/remotePairingV1';
 
@@ -289,5 +290,81 @@ describe('RemoteMiraHostClient transport selection', () => {
     await expect(client.restoreConnection()).rejects.toMatchObject({ status: 403 });
     expect(relayJsonMock).not.toHaveBeenCalled();
     await expect(store.load()).resolves.toBeNull();
+  });
+});
+
+describe('RemoteMiraHostClient chat request', () => {
+  it('forwards the supplied canonical history in the SSE request body', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'messages:read', 'messages:write'],
+      savedAt: '2026-08-27T00:00:00.000Z',
+    });
+
+    const json: JsonTransport = async request => request.parse(manifestPayload);
+    const sseMock = jest.fn();
+    const sse = <T>(request: PostSseRequest<T>): PostSseSession<T> => {
+      sseMock(request);
+      return {
+        abort: jest.fn(),
+        events: (async function* () {})(),
+      };
+    };
+    const client = new RemoteMiraHostClient(store, json, sse);
+    await client.restoreConnection();
+
+    await client.sendMessage({
+      threadId: 'thread-1',
+      messageId: 'user-new',
+      content: 'continue',
+      messages: [
+        {
+          id: 'user-old',
+          role: 'user',
+          parts: [{ type: 'text', text: 'remember this' }],
+        },
+        {
+          id: 'assistant-old',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'I remember' }],
+        },
+        {
+          id: 'user-new',
+          role: 'user',
+          parts: [{ type: 'text', text: 'continue' }],
+        },
+      ],
+    });
+
+    expect(sseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/proxy/chat/default',
+        body: expect.objectContaining({
+          id: 'thread-1',
+          messageId: 'user-new',
+          messages: [
+            {
+              id: 'user-old',
+              role: 'user',
+              parts: [{ type: 'text', text: 'remember this' }],
+            },
+            {
+              id: 'assistant-old',
+              role: 'assistant',
+              parts: [{ type: 'text', text: 'I remember' }],
+            },
+            {
+              id: 'user-new',
+              role: 'user',
+              parts: [{ type: 'text', text: 'continue' }],
+            },
+          ],
+        }),
+      }),
+    );
   });
 });

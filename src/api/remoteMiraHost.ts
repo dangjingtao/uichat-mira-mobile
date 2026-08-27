@@ -65,6 +65,11 @@ export interface SendRemoteMessageInput {
   threadId: string;
   messageId: string;
   content: string;
+  messages?: Array<{
+    id?: string;
+    role: 'system' | 'user' | 'assistant';
+    parts: RemoteMessage['parts'];
+  }>;
   agentEnabled?: boolean;
   requestedToolGroupIds?: string[];
 }
@@ -354,6 +359,16 @@ export class RemoteMiraHostClient {
       );
     }
 
+    const messages = input.messages?.length
+      ? input.messages
+      : [
+          {
+            id: input.messageId,
+            role: 'user' as const,
+            parts: [{ type: 'text' as const, text: content }],
+          },
+        ];
+
     return this.withCredential(async credential => {
       const sseOperation: SseOperation<RemoteChatStreamEvent> = {
         path: '/proxy/chat/default',
@@ -361,12 +376,7 @@ export class RemoteMiraHostClient {
         body: {
           id: input.threadId,
           messageId: input.messageId,
-          messages: [
-            {
-              role: 'user',
-              parts: [{ type: 'text', text: content }],
-            },
-          ],
+          messages,
           ...(typeof input.agentEnabled === 'boolean'
             ? { agentEnabled: input.agentEnabled }
             : {}),

@@ -109,10 +109,10 @@ const styles = StyleSheet.create({
   overlay: { flex: 1 },
   menu: {
     position: 'absolute',
-    width: 212,
+    width: 228,
     paddingVertical: spacing.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.xl,
+    borderRadius: radius.sm,
     overflow: 'hidden',
     ...shadows.composer,
   },

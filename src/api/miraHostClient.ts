@@ -42,6 +42,28 @@ const unsupportedMutation = (operation: string): never => {
 const createMessageId = () =>
   `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+const toContextMessage = (message: RemoteMessage) => {
+  if (message.role === 'tool') return null;
+
+  const text =
+    message.content.trim() ||
+    message.parts
+      .filter((part): part is Extract<typeof part, { type: 'text' }> =>
+        part.type === 'text',
+      )
+      .map(part => part.text)
+      .join('\n')
+      .trim();
+
+  if (!text) return null;
+
+  return {
+    id: message.id,
+    role: message.role,
+    parts: [{ type: 'text' as const, text }],
+  };
+};
+
 /**
  * Mobile runtime compatibility adapter.
  *
@@ -125,10 +147,22 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
       throw new Error('A stable message id is required');
     }
 
+    const canonicalMessages = await this.remote.getMessages(sessionId);
+    const contextMessages = canonicalMessages
+      .filter(message => message.id !== stableMessageId)
+      .map(toContextMessage)
+      .filter((message): message is NonNullable<typeof message> => Boolean(message));
+    contextMessages.push({
+      id: stableMessageId,
+      role: 'user',
+      parts: [{ type: 'text', text: content }],
+    });
+
     const session = await this.remote.sendMessage({
       threadId: sessionId,
       messageId: stableMessageId,
       content,
+      messages: contextMessages,
     });
     this.lastRuntimeEvents = [];
     this.currentSendAbort = session.abort;

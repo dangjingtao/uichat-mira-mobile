@@ -21,11 +21,13 @@ import {
   Monitor,
   Pin,
   Search,
+  SquarePen,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
+import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 const miraLogo = require('../../assets/branding/mira-logo-square.png');
@@ -84,6 +86,8 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     onClose();
     navigation.navigate('HostConfig');
   };
+
+  const handleUiOnlyChat = useCallback(() => undefined, []);
 
   return (
     <View
@@ -199,10 +203,38 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
         ) : null}
       </ScrollView>
 
-      <View style={[styles.remoteNote, { borderTopColor: colors.border.soft }]}>
-        <Text style={[styles.remoteNoteText, { color: colors.text.soft }]}>
-          当前远程协议只访问桌面端已有会话
-        </Text>
+      <View
+        style={[styles.bottomBar, { borderTopColor: colors.border.soft }]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="聊天"
+          onPress={handleUiOnlyChat}
+          style={({ pressed }) => [
+            styles.chatButton,
+            {
+              backgroundColor: pressed ? colors.primaryActive : colors.primary,
+            },
+          ]}
+        >
+          <SquarePen size={20} color={colors.onPrimary} strokeWidth={2.2} />
+          <Text
+            style={[styles.chatButtonLabel, { color: colors.onPrimary }]}
+          >
+            聊天
+          </Text>
+        </Pressable>
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: colors.bg.card,
+              borderColor: colors.border.default,
+            },
+          ]}
+        >
+          <Text style={[styles.avatarLabel, { color: colors.primary }]}>M</Text>
+        </View>
       </View>
     </View>
   );
@@ -281,10 +313,34 @@ const styles = StyleSheet.create({
   recentLabel: { fontSize: 15 },
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 20 },
   emptyHint: { textAlign: 'center', marginTop: 40, fontSize: 14 },
-  remoteNote: {
+  bottomBar: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
   },
-  remoteNoteText: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  chatButton: {
+    minWidth: 136,
+    height: sizing.touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.full,
+    gap: spacing.sm,
+  },
+  chatButtonLabel: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  avatar: {
+    width: sizing.touchTarget,
+    height: sizing.touchTarget,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLabel: { fontSize: fontSize.button, fontWeight: '700' },
 });

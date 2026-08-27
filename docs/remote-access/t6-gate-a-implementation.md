@@ -5,6 +5,9 @@
 ## 已实现
 
 - Mobile Chat 继续使用 `POST /proxy/chat/default`，并复用稳定的 `messageId`。
+- 每次发送前读取 Thread canonical messages，将已有 User / Assistant / System
+  文本历史与当前用户消息一起提交，保持与桌面端 Chat 请求的上下文语义一致；Tool
+  消息不作为普通模型上下文发送。
 - SSE adapter 处理 `text-delta` 增量、`finishReason=stop/error`、`error` 和 `[DONE]`；没有 `finish` 的 `[DONE]` 不会被当作成功。
 - `data-tool-event` 与 `data-execution-node` 保留为结构化运行状态，不注入普通聊天文本。
 - Chat 页面停止时只 Abort 当前 HTTP stream；不调用 backend cancel，也不宣称后端生成已停止。
