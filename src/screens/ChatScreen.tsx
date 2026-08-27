@@ -13,7 +13,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ChevronLeft,
@@ -29,6 +34,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
 import { ConversationMenu } from '../components/ConversationMenu';
+import {
+  getChatHistoryErrorMessage,
+  readCanonicalSessionTitle,
+} from './chatSessionState';
 
 function ThinkingIndicator({ color }: { color: string }) {
   const dots = useRef([
@@ -116,8 +125,18 @@ function MessageHistorySkeleton({
           { backgroundColor: colors.bg.bubble, opacity },
         ]}
       >
-        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '78%' }]} />
-        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '54%' }]} />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '78%' },
+          ]}
+        />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '54%' },
+          ]}
+        />
       </Animated.View>
       <Animated.View
         style={[
@@ -126,7 +145,12 @@ function MessageHistorySkeleton({
           { backgroundColor: colors.bg.soft, opacity },
         ]}
       >
-        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '64%' }]} />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '64%' },
+          ]}
+        />
       </Animated.View>
       <Animated.View
         style={[
@@ -135,8 +159,18 @@ function MessageHistorySkeleton({
           { backgroundColor: colors.bg.bubble, opacity },
         ]}
       >
-        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '68%' }]} />
-        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '42%' }]} />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '68%' },
+          ]}
+        />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '42%' },
+          ]}
+        />
       </Animated.View>
     </View>
   );
@@ -149,7 +183,7 @@ export function ChatScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
-  const { sessionId, title } = route.params;
+  const { sessionId, title: routeTitle } = route.params;
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const themedStyles = useMemo(
@@ -161,8 +195,10 @@ export function ChatScreen() {
     [colors],
   );
 
+  const [sessionTitle, setSessionTitle] = useState(routeTitle);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
@@ -178,27 +214,47 @@ export function ChatScreen() {
   const menuButtonRef = useRef<View>(null);
   const abortRef = useRef(false);
 
+  const refreshSessionTitle = useCallback(async () => {
+    const canonicalTitle = await readCanonicalSessionTitle(
+      miraHostClient,
+      sessionId,
+    );
+    if (canonicalTitle !== null) {
+      setSessionTitle(canonicalTitle);
+    }
+  }, [sessionId]);
+
   const loadMessages = useCallback(async (): Promise<ChatMessage[] | null> => {
+    setHistoryError(null);
     try {
       const canonicalMessages = await miraHostClient.getMessages(sessionId);
       setMessages(canonicalMessages);
       return canonicalMessages;
-    } catch {
-      // Connection and authorization state are surfaced by the remote host flow.
+    } catch (error) {
+      setHistoryError(getChatHistoryErrorMessage(error));
       return null;
     }
   }, [sessionId]);
 
-  useEffect(() => {
-    let active = true;
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setIsLoadingHistory(true);
+      void Promise.all([loadMessages(), refreshSessionTitle()]).finally(() => {
+        if (active) setIsLoadingHistory(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, [loadMessages, refreshSessionTitle]),
+  );
+
+  const retryHistory = useCallback(() => {
     setIsLoadingHistory(true);
-    void loadMessages().finally(() => {
-      if (active) setIsLoadingHistory(false);
+    void Promise.all([loadMessages(), refreshSessionTitle()]).finally(() => {
+      setIsLoadingHistory(false);
     });
-    return () => {
-      active = false;
-    };
-  }, [loadMessages]);
+  }, [loadMessages, refreshSessionTitle]);
 
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
@@ -250,10 +306,12 @@ export function ChatScreen() {
         // The stream is a delivery channel only. Re-read canonical Thread /
         // Message state so the UI never invents an Assistant message locally.
         await loadMessages();
+        void refreshSessionTitle();
         setStreamingText('');
       } catch (error) {
         setStreamingText('');
         const canonicalMessages = await loadMessages();
+        void refreshSessionTitle();
         const hasCanonicalAssistant = canonicalMessages?.some(
           (message) =>
             message.role === 'assistant' &&
@@ -272,7 +330,14 @@ export function ChatScreen() {
         setIsLoading(false);
       }
     },
-    [inputText, isLoading, loadMessages, scrollToBottom, sessionId],
+    [
+      inputText,
+      isLoading,
+      loadMessages,
+      refreshSessionTitle,
+      scrollToBottom,
+      sessionId,
+    ],
   );
 
   const handleStop = useCallback(() => {
@@ -289,8 +354,6 @@ export function ChatScreen() {
       setIsMenuVisible(true);
     });
   }, [windowWidth]);
-
-  const handleUiOnlyShare = useCallback(() => undefined, []);
 
   const handleRetry = useCallback(
     (msg: ChatMessage) => {
@@ -331,7 +394,9 @@ export function ChatScreen() {
             </View>
             {isFailed ? (
               <>
-                <Text style={[styles.failureText, { color: colors.status.error }]}>
+                <Text
+                  style={[styles.failureText, { color: colors.status.error }]}
+                >
                   {failureMessage}
                 </Text>
                 <Pressable
@@ -341,7 +406,9 @@ export function ChatScreen() {
                   ]}
                   onPress={() => handleRetry(item)}
                 >
-                  <Text style={[styles.retryText, { color: colors.status.error }]}>
+                  <Text
+                    style={[styles.retryText, { color: colors.status.error }]}
+                  >
                     点击重试
                   </Text>
                 </Pressable>
@@ -401,7 +468,7 @@ export function ChatScreen() {
           style={[styles.headerTitle, { color: colors.text.ink }]}
           numberOfLines={1}
         >
-          {title}
+          {sessionTitle}
         </Text>
         <View
           style={[
@@ -414,14 +481,12 @@ export function ChatScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="分享会话"
-            onPress={handleUiOnlyShare}
-            style={({ pressed }) => [
-              styles.groupButton,
-              pressed && { backgroundColor: colors.bg.soft },
-            ]}
+            accessibilityLabel="分享会话，暂不可用"
+            accessibilityState={{ disabled: true }}
+            disabled
+            style={styles.groupButtonDisabled}
           >
-            <Share2 size={19} color={colors.text.ink} strokeWidth={2} />
+            <Share2 size={19} color={colors.text.soft} strokeWidth={2} />
           </Pressable>
           <View
             style={[
@@ -447,7 +512,7 @@ export function ChatScreen() {
 
       <ConversationMenu
         visible={isMenuVisible}
-        title={title}
+        title={sessionTitle}
         anchor={menuAnchor}
         onClose={() => setIsMenuVisible(false)}
       />
@@ -465,7 +530,39 @@ export function ChatScreen() {
           contentContainerStyle={styles.messageList}
           onContentSizeChange={scrollToBottom}
           ListEmptyComponent={
-            isLoadingHistory ? <MessageHistorySkeleton colors={colors} /> : null
+            isLoadingHistory ? (
+              <MessageHistorySkeleton colors={colors} />
+            ) : historyError ? (
+              <View style={styles.historyErrorState}>
+                <Text
+                  style={[styles.historyErrorText, { color: colors.text.muted }]}
+                >
+                  {historyError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重新加载聊天记录"
+                  onPress={retryHistory}
+                  style={({ pressed }) => [
+                    styles.historyRetryButton,
+                    {
+                      backgroundColor: pressed
+                        ? colors.primaryActive
+                        : colors.primary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.historyRetryText,
+                      { color: colors.onPrimary },
+                    ]}
+                  >
+                    重试
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null
           }
           ListFooterComponent={renderFooter}
         />
@@ -584,6 +681,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  groupButtonDisabled: {
+    flex: 1,
+    height: sizing.buttonHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.55,
+  },
   groupDivider: { width: StyleSheet.hairlineWidth, height: 20 },
   headerTitle: {
     flex: 1,
@@ -605,6 +709,29 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingBottom: spacing.lg,
   },
+  historyErrorState: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  historyErrorText: {
+    maxWidth: 320,
+    textAlign: 'center',
+    fontSize: fontSize.bodyMd,
+    lineHeight: 22,
+  },
+  historyRetryButton: {
+    minWidth: 96,
+    height: sizing.touchTarget,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyRetryText: { fontSize: fontSize.button, fontWeight: '600' },
   skeletonBubble: {
     minHeight: 52,
     borderRadius: 16,
