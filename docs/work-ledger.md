@@ -8,8 +8,8 @@
 
 ## 当前协作约定
 
-- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-007。
-- MOB-007 已完成并合入 `dev`；MOB-009 已完成代码施工与自动化平台验收并合入 `dev`，待真机五路径人工验收；MOB-008 / MOB-010 当前仍待实施。
+- 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-009。
+- MOB-007 / MOB-008 已完成并合入 `dev`；MOB-009 已完成代码施工与自动化平台验收并合入 `dev`，待真机五路径人工验收；MOB-010 当前仍待实施。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威线程、项目和角色业务数据，不猜测远端接口字段。
 - Desktop #77 / #78 / #80 已完成合同实现并合入 Desktop `dev`；Mobile 通过 MOB-010 统一完成正式 Remote 合同适配和真实联调，不重开旧任务历史。
 - 线程置顶与未读首轮明确为 Mobile **设备级本地 UI 状态**，分别由 MOB-007 / MOB-008 实现；不得把本机状态伪装成账户级或跨端统一状态。
@@ -27,7 +27,7 @@
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | 原视觉分类代码完成；Desktop #78 已交付 `/remote/v1/roles`，权威角色名补充展示由 MOB-010 收口 | `mob_005_visual_kinds` | MOB-001, MOB-010 |
 | MOB-006 | 真实线程状态与验收 | 核对真实标题、错误态、状态真实性，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 | MOB-007 | 本机线程置顶 | 以稳定线程 ID 持久化本机置顶，支持置顶/取消置顶与稳定排序，不写回 Remote Thread | **完成**：本机持久化、主列表置顶排序、Drawer/Search 同源展示已合入 `dev`；不写回 Remote Thread，不做跨端同步 | `mob_007_local_pinning` | MOB-006 |
-| MOB-008 | 本机未读状态 | 持久化本机已读进度，以真实消息进度判定未读；仅表达当前设备是否读过 | 待实施；任务卡已创建，Desktop #79 不再作为依赖 | `mob_008_device_unread` | MOB-006 |
+| MOB-008 | 本机未读状态 | 持久化本机已读进度，以真实消息进度判定未读；仅表达当前设备是否读过 | **完成**：设备级已读进度、真实消息未读判定、主列表/Drawer/Search 同源展示已通过 PR #30 合入 `dev`；不写回 Remote Thread，不做跨端同步 | `mob_008_device_unread` | MOB-006 |
 | MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 移除主流程 Direct/Host 地址配置；保留扫码并增加 `mira://pair?...` 粘贴兜底 | **有条件完成**：PR #27 已合入 `dev`；typecheck/lint/Jest、Android debug APK、iOS Simulator 与 unsigned iPhone/IPA 构建通过；待真机五路径人工验收 | `mob_009_pairing_screen` | 现有 Remote Pairing V1 |
 | MOB-010 | Desktop Remote 合同接入收口 | 对齐 `/remote/v1/workspaces`、`/remote/v1/roles`、Workspace Thread 权威分页，完成 #77/#78/#80 Mobile 联调验收 | 待实施；Desktop 正式合同已交付并合入 `dev` | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
 
@@ -45,7 +45,7 @@
 - Desktop #80 的 Workspace Thread 真相入口为 `GET /remote/v1/workspaces/:workspaceId/threads`，Mobile 使用 `items/total/nextCursor/limit`，不再把“拉全量 Thread 后本地过滤”作为长期合同。
 - #77 / #78 / #80 暂保持 open，作为跨端交付验收入口；MOB-010 完成真实接入与联调后由 Mobile 侧按验收结果关闭。
 - 线程置顶首轮为设备级本地状态：本机持久化，只影响当前手机排序与展示，不写回 Remote Thread。
-- 线程未读首轮为设备级本地状态：优先记录 `lastReadMessageId` / `lastReadAt` 或等价已读进度，只表达当前手机是否读过最新真实内容。
+- 线程未读首轮为设备级本地状态：持久化已读进度，只表达当前手机是否读过最新真实内容；Remote Thread `messageCount` 只作为变化探针，真正未读由 Host 权威 `user` / `assistant` 消息判定。
 - Desktop Issue #79 已关闭为 `not planned`；只有未来明确需要 Desktop ↔ Mobile / 多 Mobile 同步时，才另建账户级线程状态同步能力。
 - “连接桌面端”主流程只要求用户理解扫码/粘贴 Mira 配对链接、等待桌面授权和完成连接；Direct / Relay 是 transport 细节，不在主页面让用户配置或选择。
 - 扫码失败兜底输入只接受 Mira 配对 URI，例如 `mira://pair?...`，并必须与扫码复用同一套 `parsePairingUriV1()` / `loadPairingUri()` / `useRemotePairing()` 流程。
@@ -254,18 +254,24 @@
 
 ### MOB-008：本机未读状态
 
-**状态：待实施。** 任务卡已创建：`docs/task-cards/MOB-008-device-local-unread.md`。
+**状态：完成。** 任务卡：`docs/task-cards/MOB-008-device-local-unread.md`。代码已通过 PR #30 squash 合入 `dev`，提交 `e78e3e81329c01b8f12636a1dad673ffbdc6c6c7`。
 
-产品与实现边界：
+实施结果：
 
-- 未读是设备级 UI 状态，不进入 Remote Thread 真相模型。
-- 优先持久化已读进度，如 `threadId -> lastReadMessageId / lastReadAt` 或等价稳定方案，不只存一个容易漂移的 `isUnread`。
-- 打开 Chat 并成功读取当前线程权威消息后，才推进本机已读进度。
-- 拉取到比本机已读进度更新的真实 assistant / user 内容时显示未读；读取失败、离线、401/403 不得误清未读。
-- 主列表、Drawer、Search 如展示未读标记，必须复用同一状态源。
-- Desktop 上是否已读不会自动改变 Mobile 状态，这是当前设备级语义的预期行为。
+- 新增独立 `threadReadState.ts` / `threadReadStore.ts`，以稳定线程 ID 持久化本机 `lastReadMessageId`、`lastReadAt`、最近观察到的真实内容消息及 `observedMessageCount`；不持久化容易漂移的 `isUnread` 布尔值。
+- Remote Thread 的真实 `messageCount` 保留到 Mobile `Session`，只作为“是否需要重新核对权威消息”的变化探针，不直接决定未读。
+- 真正未读只依据 Host 返回的 `user` / `assistant` 内容消息；tool/system 消息即使令 `messageCount` 变化，也不会单独制造未读语义。
+- 主列表、Drawer、Search 统一消费同一设备级状态源显示未读标记；Search 不因未读改变搜索排序。
+- `ChatScreen` 仅在 `getMessages()` 成功读取当前线程权威消息后推进本机已读进度；401、403、断网或其它读取失败不会误清未读。
+- 明确 404 时允许清理对应本机已读进度；线程仅仅没有出现在 active 列表中不视为已删除。
+- 已读进度按线程隔离，App 重启后由本机持久化恢复；Desktop 是否阅读不会被 Mobile 伪装成已同步。
+- 新增 Jest 用例覆盖持久化、首次观察、成功已读、新 assistant 消息、system/tool 不制造未读、多线程隔离和 `messageCount` 变化探针。
+- 本轮未修改 Mira Desktop / Host，也未新增账户级或跨设备同步。
 
-验收至少覆盖：新消息产生未读、成功打开后消除、App 重启后进度保留、慢网/断网/401/403 不误清、多线程互不串扰，以及 typecheck / lint / Jest。
+验证与交付：
+
+- PR #30 已 squash 合入 `dev`，合并提交 `e78e3e81329c01b8f12636a1dad673ffbdc6c6c7`。
+- 按维护者明确决定，本轮不等待 Android / iOS 平台构建作为合并阻塞条件；自动化与真机覆盖继续可并入 MOB-006 的设备验收。
 
 ### MOB-009：简化桌面配对页与 Mira 链接兜底
 
@@ -325,7 +331,7 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 2. #77 / #78 / #80 暂不关闭，待 Mobile 完成真实接入、权限/错误态和真机或等价远程联调后关闭。
 3. 是否需要权威唯一 `threadKind` 仍未决定；若不需要，移动端继续只派生 UI 显示分类。
 
-线程已读 / 置顶已从跨端阻塞中移除：Desktop #79 已关闭为 `not planned`；MOB-007 的设备级本机置顶已完成，MOB-008 的设备级本机未读仍待实施。
+线程已读 / 置顶已从跨端阻塞中移除：Desktop #79 已关闭为 `not planned`；MOB-007 的设备级本机置顶与 MOB-008 的设备级本机未读均已完成。
 
 ## 实施授权门槛
 
@@ -336,7 +342,7 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - MOB-005：已获得维护者明确实施授权；三类视觉映射已完成，Role summary 名称接入转 MOB-010。
 - MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
 - MOB-007：已获得维护者明确实施授权；本机线程置顶代码已完成并通过 PR #28 squash 合入 `dev`。
-- MOB-008：已完成任务卡和产品边界定义；当前未开始业务代码施工。
+- MOB-008：已获得维护者明确实施授权；设备级本机未读代码已完成并通过 PR #30 squash 合入 `dev`。
 - MOB-009：已完成代码施工与自动化平台验收并合入 `dev`；当前仅剩真机五路径人工验收，不再安排产品层代码施工。
 - MOB-010：已完成任务卡和 Desktop 正式合同核对；当前未开始业务代码施工。
 - 默认不修改 Mira Desktop / Host 仓库；任何跨仓修改必须再次明确授权。
@@ -345,10 +351,9 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 
 1. MOB-010：优先接住 Desktop 0.99.11 已交付的 #77/#78/#80，避免 Mobile 继续依赖已经过时的 `/chat-workspaces` 与全量 Thread 本地过滤方式。
 2. MOB-009：仅完成真机扫码、粘贴、待批准、拒绝/过期、批准完成五路径验收；代码施工已结束。
-3. MOB-008：实现本机未读进度和判定，恢复真实而非伪造的未读提示。
-4. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009/010 完成后补相应回归。
-5. MOB-004：MOB-010 接入完成后执行真实设备项目层级闭环回归，通过后标记完全完成。
-6. MOB-001 / MOB-002 / MOB-003 / MOB-005：保留原完成历史，不重开；后续正式 Remote 合同适配统一由 MOB-010 记录。
+3. MOB-006：继续完成 Android/iOS 真机视觉、网络和可访问性验收；007/008/009/010 完成后补相应回归。
+4. MOB-004：MOB-010 接入完成后执行真实设备项目层级闭环回归，通过后标记完全完成。
+5. MOB-001 / MOB-002 / MOB-003 / MOB-005：保留原完成历史，不重开；后续正式 Remote 合同适配统一由 MOB-010 记录。
 
 ## 交付记录
 
@@ -382,3 +387,5 @@ Desktop / Host 已完成并合入 `dev` 的正式交接合同：
 - 2026-08-28：PR #28 squash 合入 `dev`，提交 `90ecf42ad6ba1b23aaa17e1735b168bacc891046`；按维护者决定不等待最终平台构建，MOB-007 标记完成；置顶 hydrate 失败缺少显式错误/重试入口记录为 P2 技术债。
 - 2026-08-28：MOB-009 开始并完成产品层代码施工；移除 Direct/Host/Relay 工程配置 UI，新增 `mira://pair?...` 粘贴兜底，并补输入解析与 stale pairing request 回归。
 - 2026-08-28：MOB-009 同一 HEAD 的 typecheck / lint / Jest、Android debug APK、iOS Simulator、unsigned iPhone / IPA 构建全部通过；PR #27 squash 合入 `dev`，merge `7fae64189aadda6bf7e59230d49a201e1d108b82`。任务标记为“有条件完成”，保留真机五路径人工验收。
+- 2026-08-28：开始 MOB-008；实现设备级已读进度持久化、`messageCount` 变化探针、Host 权威 user/assistant 未读判定，以及主列表/Drawer/Search 同源未读标记；Chat 仅在权威消息读取成功后推进已读。
+- 2026-08-28：PR #30 squash 合入 `dev`，提交 `e78e3e81329c01b8f12636a1dad673ffbdc6c6c7`；按维护者决定不等待 Android / iOS 平台构建作为合并阻塞，MOB-008 标记完成。
