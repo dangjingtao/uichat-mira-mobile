@@ -26,6 +26,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
 import {
+  getSessionVisualKindLabel,
+  SessionKindIcon,
+} from '../components/SessionKindIcon';
+import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
@@ -74,6 +78,8 @@ function SessionRow({
 }: SessionRowProps) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}`}
       style={({ pressed }) => [
         styles.sessionItem,
         {
@@ -93,7 +99,12 @@ function SessionRow({
           },
         ]}
       >
-        <MessageSquare size={22} strokeWidth={1.7} color={colors.primary} />
+        <SessionKindIcon
+          session={item}
+          size={22}
+          strokeWidth={1.7}
+          color={colors.primary}
+        />
       </View>
       <View style={styles.sessionContent}>
         <View style={styles.sessionTopRow}>
