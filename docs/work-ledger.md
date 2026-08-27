@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-27 22:18（Asia/Shanghai）
+更新时间：2026-08-27 22:37（Asia/Shanghai）
 
 本台账是当前移动端线程、项目与角色展示工作的统一事实来源。任务状态、Host 依赖、产品决定和验收结果统一在此维护，避免把设计稿状态、移动端推断或代理调查结论误当成已经可用的服务端能力。
 
@@ -23,7 +23,7 @@
 | MOB-003 | 项目详情页 | 设计项目详情/项目线程列表层级，核对导航数据与返回路径 | 只读核对完成，等待 Host 契约与实施授权 | `mob_003_workspace_detail` | MOB-001, MOB-002 |
 | MOB-004 | 项目线程层级导航 | 核对“项目列表 → 项目详情线程列表 → 具体线程”在现有路由中的落点和状态传递 | 只读核对完成，等待 MOB-001～003 可实施 | `mob_004_hierarchy_nav` | MOB-001, MOB-002, MOB-003 |
 | MOB-005 | 线程类型视觉区分 | 核对普通、角色、Agent 三类图标映射和字段共存优先级 | MOB-001 Mobile 字段映射已合入，等待实施授权 | `mob_005_visual_kinds` | MOB-001 |
-| MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 假置顶/未读/搜索假骨架已移除，加载状态与错误重试已实施并通过 typecheck/lint/Jest；设备视觉验收与 Chat 标题刷新仍待 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
+| MOB-006 | 真实线程状态与验收 | 核对真实标题、已读/未读、置顶字段覆盖，整理测试与视觉验收清单 | 代码实施完成并通过 typecheck/lint/Jest；自动化平台构建与真机视觉/网络验收单独执行 | `mob_006_truth_acceptance` | MOB-001, MOB-002, MOB-005 |
 
 ## 已确认产品规则
 
@@ -117,28 +117,32 @@
 
 ### MOB-006：真实线程状态与验收
 
-已实施到 `dev`：
+代码实施已完成并合入 `dev`：
 
 - `src/screens/SessionListScreen.tsx` 已移除按 index 伪造的未读点、置顶图标和“置顶/最近对话”假分组；列表只展示 Host 真实标题与更新时间。
 - `src/components/CustomDrawer.tsx` 不再把 `sessions[0]` 伪造成“已置顶”，真实会话统一按“最近”展示。
-- `src/components/ConversationMenu.tsx` 已移除无 Host 写契约的“置顶”入口；未新增 `isPinned` 或本地替代状态。
 - `src/screens/SearchScreen.tsx` 已将 loading / success-empty / success-data / error 明确分离；骨架不再承担空结果或失败状态。
 - 主列表、抽屉、搜索均提供真实错误状态和可操作重试；401、403、网络失败分别给出不同提示。
-- 新增 `sessionCollectionState.ts` 统一四态判定与错误映射，并增加基础 Jest 覆盖。
+- 新增 `sessionCollectionState.ts` 统一列表四态判定与错误映射，并增加基础 Jest 覆盖。
+- `ChatScreen` 不再永久依赖导航标题快照：进入或重新聚焦 Chat 时重新读取 Host `getSession()` 权威标题，发送后也会再次刷新；Host 临时不可读时保留上一次真实标题，不生成替代标题。
+- Chat 历史读取失败不再显示空白：401、403、404、网络失败分别给出真实错误提示，并提供明确重试入口。
+- 新增 `chatSessionState.ts` 与 Jest 覆盖，验证 Host 权威标题读取和聊天历史错误映射。
+- `ConversationMenu` 中尚无真实合同/实现的会话动作统一呈现为 disabled，不再产生“点击即已执行”的假状态；顶部分享按钮同样在真实实现前禁用。
+- 未新增 `isUnread`、`isPinned` 或任何客户端自造线程状态。
 
 自动化验证：
 
-- GitHub Actions `Mobile CI #244`：`Typecheck, lint and test` 成功。
+- GitHub Actions `Mobile CI #244`：第一轮 `Typecheck, lint and test` 成功。
+- GitHub Actions `Mobile CI #249`：第二轮 Chat 标题/错误态/动作真实性改动的 `Typecheck, lint and test` 成功。
 - `Typecheck`：success。
 - `Lint`：success。
 - `Test`：success。
-- Android / iOS 构建仍按同一 CI 独立运行；自动化构建不能替代真机视觉与网络验收。
+- Android / iOS 自动化构建由 CI #249 独立继续执行；其结果属于平台构建证据，不能替代真机视觉与网络验收。
 
-当前剩余：
+当前剩余验收：
 
-- Chat 当前仍使用导航参数中的标题快照；若 Host 在页面打开后改名，页面内不会自动刷新。该项保留为 MOB-006 后续最小修复，不在本次状态清理中伪造刷新语义。
-- 视觉验收仍需覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack。
-- Host 尚未定义线程已读/未读与置顶的持久化、多设备同步和写权限语义；在合同出现前 UI 继续零展示、零操作。
+- 真机视觉/网络验收仍需覆盖 Android/iOS、浅色/深色、动态字体、长标题、多线程、慢网/断网/401/403、返回路径、VoiceOver/TalkBack。
+- Host 尚未定义线程已读/未读与置顶的持久化、多设备同步和写权限语义；这不是 Mobile 可自行补齐的代码缺口。在合同出现前 UI 继续零展示、零操作。
 
 ## Host 依赖与待维护者决定
 
@@ -152,7 +156,7 @@
 ## 实施授权门槛
 
 - MOB-001：已获得维护者明确实施授权；Mobile 侧最小字段映射已合入 `dev`。
-- MOB-006：已获得维护者明确实施授权；第一轮真实状态清理已合入 `dev`。
+- MOB-006：已获得维护者明确实施授权；代码实施已完成并通过自动化代码级验证，真机验收仍单独记录。
 - 涉及 Host Remote 契约的部分仍需 Host 方案得到确认，不因 Mobile 已开工而视为自动授权。
 - MOB-002/003 的项目列表和详情参考图需重新提供，或维护者明确允许按现有移动端设计系统落地。
 - 默认不修改 Mira Host / 桌面端仓库；任何跨仓修改必须再次明确授权。
@@ -160,7 +164,7 @@
 ## 建议实施顺序
 
 1. MOB-001：Mobile 属性映射已完成；等待并确认 Host Workspace/Role Remote 契约。
-2. MOB-006：第一轮假状态清理已完成；补 Chat 标题刷新并完成设备视觉验收。
+2. MOB-006：代码实施完成；仅剩设备视觉/网络验收。
 3. MOB-005：统一三类线程图标和可访问性文案。
 4. MOB-002：在 Workspace Remote contract 可用后实现项目列表。
 5. MOB-003：实现项目详情和项目线程过滤。
@@ -175,4 +179,6 @@
 - 2026-08-27：开始 MOB-001；补齐 Remote Thread 属性到 Session 的映射并增加回归测试。
 - 2026-08-27：PR #23 的 `Typecheck, lint and test` 通过；MOB-001 合入 `dev`，Host Workspace/Role 契约仍未关闭。
 - 2026-08-27：开始 MOB-006；提交 `2d0c906` 到 `dev`，移除假置顶/未读/搜索假骨架，补齐 loading/empty/data/error 与重试、401/403/网络错误区分和基础测试。
-- 2026-08-27：Mobile CI #244 的 `Typecheck, lint and test` 通过；MOB-006 第一轮状态清理完成，Chat 标题刷新与真机视觉验收仍待。
+- 2026-08-27：Mobile CI #244 的 `Typecheck, lint and test` 通过；MOB-006 第一轮状态清理完成。
+- 2026-08-27：继续 MOB-006；补 Host 权威 Chat 标题刷新、聊天历史错误/重试、`chatSessionState` 测试，并禁用未接入的会话动作。
+- 2026-08-27：Mobile CI #249 的 `Typecheck, lint and test` 通过；MOB-006 代码实施完成，后续只保留自动化平台构建结果与真机视觉/网络验收记录。
