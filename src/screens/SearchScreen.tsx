@@ -18,6 +18,10 @@ import { miraHostClient } from '../api/miraHostClient';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import {
+  getSessionVisualKindLabel,
+  SessionKindIcon,
+} from '../components/SessionKindIcon';
+import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
@@ -147,10 +151,19 @@ export function SearchScreen() {
           results.map((session) => (
             <Pressable
               key={session.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}`}
               style={styles.result}
               onPress={() => openSession(session)}
             >
-              <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]} />
+              <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]}>
+                <SessionKindIcon
+                  session={session}
+                  size={20}
+                  strokeWidth={1.8}
+                  color={colors.primary}
+                />
+              </View>
               <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
                 <Text
                   style={[styles.resultTitle, { color: colors.text.ink }]}
@@ -243,6 +256,8 @@ const styles = StyleSheet.create({
     width: sizing.touchTarget,
     height: sizing.touchTarget,
     borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resultLine: {
     height: sizing.buttonHeight,
