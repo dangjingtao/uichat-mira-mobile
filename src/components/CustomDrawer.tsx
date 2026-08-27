@@ -173,7 +173,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                 accessibilityLabel={accessibilityLabel}
               >
                 <cat.icon size={22} color={colors.text.muted} />
-                <Text style={[styles.categoryLabel, { color: colors.text.base }]}> 
+                <Text style={[styles.categoryLabel, { color: colors.text.base }]}>
                   {cat.label}
                 </Text>
               </Pressable>
