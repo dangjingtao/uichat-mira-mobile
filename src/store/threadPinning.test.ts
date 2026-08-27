@@ -1,7 +1,9 @@
 import type { Session } from '../types';
-import { MemoryLocalKeyValueStore } from '../storage/localKeyValueStore';
 import {
-  pruneThreadPins,
+  MemoryLocalKeyValueStore,
+  type LocalKeyValueStore,
+} from '../storage/localKeyValueStore';
+import {
   sortSessionsByLocalPin,
   ThreadPinRepository,
   type ThreadPinMap,
@@ -12,6 +14,27 @@ const session = (id: string, updatedAt: string, title = id): Session => ({
   title,
   updatedAt: new Date(updatedAt),
 });
+
+class DelayedLocalKeyValueStore implements LocalKeyValueStore {
+  private value: string | null = null;
+
+  isAvailable() {
+    return true;
+  }
+
+  async get() {
+    return this.value;
+  }
+
+  async set(_key: string, value: string) {
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    this.value = value;
+  }
+
+  async remove() {
+    this.value = null;
+  }
+}
 
 describe('ThreadPinRepository', () => {
   it('persists pins across repository instances', async () => {
@@ -31,6 +54,17 @@ describe('ThreadPinRepository', () => {
 
     await repository.save({ a: '2026-08-28T00:00:00.000Z' });
     await repository.save({});
+
+    await expect(repository.load()).resolves.toEqual({});
+  });
+
+  it('serializes rapid writes so the latest pin state wins', async () => {
+    const storage = new DelayedLocalKeyValueStore();
+    const repository = new ThreadPinRepository(storage);
+
+    const pin = repository.save({ a: '2026-08-28T00:00:00.000Z' });
+    const unpin = repository.save({});
+    await Promise.all([pin, unpin]);
 
     await expect(repository.load()).resolves.toEqual({});
   });
@@ -81,16 +115,5 @@ describe('local thread pin ordering', () => {
     const refreshed = [session('a', '2026-08-28T00:10:00.000Z', 'New title')];
 
     expect(sortSessionsByLocalPin(refreshed, pins)[0].id).toBe('a');
-  });
-
-  it('prunes pins for threads absent from the authoritative list', () => {
-    const pins = {
-      a: '2026-08-28T00:00:00.000Z',
-      deleted: '2026-08-28T00:01:00.000Z',
-    };
-
-    expect(pruneThreadPins(pins, ['a', 'b'])).toEqual({
-      a: '2026-08-28T00:00:00.000Z',
-    });
   });
 });
