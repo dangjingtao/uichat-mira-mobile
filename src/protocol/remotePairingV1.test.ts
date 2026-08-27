@@ -58,4 +58,18 @@ describe('parsePairingUriV1', () => {
       ),
     ).toThrow('does not contain a reachable Mira endpoint');
   });
+
+  it('rejects ordinary HTTP(S) URLs as pairing input', () => {
+    expect(() =>
+      parsePairingUriV1('https://desktop.example.ts.net/remote/pairing'),
+    ).toThrow('Pairing link must start with mira://pair');
+  });
+
+  it('rejects Mira pairing links missing required request fields', () => {
+    expect(() =>
+      parsePairingUriV1(
+        'mira://pair?version=1&host=https%3A%2F%2Fdesktop.example.ts.net',
+      ),
+    ).toThrow('Pairing link is missing challenge or code');
+  });
 });
