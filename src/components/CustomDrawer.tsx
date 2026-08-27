@@ -28,6 +28,8 @@ import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
+import { getSessionRoleName } from '../api/roleApi';
+import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { useThreadPinStore } from '../store/threadPinStore';
 import { isThreadPinned } from '../store/threadPinning';
@@ -72,6 +74,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const roleNames = useRoleNameMap();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
   const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
@@ -221,10 +224,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                   item.workspaceId.trim().length > 0;
                 const pinned = isThreadPinned(pinnedAtByThreadId, item.id);
                 const unread = selectThreadUnread(progressByThreadId, item.id);
+                const roleName = getSessionRoleName(item, roleNames);
                 return (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
+                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
                     style={({ pressed }) => [
                       styles.recentItem,
                       pressed && { backgroundColor: colors.bg.soft },
@@ -237,12 +241,22 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
                       strokeWidth={1.8}
                       color={colors.text.muted}
                     />
-                    <Text
-                      style={[styles.recentLabel, { color: colors.text.base }]}
-                      numberOfLines={1}
-                    >
-                      {item.title}
-                    </Text>
+                    <View style={styles.recentText}>
+                      <Text
+                        style={[styles.recentLabel, { color: colors.text.base }]}
+                        numberOfLines={1}
+                      >
+                        {item.title}
+                      </Text>
+                      {roleName ? (
+                        <Text
+                          style={[styles.recentRole, { color: colors.text.soft }]}
+                          numberOfLines={1}
+                        >
+                          {roleName}
+                        </Text>
+                      ) : null}
+                    </View>
                     {unread ? (
                       <View
                         accessibilityElementsHidden
@@ -401,7 +415,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  recentLabel: { flex: 1, fontSize: 15 },
+  recentText: { flex: 1, minWidth: 0 },
+  recentLabel: { fontSize: 15 },
+  recentRole: { marginTop: 2, fontSize: fontSize.xs },
   unreadDot: {
     width: 7,
     height: 7,

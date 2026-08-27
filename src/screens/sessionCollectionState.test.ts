@@ -12,7 +12,7 @@ describe('session collection truth state', () => {
     expect(resolveSessionCollectionState(false, null, 2)).toBe('data');
   });
 
-  it('distinguishes authorization failures from network failures', () => {
+  it('distinguishes authorization, not-found and network failures', () => {
     expect(
       getSessionLoadErrorMessage(
         new RemoteHostError('HTTP_401', 'unauthorized', 401),
@@ -21,6 +21,9 @@ describe('session collection truth state', () => {
     expect(
       getSessionLoadErrorMessage(new RemoteHostError('HTTP_403', 'forbidden', 403)),
     ).toBe('当前设备没有读取会话的权限');
+    expect(
+      getSessionLoadErrorMessage(new RemoteHostError('HTTP_404', 'not found', 404)),
+    ).toBe('目标会话或项目不存在，或当前设备无法访问');
     expect(
       getSessionLoadErrorMessage(
         new RemoteHostError('NETWORK_ERROR', 'offline'),

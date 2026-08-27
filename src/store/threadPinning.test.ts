@@ -27,7 +27,7 @@ class DelayedLocalKeyValueStore implements LocalKeyValueStore {
   }
 
   async set(_key: string, value: string) {
-    await new Promise((resolve) => setTimeout(resolve, 15));
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 15));
     this.value = value;
   }
 

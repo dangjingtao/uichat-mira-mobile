@@ -16,6 +16,8 @@ import { FolderOpen, Pin, Search, X } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
+import { getSessionRoleName } from '../api/roleApi';
+import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { useThreadPinStore } from '../store/threadPinStore';
@@ -47,6 +49,7 @@ type SearchTab = (typeof tabs)[number]['id'];
 export function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
+  const roleNames = useRoleNameMap();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
   const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
@@ -180,11 +183,12 @@ export function SearchScreen() {
               session.workspaceId.trim().length > 0;
             const pinned = isThreadPinned(pinnedAtByThreadId, session.id);
             const unread = selectThreadUnread(progressByThreadId, session.id);
+            const roleName = getSessionRoleName(session, roleNames);
             return (
               <Pressable
                 key={session.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
+                accessibilityLabel={`${getSessionVisualKindLabel(session)}：${session.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
                 style={styles.result}
                 onPress={() => openSession(session)}
               >
@@ -214,13 +218,21 @@ export function SearchScreen() {
                       <Pin size={14} color={colors.primary} strokeWidth={2} />
                     ) : null}
                   </View>
-                  {belongsToWorkspace ? (
+                  {roleName || belongsToWorkspace || pinned ? (
                     <View style={styles.projectHint}>
-                      <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
-                      <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
+                      {roleName ? (
+                        <Text style={[styles.projectHintText, { color: colors.text.soft }]}>角色 · {roleName}</Text>
+                      ) : null}
+                      {belongsToWorkspace ? (
+                        <>
+                          <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
+                          <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
+                        </>
+                      ) : null}
+                      {pinned ? (
+                        <Text style={[styles.projectHintText, { color: colors.text.soft }]}>本机置顶</Text>
+                      ) : null}
                     </View>
-                  ) : pinned ? (
-                    <Text style={[styles.projectHintText, { color: colors.text.soft }]}>本机置顶</Text>
                   ) : null}
                 </View>
               </Pressable>
@@ -335,6 +347,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 4,
   },
   projectHintText: { fontSize: fontSize.xs },
