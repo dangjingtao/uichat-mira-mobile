@@ -9,6 +9,7 @@
 | MOB-007 | 本机线程置顶 | 待实施 | 无 |
 | MOB-008 | 本机未读状态 | 待实施 | 无 |
 | MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 待实施 | 无新增依赖 |
+| MOB-010 | Desktop Remote 合同接入收口 | 待实施 | Desktop #77 / #78 / #80 已完成合同交付 |
 
 ## 产品决策
 
@@ -21,8 +22,11 @@
 
 2026-08-28 决定：桌面配对页只暴露用户需要理解的配对流程。扫码为主入口，扫码失败时允许粘贴 `mira://pair?...` 配对链接兜底；Direct / Relay 继续作为底层 transport，不再在主页面提供 Host URL、手工 Direct 检查或传输选择。
 
+2026-08-28 决定：Desktop #77 / #78 / #80 已给出并合入正式 Remote 合同。MOB-002 / MOB-003 / MOB-005 的原始产品结构和完成记录不重开，由 MOB-010 统一负责把已完成 Mobile 代码适配到 `/remote/v1/workspaces`、`/remote/v1/roles` 和 Workspace Thread 权威分页接口。
+
 详细任务卡：
 
 - `MOB-007-local-thread-pinning.md`
 - `MOB-008-device-local-unread.md`
 - `MOB-009-pairing-screen-simplification.md`
+- `MOB-010-desktop-remote-contract-alignment.md`
