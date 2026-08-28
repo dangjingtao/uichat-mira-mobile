@@ -15,9 +15,10 @@
 其中：
 
 - `PRD.md`：产品问题、用户场景、功能范围、交互规则、异常与验收标准的产品基线。
+- `TECHNICAL_DESIGN.md`：端云架构、数据边界、状态实现、恢复策略、Provider / Destination 与工程约束的技术基线。
 - `README.md`：跨仓库边界、架构原则与一致性治理规则。
 
-另外两个仓库不得独立定义或修改拾言的产品行为：
+另外两个仓库不得独立定义或修改拾言的产品行为或跨仓库合同：
 
 - `mira-shiyan-cloud` 只实现这里已经确认的云端能力。
 - `mira-shiyan` 只作为默认内容 Destination，不反向定义拾言业务。
@@ -37,7 +38,7 @@
 - Desktop 始终是一等客户端，负责更完整的回看、调整、配置和历史使用。
 - 首版作为 Mira 官方内置插件；架构保留未来第三方插件扩展能力，但第三方插件生态不属于 MVP。
 
-完整产品需求以 [`PRD.md`](./PRD.md) 为准。
+完整产品需求以 [`PRD.md`](./PRD.md) 为准；正式技术实现基线以 [`TECHNICAL_DESIGN.md`](./TECHNICAL_DESIGN.md) 为准。
 
 ## 3. 场景模型
 
@@ -165,7 +166,7 @@ MVP：
 - LLM 不要求使用 Workers AI；使用独立轻量 LLM 服务层统一保管现有 Provider Key、基础路由、fallback 与错误归一。
 - LLM 服务层不得拥有 CaptureTask 业务状态解释权。
 
-具体 API、表结构、切片参数、库选型等由实现根据稳定性、落地成本与 Debug 成本决定，不在产品真相层过度固化。
+具体实现以 `TECHNICAL_DESIGN.md` 为技术基线；API 路径、表字段和库内部细节仍允许施工在不违反该基线的前提下按稳定性、落地成本与 Debug 成本调整。
 
 ## 11. 跨仓库一致性检查
 
@@ -182,13 +183,13 @@ MVP：
 
 ### 修改前
 
-1. 阅读本目录的 `PRD.md` 与本文件相关章节。
-2. 确认修改属于实现细节还是会改变 canonical truth。
+1. 阅读本目录的 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件相关章节。
+2. 确认修改属于局部实现细节还是会改变 canonical truth。
 3. 若会改变产品或跨仓库合同，先修改本目录真相并完成评审。
 
 ### 修改后
 
-1. 对照 `PRD.md` 与本文件逐项核对行为和状态语义。
+1. 对照 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件逐项核对行为和状态语义。
 2. 检查 `mira-shiyan-cloud` 是否出现与本目录冲突的接口、状态或数据定义。
 3. 检查 `mira-shiyan` 是否被错误用作业务数据库或业务真相源。
 4. 若跨仓库合同发生变化，三个仓库中的引用必须同步更新。
@@ -198,6 +199,7 @@ MVP：
 ## 12. 相关文档
 
 - 正式 MVP PRD：[`PRD.md`](./PRD.md)
+- 正式 MVP 技术设计：[`TECHNICAL_DESIGN.md`](./TECHNICAL_DESIGN.md)
 - 早期技术草案：`../meeting-capture-mvp.md`
 
-早期技术草案仅保留讨论与技术探索价值；与本目录正式真相冲突时，以 `PRD.md` 与本文件为准。
+早期技术草案仅保留讨论与技术探索价值；与本目录正式真相冲突时，以 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件为准。
