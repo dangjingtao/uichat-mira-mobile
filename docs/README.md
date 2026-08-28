@@ -8,6 +8,10 @@
 
 Mobile 新能力仍只消费 Mira Host 的 canonical contract；跨到 Desktop / Server 的协议问题只记录为依赖，未经明确授权不在本仓库越界修改。
 
+## 功能设计
+
+- [会议采集 MVP 设计](meeting-capture-mvp.md) — Mobile 录音 → R2 → STT → LLM 整理 → GitHub Markdown；当前为设计草案，未进入施工。
+
 ## 工程与发布
 
 - [GitHub Actions 构建与发布](github-build-release.md)
