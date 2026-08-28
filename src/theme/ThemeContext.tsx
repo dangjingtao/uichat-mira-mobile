@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, type ColorSchemeName } from 'react-native';
 import { themePresets, type ThemeColors } from './palette';
 import {
   DEFAULT_DEVICE_THEME_SETTINGS,
@@ -35,7 +35,7 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function resolveEffectiveTheme(
   mode: ThemeMode,
-  systemColorScheme: 'light' | 'dark' | null | undefined,
+  systemColorScheme: ColorSchemeName,
 ): 'light' | 'dark' {
   if (mode === 'system') {
     return systemColorScheme === 'dark' ? 'dark' : 'light';
