@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
   Clock3,
+  ExternalLink,
   FileText,
   History,
   Mic2,
@@ -24,6 +26,7 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
+import { getShiyanHistoryDataSource, type ShiyanHistoryTaskSummary } from './history';
 import {
   SHIYAN_BUILT_IN_SCENES,
   getCustomSceneDraft,
@@ -215,13 +218,62 @@ export function ShiyanSceneSelectScreen() {
 
 export function ShiyanHistoryScreen() {
   const { colors } = useTheme();
+  const [tasks, setTasks] = useState<readonly ShiyanHistoryTaskSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setLoading(true);
+      getShiyanHistoryDataSource()
+        .listTasks()
+        .then((nextTasks) => {
+          if (active) setTasks(nextTasks);
+        })
+        .catch(() => {
+          if (active) setTasks([]);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
   return (
     <ScreenShell title="历史任务">
-      <View style={styles.emptyState}>
-        <FileText size={34} color={colors.text.soft} />
-        <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>还没有拾言任务</Text>
-        <Text style={[styles.emptyText, { color: colors.text.soft }]}>完成首次真实采集后，这里会显示任务标题、场景、时间、当前阶段和可打开的投递去向。</Text>
-      </View>
+      {tasks.length > 0 ? (
+        <ScrollView contentContainerStyle={styles.content}>
+          {tasks.map((task) => (
+            <View
+              key={task.id}
+              style={[styles.historyCard, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{task.title}</Text>
+              <Text style={[styles.cardDescription, { color: colors.text.soft }]}>{task.sceneName} · {task.createdAt}</Text>
+              <Text style={[styles.structureText, { color: colors.text.base }]}>{task.currentStage} · {task.stageStatus}</Text>
+              {task.canonicalDestinationUrl ? (
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() => void Linking.openURL(task.canonicalDestinationUrl as string)}
+                  style={styles.destinationLink}
+                >
+                  <ExternalLink size={14} color={colors.primary} />
+                  <Text style={[styles.destinationLinkText, { color: colors.primary }]}>打开真实去向</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={styles.emptyState}>
+          <FileText size={34} color={colors.text.soft} />
+          <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>{loading ? '正在读取拾言任务' : '还没有拾言任务'}</Text>
+          <Text style={[styles.emptyText, { color: colors.text.soft }]}>完成首次真实采集后，这里会显示任务标题、场景、时间、当前阶段和可打开的投递去向。</Text>
+        </View>
+      )}
     </ScreenShell>
   );
 }
@@ -307,6 +359,9 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDescription: { fontSize: 14, lineHeight: 20 },
   sceneCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: 7 },
+  historyCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  destinationLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start' },
+  destinationLinkText: { fontSize: 13, fontWeight: '600' },
   structureText: { fontSize: 12, lineHeight: 18 },
   pendingBox: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, alignItems: 'flex-start' },
   pendingText: { flex: 1, fontSize: 13, lineHeight: 19 },
