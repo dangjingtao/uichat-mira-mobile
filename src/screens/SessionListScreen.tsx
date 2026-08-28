@@ -57,7 +57,6 @@ import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 const SWIPE_ACTION_WIDTH = 72;
-const SWIPE_ACTIONS_WIDTH = SWIPE_ACTION_WIDTH * 2;
 const SWIPE_OPEN_THRESHOLD = 44;
 
 function formatTime(date: Date): string {
@@ -94,6 +93,7 @@ interface SessionRowProps {
   colors: ReturnType<typeof useTheme>['colors'];
   isPinned: boolean;
   isUnread: boolean;
+  canDelete: boolean;
   onOpen: () => void;
   onTogglePin: () => void;
   onDelete: () => void;
@@ -106,12 +106,14 @@ function SessionRow({
   colors,
   isPinned,
   isUnread,
+  canDelete,
   onOpen,
   onTogglePin,
   onDelete,
 }: SessionRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpenRef = useRef(false);
+  const actionsWidth = SWIPE_ACTION_WIDTH * (canDelete ? 2 : 1);
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
   const preview = belongsToWorkspace
@@ -126,13 +128,13 @@ function SessionRow({
     (open: boolean) => {
       isOpenRef.current = open;
       Animated.spring(translateX, {
-        toValue: open ? SWIPE_ACTIONS_WIDTH : 0,
+        toValue: open ? actionsWidth : 0,
         useNativeDriver: true,
         friction: 9,
         tension: 80,
       }).start();
     },
-    [translateX],
+    [actionsWidth, translateX],
   );
 
   const panResponder = useMemo(
@@ -144,11 +146,8 @@ function SessionRow({
           return gesture.dx > 0 || isOpenRef.current;
         },
         onPanResponderMove: (_event, gesture) => {
-          const base = isOpenRef.current ? SWIPE_ACTIONS_WIDTH : 0;
-          const next = Math.max(
-            0,
-            Math.min(SWIPE_ACTIONS_WIDTH, base + gesture.dx),
-          );
+          const base = isOpenRef.current ? actionsWidth : 0;
+          const next = Math.max(0, Math.min(actionsWidth, base + gesture.dx));
           translateX.setValue(next);
         },
         onPanResponderRelease: (_event, gesture) => {
@@ -160,7 +159,7 @@ function SessionRow({
         },
         onPanResponderTerminate: () => settle(isOpenRef.current),
       }),
-    [settle, translateX],
+    [actionsWidth, settle, translateX],
   );
 
   const handleOpen = useCallback(() => {
@@ -199,22 +198,21 @@ function SessionRow({
             {isPinned ? '取消置顶' : '置顶'}
           </Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`删除：${item.title}`}
-          onPress={handleDelete}
-          style={({ pressed }) => [
-            styles.swipeAction,
-            {
-              backgroundColor: pressed
-                ? colors.status.errorBg
-                : colors.status.error,
-            },
-          ]}
-        >
-          <Trash2 size={18} color={colors.onPrimary} strokeWidth={2} />
-          <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
-        </Pressable>
+        {canDelete ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`删除：${item.title}`}
+            onPress={handleDelete}
+            style={({ pressed }) => [
+              styles.swipeAction,
+              { backgroundColor: colors.status.error },
+              pressed && { opacity: 0.82 },
+            ]}
+          >
+            <Trash2 size={18} color={colors.onPrimary} strokeWidth={2} />
+            <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <Animated.View
@@ -309,6 +307,7 @@ export function SessionListScreen() {
   const clearThreadRead = useThreadReadStore((state) => state.clearThread);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [canDeleteSessions, setCanDeleteSessions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -350,11 +349,16 @@ export function SessionListScreen() {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const list = await miraHostClient.listSessions();
+      const [list, canDelete] = await Promise.all([
+        miraHostClient.listSessions(),
+        miraHostClient.canDeleteSession().catch(() => false),
+      ]);
       setSessions(list);
+      setCanDeleteSessions(canDelete);
       void syncUnreadSessions(list).catch(() => undefined);
     } catch (error) {
       setSessions([]);
+      setCanDeleteSessions(false);
       setLoadError(getSessionLoadErrorMessage(error));
     } finally {
       setIsLoading(false);
@@ -504,6 +508,7 @@ export function SessionListScreen() {
               colors={colors}
               isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
               isUnread={selectThreadUnread(progressByThreadId, item.id)}
+              canDelete={canDeleteSessions}
               onOpen={() => openSession(item)}
               onTogglePin={() => void togglePin(item)}
               onDelete={() => confirmDelete(item)}
