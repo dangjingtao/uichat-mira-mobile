@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  Bootstrap: undefined;
   SessionList: undefined;
   Chat: { sessionId: string; title: string };
   WorkspaceList: undefined;
