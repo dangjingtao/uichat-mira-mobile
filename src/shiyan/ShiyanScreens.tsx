@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -222,25 +222,32 @@ export function ShiyanHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const latestReloadToken = useRef(reloadToken);
+  latestReloadToken.current = reloadToken;
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const attemptToken = reloadToken;
       setLoading(true);
       setLoadFailed(false);
       getShiyanHistoryDataSource()
         .listTasks()
         .then((nextTasks) => {
-          if (active) {
+          if (active && latestReloadToken.current === attemptToken) {
             setTasks(nextTasks);
             setLoadFailed(false);
           }
         })
         .catch(() => {
-          if (active) setLoadFailed(true);
+          if (active && latestReloadToken.current === attemptToken) {
+            setLoadFailed(true);
+          }
         })
         .finally(() => {
-          if (active) setLoading(false);
+          if (active && latestReloadToken.current === attemptToken) {
+            setLoading(false);
+          }
         });
       return () => {
         active = false;
