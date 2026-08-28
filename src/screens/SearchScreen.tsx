@@ -92,10 +92,6 @@ export function SearchScreen() {
 
   const openSession = (session: Session) => {
     const target = resolveSessionOpenTarget(session);
-    if (target.kind === 'workspace-list') {
-      navigation.navigate('WorkspaceList');
-      return;
-    }
     if (target.kind === 'contract-error') {
       Alert.alert('无法打开会话', target.message);
       return;
@@ -226,7 +222,7 @@ export function SearchScreen() {
                       {belongsToWorkspace ? (
                         <>
                           <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
-                          <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
+                          <Text style={[styles.projectHintText, { color: colors.text.soft }]}>项目会话</Text>
                         </>
                       ) : null}
                       {pinned ? (
@@ -245,7 +241,7 @@ export function SearchScreen() {
                 ? '暂无会话'
                 : `没有找到“${query.trim()}”`}
             </Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}> 
               {collectionState === 'empty'
                 ? 'Remote Host V1 当前只搜索桌面端已有会话'
                 : '换个关键词再试试'}
