@@ -1,4 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +11,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -19,6 +25,7 @@ import {
   MessageSquare,
   Pin,
   Settings as SettingsIcon,
+  Trash2,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
@@ -49,6 +56,9 @@ import {
 import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
+const SWIPE_ACTION_WIDTH = 72;
+const SWIPE_ACTIONS_WIDTH = SWIPE_ACTION_WIDTH * 2;
+const SWIPE_OPEN_THRESHOLD = 44;
 
 function formatTime(date: Date): string {
   const now = new Date();
@@ -86,6 +96,7 @@ interface SessionRowProps {
   isUnread: boolean;
   onOpen: () => void;
   onTogglePin: () => void;
+  onDelete: () => void;
 }
 
 function SessionRow({
@@ -97,97 +108,187 @@ function SessionRow({
   isUnread,
   onOpen,
   onTogglePin,
+  onDelete,
 }: SessionRowProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const isOpenRef = useRef(false);
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
   const preview = belongsToWorkspace
-    ? `项目会话${roleName ? ` · ${roleName}` : ''} · 从项目中打开`
+    ? `项目会话${roleName ? ` · ${roleName}` : ''}`
     : roleName
       ? `角色 · ${roleName}`
       : connectionStatus === 'connected'
         ? '继续与 Mira 对话'
         : '连接 Mira Host 后继续对话';
 
-  return (
-    <View
-      style={[
-        styles.sessionItem,
-        {
-          backgroundColor: colors.bg.canvas,
-          borderColor: colors.border.soft,
+  const settle = useCallback(
+    (open: boolean) => {
+      isOpenRef.current = open;
+      Animated.spring(translateX, {
+        toValue: open ? SWIPE_ACTIONS_WIDTH : 0,
+        useNativeDriver: true,
+        friction: 9,
+        tension: 80,
+      }).start();
+    },
+    [translateX],
+  );
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) => {
+          const horizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
+          if (!horizontal || Math.abs(gesture.dx) < 8) return false;
+          return gesture.dx > 0 || isOpenRef.current;
         },
-      ]}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
-        style={({ pressed }) => [
-          styles.sessionOpen,
-          pressed && { backgroundColor: colors.bg.soft },
-        ]}
-        onPress={onOpen}
-      >
-        <View
-          style={[
-            styles.avatar,
+        onPanResponderMove: (_event, gesture) => {
+          const base = isOpenRef.current ? SWIPE_ACTIONS_WIDTH : 0;
+          const next = Math.max(
+            0,
+            Math.min(SWIPE_ACTIONS_WIDTH, base + gesture.dx),
+          );
+          translateX.setValue(next);
+        },
+        onPanResponderRelease: (_event, gesture) => {
+          if (isOpenRef.current) {
+            settle(gesture.dx > -SWIPE_OPEN_THRESHOLD);
+            return;
+          }
+          settle(gesture.dx >= SWIPE_OPEN_THRESHOLD);
+        },
+        onPanResponderTerminate: () => settle(isOpenRef.current),
+      }),
+    [settle, translateX],
+  );
+
+  const handleOpen = useCallback(() => {
+    if (isOpenRef.current) {
+      settle(false);
+      return;
+    }
+    onOpen();
+  }, [onOpen, settle]);
+
+  const handleTogglePin = useCallback(() => {
+    settle(false);
+    onTogglePin();
+  }, [onTogglePin, settle]);
+
+  const handleDelete = useCallback(() => {
+    settle(false);
+    onDelete();
+  }, [onDelete, settle]);
+
+  return (
+    <View style={[styles.swipeRow, { borderColor: colors.border.soft }]}>
+      <View style={styles.swipeActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
+          accessibilityState={{ selected: isPinned }}
+          onPress={handleTogglePin}
+          style={({ pressed }) => [
+            styles.swipeAction,
+            { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+          ]}
+        >
+          <Pin size={18} color={colors.onPrimary} strokeWidth={2} />
+          <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>
+            {isPinned ? '取消置顶' : '置顶'}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`删除：${item.title}`}
+          onPress={handleDelete}
+          style={({ pressed }) => [
+            styles.swipeAction,
             {
-              backgroundColor: colors.bg.card,
-              borderColor: colors.border.default,
+              backgroundColor: pressed
+                ? colors.status.errorBg
+                : colors.status.error,
             },
           ]}
         >
-          <SessionKindIcon
-            session={item}
-            size={22}
-            strokeWidth={1.7}
-            color={colors.primary}
-          />
-        </View>
-        <View style={styles.sessionContent}>
-          <View style={styles.sessionTopRow}>
-            <View style={styles.sessionTitleGroup}>
-              <Text
-                style={[styles.sessionTitle, { color: colors.text.ink }]}
-                numberOfLines={1}
-              >
-                {item.title}
-              </Text>
-              {isUnread ? (
-                <View
-                  accessibilityElementsHidden
-                  style={[styles.unreadDot, { backgroundColor: colors.primary }]}
-                />
-              ) : null}
-            </View>
-            <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
-              {formatTime(item.updatedAt)}
-            </Text>
-          </View>
-          <Text
-            style={[styles.sessionPreview, { color: colors.text.muted }]}
-            numberOfLines={1}
-          >
-            {isPinned ? `本机置顶 · ${preview}` : preview}
-          </Text>
-        </View>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
-        accessibilityState={{ selected: isPinned }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={onTogglePin}
-        style={({ pressed }) => [
-          styles.pinButton,
-          pressed && { backgroundColor: colors.bg.soft },
+          <Trash2 size={18} color={colors.onPrimary} strokeWidth={2} />
+          <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
+        </Pressable>
+      </View>
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.sessionItem,
+          {
+            backgroundColor: colors.bg.canvas,
+            transform: [{ translateX }],
+          },
         ]}
       >
-        <Pin
-          size={18}
-          strokeWidth={isPinned ? 2.2 : 1.7}
-          color={isPinned ? colors.primary : colors.text.soft}
-        />
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
+          style={({ pressed }) => [
+            styles.sessionOpen,
+            pressed && { backgroundColor: colors.bg.soft },
+          ]}
+          onPress={handleOpen}
+        >
+          <View
+            style={[
+              styles.avatar,
+              {
+                backgroundColor: colors.bg.card,
+                borderColor: colors.border.default,
+              },
+            ]}
+          >
+            <SessionKindIcon
+              session={item}
+              size={22}
+              strokeWidth={1.7}
+              color={colors.primary}
+            />
+          </View>
+          <View style={styles.sessionContent}>
+            <View style={styles.sessionTopRow}>
+              <View style={styles.sessionTitleGroup}>
+                {isUnread ? (
+                  <View
+                    accessibilityElementsHidden
+                    style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+                  />
+                ) : null}
+                <Text
+                  style={[styles.sessionTitle, { color: colors.text.ink }]}
+                  numberOfLines={1}
+                >
+                  {item.title}
+                </Text>
+                {isPinned ? (
+                  <Pin
+                    accessibilityElementsHidden
+                    size={14}
+                    strokeWidth={1.7}
+                    color={colors.text.soft}
+                  />
+                ) : null}
+              </View>
+              <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
+                {formatTime(item.updatedAt)}
+              </Text>
+            </View>
+            <Text
+              style={[styles.sessionPreview, { color: colors.text.muted }]}
+              numberOfLines={1}
+            >
+              {preview}
+            </Text>
+          </View>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -205,6 +306,7 @@ export function SessionListScreen() {
   const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
   const hydrateReads = useThreadReadStore((state) => state.hydrate);
   const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
+  const clearThreadRead = useThreadReadStore((state) => state.clearThread);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -271,6 +373,13 @@ export function SessionListScreen() {
     () => sortSessionsByLocalPin(sessions, pinnedAtByThreadId),
     [pinnedAtByThreadId, sessions],
   );
+  const pinnedCount = useMemo(
+    () =>
+      orderedSessions.filter((session) =>
+        isThreadPinned(pinnedAtByThreadId, session.id),
+      ).length,
+    [orderedSessions, pinnedAtByThreadId],
+  );
 
   const collectionState = resolveSessionCollectionState(
     isLoading,
@@ -289,10 +398,6 @@ export function SessionListScreen() {
 
   const openSession = (session: Session) => {
     const target = resolveSessionOpenTarget(session);
-    if (target.kind === 'workspace-list') {
-      navigation.navigate('WorkspaceList');
-      return;
-    }
     if (target.kind === 'contract-error') {
       Alert.alert('无法打开会话', target.message);
       return;
@@ -313,6 +418,34 @@ export function SessionListScreen() {
     } catch {
       Alert.alert('置顶操作失败', '无法保存本机置顶状态，请重试。');
     }
+  };
+
+  const deleteSession = async (session: Session) => {
+    try {
+      await miraHostClient.deleteSession(session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+      await Promise.allSettled([
+        unpinThread(session.id),
+        clearThreadRead(session.id),
+      ]);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : '无法删除该会话，请重试。';
+      Alert.alert('删除失败', message);
+    }
+  };
+
+  const confirmDelete = (session: Session) => {
+    Alert.alert('删除会话', `确定删除“${session.title}”吗？此操作会同步删除桌面端线程。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => void deleteSession(session),
+      },
+    ]);
   };
 
   return (
@@ -356,17 +489,26 @@ export function SessionListScreen() {
         data={orderedSessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
-        renderItem={({ item }) => (
-          <SessionRow
-            item={item}
-            roleName={getSessionRoleName(item, roleNames)}
-            connectionStatus={connectionStatus}
-            colors={colors}
-            isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
-            isUnread={selectThreadUnread(progressByThreadId, item.id)}
-            onOpen={() => openSession(item)}
-            onTogglePin={() => void togglePin(item)}
-          />
+        renderItem={({ item, index }) => (
+          <>
+            {index === 0 && pinnedCount > 0 ? (
+              <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>置顶</Text>
+            ) : null}
+            {index === pinnedCount && pinnedCount > 0 && pinnedCount < orderedSessions.length ? (
+              <Text style={[styles.recentSectionLabel, { color: colors.text.soft }]}>最近对话</Text>
+            ) : null}
+            <SessionRow
+              item={item}
+              roleName={getSessionRoleName(item, roleNames)}
+              connectionStatus={connectionStatus}
+              colors={colors}
+              isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
+              isUnread={selectThreadUnread(progressByThreadId, item.id)}
+              onOpen={() => openSession(item)}
+              onTogglePin={() => void togglePin(item)}
+              onDelete={() => confirmDelete(item)}
+            />
+          </>
         )}
         ListEmptyComponent={() => {
           if (collectionState === 'loading') {
@@ -421,9 +563,7 @@ export function SessionListScreen() {
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
-                Remote Host V1 当前只展示桌面端已有会话
-              </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>Remote Host V1 当前只展示桌面端已有会话</Text>
             </View>
           );
         }}
@@ -491,26 +631,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: { paddingHorizontal: spacing.lg },
+  sectionLabel: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    fontSize: fontSize.captionUppercase,
+  },
+  recentSectionLabel: {
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    fontSize: fontSize.captionUppercase,
+  },
+  swipeRow: {
+    minHeight: 72,
+    overflow: 'hidden',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  swipeActions: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+  },
+  swipeAction: {
+    width: SWIPE_ACTION_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  swipeActionLabel: { fontSize: fontSize.xs, fontWeight: '600' },
   sessionItem: {
     minHeight: 72,
     flexDirection: 'row',
     alignItems: 'stretch',
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sessionOpen: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: spacing.xs,
+    paddingHorizontal: spacing.xs,
     paddingVertical: spacing.md,
-  },
-  pinButton: {
-    width: sizing.touchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    marginVertical: spacing.sm,
   },
   avatar: {
     width: 48,
