@@ -220,18 +220,24 @@ export function ShiyanHistoryScreen() {
   const { colors } = useTheme();
   const [tasks, setTasks] = useState<readonly ShiyanHistoryTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
+      setLoadFailed(false);
       getShiyanHistoryDataSource()
         .listTasks()
         .then((nextTasks) => {
-          if (active) setTasks(nextTasks);
+          if (active) {
+            setTasks(nextTasks);
+            setLoadFailed(false);
+          }
         })
         .catch(() => {
-          if (active) setTasks([]);
+          if (active) setLoadFailed(true);
         })
         .finally(() => {
           if (active) setLoading(false);
@@ -239,12 +245,30 @@ export function ShiyanHistoryScreen() {
       return () => {
         active = false;
       };
-    }, []),
+    }, [reloadToken]),
   );
 
   return (
     <ScreenShell title="历史任务">
-      {tasks.length > 0 ? (
+      {loadFailed ? (
+        <View style={styles.emptyState}>
+          <FileText size={34} color={colors.text.soft} />
+          <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>拾言任务读取失败</Text>
+          <Text style={[styles.emptyText, { color: colors.text.soft }]}>没有把读取失败当成空历史。请检查连接后重新加载。</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="重新加载拾言任务"
+            disabled={loading}
+            onPress={() => setReloadToken((value) => value + 1)}
+            style={({ pressed }) => [
+              styles.retryButton,
+              { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card },
+            ]}
+          >
+            <Text style={[styles.retryButtonText, { color: colors.primary }]}>{loading ? '正在重试' : '重新加载'}</Text>
+          </Pressable>
+        </View>
+      ) : tasks.length > 0 ? (
         <ScrollView contentContainerStyle={styles.content}>
           {tasks.map((task) => (
             <View
@@ -368,6 +392,8 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, gap: spacing.sm },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: spacing.sm },
   emptyText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  retryButton: { minHeight: 42, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.full, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  retryButtonText: { fontSize: 14, fontWeight: '600' },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginTop: spacing.sm },
   input: { minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 15 },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
