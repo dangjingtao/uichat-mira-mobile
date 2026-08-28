@@ -6,7 +6,6 @@ import {
   FolderPlus,
   House,
   Paperclip,
-  Pin,
   Search,
   Share2,
   Trash2,
@@ -14,12 +13,17 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 
-type MenuIcon = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+type MenuIcon = React.ComponentType<{
+  color?: string;
+  size?: number;
+  strokeWidth?: number;
+}>;
 
 interface ConversationMenuItem {
   id: string;
   label: string;
   icon: MenuIcon;
+  enabled?: boolean;
   destructive?: boolean;
   hasChevron?: boolean;
   addTopSpacing?: boolean;
@@ -27,13 +31,18 @@ interface ConversationMenuItem {
 
 const menuItems: ConversationMenuItem[] = [
   { id: 'share', label: '分享', icon: Share2 },
-  { id: 'pin', label: '置顶', icon: Pin },
   { id: 'project', label: '添加到项目', icon: FolderPlus, hasChevron: true },
   { id: 'files', label: '已上传文件', icon: Paperclip },
   { id: 'search', label: '在聊天中查找', icon: Search },
   { id: 'home', label: '添加到首页', icon: House },
   { id: 'archive', label: '归档', icon: Archive },
-  { id: 'delete', label: '删除', icon: Trash2, destructive: true, addTopSpacing: true },
+  {
+    id: 'delete',
+    label: '删除',
+    icon: Trash2,
+    destructive: true,
+    addTopSpacing: true,
+  },
 ];
 
 interface ConversationMenuProps {
@@ -46,7 +55,12 @@ interface ConversationMenuProps {
   onClose: () => void;
 }
 
-export function ConversationMenu({ visible, title, anchor, onClose }: ConversationMenuProps) {
+export function ConversationMenu({
+  visible,
+  title,
+  anchor,
+  onClose,
+}: ConversationMenuProps) {
   const { colors } = useTheme();
 
   return (
@@ -75,27 +89,41 @@ export function ConversationMenu({ visible, title, anchor, onClose }: Conversati
             },
           ]}
         >
-          <Text style={[styles.title, { color: colors.text.muted }]} numberOfLines={1}>
+          <Text
+            style={[styles.title, { color: colors.text.muted }]}
+            numberOfLines={1}
+          >
             {title}
           </Text>
           {menuItems.map((item) => {
-            const itemColor = item.destructive ? colors.status.error : colors.text.ink;
+            const disabled = item.enabled !== true;
+            const itemColor = item.destructive
+              ? colors.status.error
+              : colors.text.ink;
             const Icon = item.icon;
             return (
               <Pressable
                 key={item.id}
                 accessibilityRole="button"
-                accessibilityLabel={item.label}
-                onPress={onClose}
+                accessibilityLabel={
+                  disabled ? `${item.label}，暂不可用` : item.label
+                }
+                accessibilityState={{ disabled }}
+                disabled={disabled}
                 style={({ pressed }) => [
                   styles.item,
                   item.addTopSpacing && styles.itemWithTopSpacing,
-                  pressed && { backgroundColor: colors.bg.soft },
+                  disabled && styles.disabledItem,
+                  pressed && !disabled && { backgroundColor: colors.bg.soft },
                 ]}
               >
                 <Icon size={20} color={itemColor} strokeWidth={2.2} />
-                <Text style={[styles.itemLabel, { color: itemColor }]}>{item.label}</Text>
-                {item.hasChevron && <ChevronRight size={18} color={itemColor} strokeWidth={2.2} />}
+                <Text style={[styles.itemLabel, { color: itemColor }]}>
+                  {item.label}
+                </Text>
+                {item.hasChevron && (
+                  <ChevronRight size={18} color={itemColor} strokeWidth={2.2} />
+                )}
               </Pressable>
             );
           })}
@@ -109,10 +137,10 @@ const styles = StyleSheet.create({
   overlay: { flex: 1 },
   menu: {
     position: 'absolute',
-    width: 212,
+    width: 228,
     paddingVertical: spacing.sm,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.xl,
+    borderRadius: radius.sm,
     overflow: 'hidden',
     ...shadows.composer,
   },
@@ -130,6 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.lg,
   },
+  disabledItem: { opacity: 0.45 },
   itemWithTopSpacing: { marginTop: spacing.sm },
   itemLabel: { flex: 1, fontSize: fontSize.bodyMd, lineHeight: 22 },
 });

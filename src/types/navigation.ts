@@ -1,10 +1,15 @@
 export type RootStackParamList = {
   SessionList: undefined;
   Chat: { sessionId: string; title: string };
+  WorkspaceList: undefined;
+  WorkspaceDetail: { workspaceId: string; workspaceName: string };
   HostConfig:
     | {
         version?: string;
         host?: string;
+        relay?: string;
+        relayId?: string;
+        relayToken?: string;
         challenge?: string;
         code?: string;
       }

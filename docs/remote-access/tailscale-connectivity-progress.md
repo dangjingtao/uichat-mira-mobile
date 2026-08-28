@@ -1,10 +1,9 @@
 # Mira Mobile · Tailscale 联通工程进度
 
-> 最后更新：2026-08-01 19:11（UTC+8）  
+> 最后更新：2026-08-26（UTC+8）
 > 仓库：`dangjingtao/uichat-mira-mobile`  
-> 工作分支：`feature/tomz-tailscale`  
-> 对比分支：`dev`  
-> 当前阶段：**联通主链已完成代码施工，尚未完成构建与真机验收。**
+> 当前分支：`dev`
+> 当前阶段：**远程连接设计已冻结；代码验证和真机验收仍按平台分项进行。**
 
 ## 1. 当前目标
 
@@ -108,7 +107,7 @@ Android 与 iOS 已注册 `mira://pair`。
 - `ios/UIChatMira/Info.plist`
 - `ios/UIChatMira/AppDelegate.swift`
 
-### 2.4 HostConfig 状态拆分
+### 2.4 HostConfig 状态拆分（历史实现，交互规范已收敛）
 
 原有页面的模拟 1.5 秒“连接成功”已移除。
 
@@ -119,7 +118,7 @@ Tailscale 联通：未检查 / 检查中 / 已联通 / 具体故障
 Mira 授权：未配对 / 等待桌面批准 / 已配对 / 已撤销
 ```
 
-未进入 `Tailscale ready` 时，设备申请按钮不可用。页面不再要求用户输入普通登录 Token，也不把 Magic IP 当成默认生产入口；优先使用桌面生成的配对链接与 Serve HTTPS URL。
+当前 canonical 交互不再把 Tailscale 作为用户前置条件：Relay 可用时无需 `Tailscale ready`，只有 Direct 兜底时才探测 Tailscale。页面不要求用户选择 Transport；Relay/Tailscale 仅在连接详情中展示。
 
 主要代码：
 
@@ -193,7 +192,7 @@ Tailscale Connectivity ready
 
 ## 3. 当前验证真相
 
-以下内容已经写入分支，但**尚未声称通过**：
+以下内容属于代码已落地但仍需环境证据的项目，**尚未声称通过**：
 
 - TypeScript typecheck
 - ESLint
@@ -202,7 +201,7 @@ Tailscale Connectivity ready
 - iOS 构建
 - Android 真机 Tailscale 联通
 - iOS 真机 Tailscale 联通
-- Mobile 与 Desktop Host 的完整配对闭环
+- Mobile 与 Desktop Host 的完整配对闭环（Relay-first 与 Direct fallback）
 - Wi-Fi / 蜂窝 / VPN 切换恢复
 - 设备撤销后的重新配对
 
@@ -217,19 +216,19 @@ Tailscale Connectivity ready
 | `/health` + `/app/meta` | 已施工 | 已施工 | 未真机验证 |
 | DNS 独立分类 | 原生实现 | 暂无原生实现 | 未验证 |
 | TLS 独立分类 | 原生实现 | 依赖系统 fetch 错误 | 未验证 |
-| VPN / Wi-Fi / 蜂窝监听 | 原生实现 | 待实现 | 未验证 |
+| VPN / Wi-Fi / 蜂窝监听 | 原生实现 | 前台网络变化可由跨平台层覆盖；原生监听为增强项 | 未验证 |
 | 回前台重新探测 | 已施工 | 已施工 | 未验证 |
 | claim 前联通门禁 | 已施工 | 已施工 | 未验证 |
-| 设备凭证安全存储 | Keystore 已施工 | Keychain 待实现 | 未验证 |
+| 设备凭证安全存储 | Keystore 已施工 | Keychain 待实现，未作为 Android/Relay 设计阻塞项 | 未验证 |
 | claim / poll / manifest | 已施工 | Keychain 完成前主动阻断 | 未验证 |
-| Session / Chat 切真实 Host | 尚未进入主施工 | 尚未进入主施工 | 未开始 |
+| Session / Chat 切真实 Host | 后续应用层阶段 | 后续应用层阶段 | 未开始 |
 
 ## 5. 当前缺口
 
-### P0：必须先完成
+### P0：必须先完成（环境验收，不是设计缺口）
 
-1. 拉取 `feature/tomz-tailscale` 到本地执行 typecheck、lint 和 Jest。
-2. 完成 Android Debug 构建，修复 Kotlin / React Native 0.86 原生桥编译问题。
+1. 在 `dev` 工作区执行 typecheck、lint 和 Jest，并保存结果。
+2. 完成 Android Debug 构建，修复 Kotlin / React Native 0.86 原生桥编译问题（如有）。
 3. 使用 Android 真机连接同一 Tailnet，验证：
    - MagicDNS
    - Serve HTTPS

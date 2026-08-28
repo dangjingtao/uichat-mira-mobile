@@ -7,6 +7,14 @@ export interface Session {
   id: string;
   title: string;
   updatedAt: Date;
+  /** Canonical Host ownership metadata. Optional for legacy mock/story sessions. */
+  workspaceId?: string | null;
+  knowledgeBaseId?: string | null;
+  roleId?: string | null;
+  agentEnabled?: boolean | null;
+  status?: string;
+  /** Canonical Remote Thread message count, used only as a change probe. */
+  messageCount?: number;
 }
 
 export interface ChatMessage {

@@ -6,9 +6,9 @@ import {
 } from '../api/remoteMiraHost';
 import {
   REMOTE_DEVICE_SCOPES,
-  type PairingDescriptor,
   type RemoteDeviceScope,
 } from '../protocol/remoteHostV1';
+import type { PairingDescriptorV1 } from '../protocol/remotePairingV1';
 
 export type RemotePairingPhase =
   | 'idle'
@@ -38,10 +38,7 @@ const INITIAL_STATE: RemotePairingViewState = {
 
 const POLL_INTERVAL_MS = 1_500;
 
-export const useRemotePairing = (
-  descriptor: PairingDescriptor | null,
-  connectivityReady: boolean,
-) => {
+export const useRemotePairing = (descriptor: PairingDescriptorV1 | null) => {
   const [state, setState] = useState<RemotePairingViewState>(INITIAL_STATE);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingGeneration = useRef(0);
@@ -61,7 +58,13 @@ export const useRemotePairing = (
 
   useEffect(() => {
     reset();
-  }, [descriptor?.challengeId, descriptor?.hostUrl, reset]);
+  }, [
+    descriptor?.challengeId,
+    descriptor?.hostUrl,
+    descriptor?.relay?.endpoint,
+    descriptor?.relay?.relayId,
+    reset,
+  ]);
 
   useEffect(() => stopPolling, [stopPolling]);
 
@@ -124,7 +127,7 @@ export const useRemotePairing = (
             return;
           }
 
-          setState((current) => ({
+          setState(current => ({
             ...current,
             phase: 'waiting_approval',
             pending,
@@ -159,14 +162,6 @@ export const useRemotePairing = (
       });
       return;
     }
-    if (!connectivityReady) {
-      setState({
-        ...INITIAL_STATE,
-        phase: 'blocked',
-        message: 'Tailscale 联通尚未通过，未提交配对申请。',
-      });
-      return;
-    }
     if (!remoteMiraHostClient.isSecureStorageAvailable()) {
       setState({
         ...INITIAL_STATE,
@@ -177,10 +172,11 @@ export const useRemotePairing = (
     }
 
     stopPolling();
+    const generation = pollingGeneration.current;
     setState({
       ...INITIAL_STATE,
       phase: 'claiming',
-      message: '正在向 Mira Desktop 提交设备申请。',
+      message: '正在连接桌面并提交设备申请。',
     });
 
     try {
@@ -189,8 +185,11 @@ export const useRemotePairing = (
         platform: Platform.OS,
         requestedScopes: [...REMOTE_DEVICE_SCOPES],
       });
+      if (generation !== pollingGeneration.current) return;
+
       const pending: PendingPairing = {
         descriptor,
+        transport: claim.transport,
         claimId: claim.claimId,
         pollToken: claim.pollToken,
         expiresAt: claim.expiresAt,
@@ -204,13 +203,22 @@ export const useRemotePairing = (
       });
       beginPolling(pending);
     } catch (error) {
+      if (generation !== pollingGeneration.current) return;
+      if (error instanceof Error && 'code' in error && error.code === 'PAIRING_CLAIM_UNCERTAIN') {
+        setState({
+          ...INITIAL_STATE,
+          phase: 'error',
+          message: '设备申请状态不确定，请回到 Mira Desktop 确认是否已收到申请；不要通过另一条通道重新提交。',
+        });
+        return;
+      }
       setState({
         ...INITIAL_STATE,
         phase: 'error',
         message: error instanceof Error ? error.message : '提交配对申请失败',
       });
     }
-  }, [beginPolling, connectivityReady, descriptor, stopPolling]);
+  }, [beginPolling, descriptor, stopPolling]);
 
   return {
     state,

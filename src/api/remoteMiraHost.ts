@@ -2,14 +2,12 @@ import { Platform } from 'react-native';
 import {
   parsePairingClaimResponse,
   parsePairingPollResponse,
-  parsePairingUri,
   parseRemoteAgentRun,
   parseRemoteChatStreamEvent,
   parseRemoteManifest,
   parseRemoteMessage,
   parseRemoteThread,
   type PairingClaimResponse,
-  type PairingDescriptor,
   type PairingPollResponse,
   type RemoteAgentRun,
   type RemoteChatStreamEvent,
@@ -19,16 +17,27 @@ import {
   type RemoteThread,
 } from '../protocol/remoteHostV1';
 import {
+  parsePairingUriV1,
+  type PairingDescriptorV1,
+  type RemoteRelayEndpoint,
+} from '../protocol/remotePairingV1';
+import {
   deviceCredentialStore,
   type DeviceCredentialStore,
   type StoredDeviceCredential,
 } from '../security/deviceCredentialStore';
-import { openPostSse, type PostSseSession } from './postSse';
+import { openPostSse, type PostSseRequest, type PostSseSession } from './postSse';
 import {
   RemoteHostError,
   requestRemoteJson,
   type RemoteJsonRequest,
 } from './remoteHttp';
+import {
+  closeRelayConnections,
+  isRelayTransportError,
+  openRelayPostSse,
+  requestRelayJson,
+} from './remoteRelay';
 
 export interface MobileDeviceIdentity {
   name: string;
@@ -37,8 +46,11 @@ export interface MobileDeviceIdentity {
   requestedScopes?: RemoteDeviceScope[];
 }
 
+export type RemoteTransportKind = 'direct' | 'relay';
+
 export interface PendingPairing {
-  descriptor: PairingDescriptor;
+  descriptor: PairingDescriptorV1;
+  transport: RemoteTransportKind;
   claimId: string;
   pollToken: string;
   expiresAt: string;
@@ -53,12 +65,37 @@ export interface SendRemoteMessageInput {
   threadId: string;
   messageId: string;
   content: string;
+  messages?: Array<{
+    id?: string;
+    role: 'system' | 'user' | 'assistant';
+    parts: RemoteMessage['parts'];
+  }>;
   agentEnabled?: boolean;
   requestedToolGroupIds?: string[];
 }
 
 type RemoteJsonTransport = <T>(request: RemoteJsonRequest<T>) => Promise<T>;
 type RemoteSseTransport = typeof openPostSse;
+type RemoteRelayJsonTransport = typeof requestRelayJson;
+type RemoteRelaySseTransport = typeof openRelayPostSse;
+type JsonOperation<T> = Omit<
+  RemoteJsonRequest<T>,
+  'hostUrl' | 'allowInsecureDevelopment'
+>;
+type SseOperation<T> = Omit<
+  PostSseRequest<T>,
+  'hostUrl' | 'allowInsecureDevelopment'
+>;
+type RemoteEndpoints = {
+  hostUrl: string | null;
+  relay: RemoteRelayEndpoint | null;
+};
+
+type PairingClaimWithTransport = PairingClaimResponse & {
+  transport: RemoteTransportKind;
+};
+
+const DIRECT_RETRY_COOLDOWN_MS = 30_000;
 
 const parseArray = <T>(
   value: unknown,
@@ -76,13 +113,19 @@ const normalizeDeviceName = (value: string) => {
   return normalized || 'Mira Mobile';
 };
 
+const isDirectNetworkError = (error: unknown) =>
+  error instanceof RemoteHostError && error.code === 'NETWORK_ERROR';
+
 export class RemoteMiraHostClient {
   private activeCredential: StoredDeviceCredential | null = null;
+  private directRetryAfter = 0;
 
   constructor(
     private readonly credentialStore: DeviceCredentialStore = deviceCredentialStore,
     private readonly jsonTransport: RemoteJsonTransport = requestRemoteJson,
     private readonly sseTransport: RemoteSseTransport = openPostSse,
+    private readonly relayJsonTransport: RemoteRelayJsonTransport = requestRelayJson,
+    private readonly relaySseTransport: RemoteRelaySseTransport = openRelayPostSse,
   ) {}
 
   isSecureStorageAvailable() {
@@ -98,10 +141,11 @@ export class RemoteMiraHostClient {
     pairingUri: string,
     identity: MobileDeviceIdentity,
   ): Promise<PendingPairing> {
-    const descriptor = parsePairingUri(pairingUri);
+    const descriptor = parsePairingUriV1(pairingUri);
     const claim = await this.claimPairing(descriptor, identity);
     return {
       descriptor,
+      transport: claim.transport,
       claimId: claim.claimId,
       pollToken: claim.pollToken,
       expiresAt: claim.expiresAt,
@@ -109,37 +153,41 @@ export class RemoteMiraHostClient {
   }
 
   async claimPairing(
-    descriptor: PairingDescriptor,
+    descriptor: PairingDescriptorV1,
     identity: MobileDeviceIdentity,
-  ): Promise<PairingClaimResponse> {
-    return this.jsonTransport({
-      hostUrl: descriptor.hostUrl,
-      path: '/remote/pairing/claim',
-      method: 'POST',
-      allowInsecureDevelopment: __DEV__,
-      body: {
-        challengeId: descriptor.challengeId,
-        code: descriptor.code,
-        deviceName: normalizeDeviceName(identity.name),
-        platform: identity.platform ?? Platform.OS,
-        ...(identity.publicKey ? { publicKey: identity.publicKey } : {}),
-        ...(identity.requestedScopes
-          ? { requestedScopes: identity.requestedScopes }
-          : {}),
-      },
-      parse: parsePairingClaimResponse,
-    });
+  ): Promise<PairingClaimWithTransport> {
+    const transport = await this.selectPairingTransport(descriptor);
+    let claim: PairingClaimResponse;
+    try {
+      claim = await this.claimPairingOnTransport(descriptor, identity, transport);
+    } catch (error) {
+      if (
+        isDirectNetworkError(error) ||
+        (transport === 'relay' && isRelayTransportError(error))
+      ) {
+        throw new RemoteHostError(
+          'PAIRING_CLAIM_UNCERTAIN',
+          'Mira Desktop may have received the pairing request; do not retry through another transport',
+          undefined,
+          error,
+        );
+      }
+      throw error;
+    }
+    return { ...claim, transport };
   }
 
   async pollPairing(pending: PendingPairing): Promise<PairingPollResponse> {
-    const result = await this.jsonTransport({
-      hostUrl: pending.descriptor.hostUrl,
-      path: `/remote/pairing/claims/${encodeURIComponent(pending.claimId)}/poll`,
-      method: 'POST',
-      allowInsecureDevelopment: __DEV__,
-      body: { pollToken: pending.pollToken },
-      parse: parsePairingPollResponse,
-    });
+    const result = await this.requestJsonOnTransport(
+      pending.descriptor,
+      pending.transport,
+      {
+        path: `/remote/pairing/claims/${encodeURIComponent(pending.claimId)}/poll`,
+        method: 'POST',
+        body: { pollToken: pending.pollToken },
+        parse: parsePairingPollResponse,
+      },
+    );
 
     if (!result.credential) {
       return result;
@@ -153,6 +201,7 @@ export class RemoteMiraHostClient {
 
     const stored: StoredDeviceCredential = {
       hostUrl: pending.descriptor.hostUrl,
+      relay: pending.descriptor.relay,
       credential: result.credential,
       deviceId: result.deviceId,
       scopes: result.scopes,
@@ -162,10 +211,7 @@ export class RemoteMiraHostClient {
     this.activeCredential = stored;
 
     try {
-      const manifest = await this.getManifestWithCredential(
-        pending.descriptor.hostUrl,
-        result.credential,
-      );
+      const manifest = await this.getManifestWithCredential(stored);
       if (manifest.device.id !== result.deviceId) {
         await this.credentialStore.clear();
         this.activeCredential = null;
@@ -202,10 +248,7 @@ export class RemoteMiraHostClient {
     }
 
     try {
-      const manifest = await this.getManifestWithCredential(
-        stored.hostUrl,
-        stored.credential,
-      );
+      const manifest = await this.getManifestWithCredential(stored);
       const refreshed: StoredDeviceCredential = {
         ...stored,
         deviceId: manifest.device.id,
@@ -227,49 +270,77 @@ export class RemoteMiraHostClient {
 
   async disconnect() {
     this.activeCredential = null;
+    this.directRetryAfter = 0;
+    closeRelayConnections();
     await this.credentialStore.clear();
   }
 
   async getManifest(): Promise<RemoteManifest> {
     const credential = await this.requireCredential();
-    return this.getManifestWithCredential(
-      credential.hostUrl,
-      credential.credential,
-    );
+    return this.getManifestWithCredential(credential);
   }
 
   async listThreads(): Promise<RemoteThread[]> {
-    return this.withCredential((credential) =>
-      this.jsonTransport({
-        hostUrl: credential.hostUrl,
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
         path: '/threads?status=active&sortBy=updatedAt&sortOrder=desc',
         credential: credential.credential,
-        allowInsecureDevelopment: __DEV__,
-        parse: (value) => parseArray(value, parseRemoteThread, 'threads'),
+        parse: value => parseArray(value, parseRemoteThread, 'threads'),
       }),
     );
   }
 
   async getThread(threadId: string): Promise<RemoteThread> {
-    return this.withCredential((credential) =>
-      this.jsonTransport({
-        hostUrl: credential.hostUrl,
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
         path: `/threads/${encodeURIComponent(threadId)}`,
         credential: credential.credential,
-        allowInsecureDevelopment: __DEV__,
         parse: parseRemoteThread,
       }),
     );
   }
 
   async getMessages(threadId: string): Promise<RemoteMessage[]> {
-    return this.withCredential((credential) =>
-      this.jsonTransport({
-        hostUrl: credential.hostUrl,
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
         path: `/threads/${encodeURIComponent(threadId)}/messages`,
         credential: credential.credential,
-        allowInsecureDevelopment: __DEV__,
-        parse: (value) => parseArray(value, parseRemoteMessage, 'messages'),
+        parse: value => parseArray(value, parseRemoteMessage, 'messages'),
+      }),
+    );
+  }
+
+  async createThread(title?: string): Promise<RemoteThread> {
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
+        path: '/threads',
+        method: 'POST',
+        credential: credential.credential,
+        ...(title ? { body: { title } } : {}),
+        parse: parseRemoteThread,
+      }),
+    );
+  }
+
+  async renameThread(threadId: string, title: string): Promise<RemoteThread> {
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
+        path: `/threads/${encodeURIComponent(threadId)}`,
+        method: 'PATCH',
+        credential: credential.credential,
+        body: { title },
+        parse: parseRemoteThread,
+      }),
+    );
+  }
+
+  async deleteThread(threadId: string): Promise<void> {
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
+        path: `/threads/${encodeURIComponent(threadId)}`,
+        method: 'DELETE',
+        credential: credential.credential,
+        parse: () => undefined,
       }),
     );
   }
@@ -288,24 +359,73 @@ export class RemoteMiraHostClient {
       );
     }
 
-    const credential = await this.requireCredential();
-    return this.sseTransport({
-      hostUrl: credential.hostUrl,
-      path: '/proxy/chat/default',
-      credential: credential.credential,
-      allowInsecureDevelopment: __DEV__,
-      body: {
-        id: input.threadId,
-        messageId: input.messageId,
-        messages: [{ role: 'user', content }],
-        ...(typeof input.agentEnabled === 'boolean'
-          ? { agentEnabled: input.agentEnabled }
-          : {}),
-        ...(input.requestedToolGroupIds
-          ? { requestedToolGroupIds: input.requestedToolGroupIds }
-          : {}),
-      },
-      parse: parseRemoteChatStreamEvent,
+    const messages = input.messages?.length
+      ? input.messages
+      : [
+          {
+            id: input.messageId,
+            role: 'user' as const,
+            parts: [{ type: 'text' as const, text: content }],
+          },
+        ];
+
+    return this.withCredential(async credential => {
+      const sseOperation: SseOperation<RemoteChatStreamEvent> = {
+        path: '/proxy/chat/default',
+        credential: credential.credential,
+        body: {
+          id: input.threadId,
+          messageId: input.messageId,
+          messages,
+          ...(typeof input.agentEnabled === 'boolean'
+            ? { agentEnabled: input.agentEnabled }
+            : {}),
+          ...(input.requestedToolGroupIds
+            ? { requestedToolGroupIds: input.requestedToolGroupIds }
+            : {}),
+        },
+        parse: parseRemoteChatStreamEvent,
+      };
+
+      // Probe with an idempotent manifest read before opening the side-effecting
+      // chat stream. This chooses Direct or Relay without blindly replaying POST.
+      // If the selected transport fails between the probe and the SSE open, retry
+      // with the other transport.
+      const order = this.transportOrder(credential);
+      let lastError: unknown = new RemoteHostError(
+        'REMOTE_ENDPOINT_UNAVAILABLE',
+        'No Mira remote endpoint is available for sending a message',
+      );
+
+      for (let index = 0; index < order.length; index += 1) {
+        const transport = order[index];
+        try {
+          // Probe — idempotent, safe to retry.
+          await this.requestJsonOnTransport(credential, transport, {
+            path: '/remote/v1/manifest',
+            credential: credential.credential,
+            parse: parseRemoteManifest,
+          });
+          if (transport === 'direct') this.directRetryAfter = 0;
+          // Open SSE on the confirmed transport.
+          return this.openSseOnTransport(credential, transport, sseOperation);
+        } catch (error) {
+          lastError = error;
+          const hasNext = index + 1 < order.length;
+          if (!hasNext) throw error;
+
+          if (transport === 'direct' && isDirectNetworkError(error)) {
+            this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
+            continue;
+          }
+          if (transport === 'relay' && isRelayTransportError(error)) {
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      throw lastError;
     });
   }
 
@@ -326,21 +446,83 @@ export class RemoteMiraHostClient {
   }
 
   getThreadMediaRequest(threadId: string, mediaId: string) {
-    return this.requireCredential().then((credential) => ({
-      url: `${credential.hostUrl}/threads/${encodeURIComponent(threadId)}/media/${encodeURIComponent(mediaId)}/content`,
-      headers: { Authorization: `Bearer ${credential.credential}` },
-    }));
+    return this.requireCredential().then(credential => {
+      if (!credential.hostUrl) {
+        throw new RemoteHostError(
+          'DIRECT_MEDIA_ENDPOINT_REQUIRED',
+          'This media request currently requires a Direct Mira Host endpoint',
+        );
+      }
+      return {
+        url: `${credential.hostUrl}/threads/${encodeURIComponent(threadId)}/media/${encodeURIComponent(mediaId)}/content`,
+        headers: { Authorization: `Bearer ${credential.credential}` },
+      };
+    });
+  }
+
+  private async selectPairingTransport(
+    descriptor: PairingDescriptorV1,
+  ): Promise<RemoteTransportKind> {
+    if (descriptor.relay) {
+      try {
+        await this.requestJsonOnTransport(descriptor, 'relay', {
+          path: '/health',
+          raw: true,
+          parse: value => value,
+        });
+        return 'relay';
+      } catch (error) {
+        if (!isRelayTransportError(error) || !descriptor.hostUrl) throw error;
+      }
+    }
+
+    if (!descriptor.hostUrl) {
+      throw new RemoteHostError(
+        'PAIRING_ENDPOINT_UNAVAILABLE',
+        'No Mira pairing endpoint is available',
+      );
+    }
+
+    await this.jsonTransport({
+      hostUrl: descriptor.hostUrl,
+      path: '/health',
+      allowInsecureDevelopment: __DEV__,
+      raw: true,
+      parse: value => value,
+    });
+    this.directRetryAfter = 0;
+    return 'direct';
+  }
+
+  private async claimPairingOnTransport(
+    descriptor: PairingDescriptorV1,
+    identity: MobileDeviceIdentity,
+    transport: RemoteTransportKind,
+  ): Promise<PairingClaimResponse> {
+    return this.requestJsonOnTransport(descriptor, transport, {
+      path: '/remote/pairing/claim',
+      method: 'POST',
+      body: {
+        challengeId: descriptor.challengeId,
+        code: descriptor.code,
+        deviceName: normalizeDeviceName(identity.name),
+        platform: identity.platform ?? Platform.OS,
+        transport,
+        ...(identity.publicKey ? { publicKey: identity.publicKey } : {}),
+        ...(identity.requestedScopes
+          ? { requestedScopes: identity.requestedScopes }
+          : {}),
+      },
+      parse: parsePairingClaimResponse,
+    });
   }
 
   private async getManifestWithCredential(
-    hostUrl: string,
-    credential: string,
+    credential: StoredDeviceCredential,
   ): Promise<RemoteManifest> {
-    return this.jsonTransport({
-      hostUrl,
+    return this.requestCredentialJson(credential, {
       path: '/remote/v1/manifest',
-      credential,
-      allowInsecureDevelopment: __DEV__,
+      credential: credential.credential,
       parse: parseRemoteManifest,
     });
   }
@@ -350,16 +532,142 @@ export class RemoteMiraHostClient {
     method: 'GET' | 'POST',
     suffix: string,
   ): Promise<RemoteAgentRun> {
-    return this.withCredential((credential) =>
-      this.jsonTransport({
-        hostUrl: credential.hostUrl,
+    return this.withCredential(credential =>
+      this.requestCredentialJson(credential, {
         path: `/agent/runs/${encodeURIComponent(runId)}${suffix}`,
         method,
         credential: credential.credential,
-        allowInsecureDevelopment: __DEV__,
         parse: parseRemoteAgentRun,
       }),
     );
+  }
+
+  private async requestCredentialJson<T>(
+    credential: StoredDeviceCredential,
+    operation: JsonOperation<T>,
+  ): Promise<T> {
+    const result = await this.requestAcrossEndpoints(credential, operation);
+    return result.value;
+  }
+
+  private async requestAcrossEndpoints<T>(
+    endpoints: RemoteEndpoints,
+    operation: JsonOperation<T>,
+  ): Promise<{ value: T; transport: RemoteTransportKind }> {
+    const order = this.transportOrder(endpoints);
+    let lastError: unknown = new RemoteHostError(
+      'REMOTE_ENDPOINT_UNAVAILABLE',
+      'No Mira remote endpoint is available',
+    );
+
+    for (let index = 0; index < order.length; index += 1) {
+      const transport = order[index];
+      try {
+        const value = await this.requestJsonOnTransport(
+          endpoints,
+          transport,
+          operation,
+        );
+        if (transport === 'direct') this.directRetryAfter = 0;
+        return { value, transport };
+      } catch (error) {
+        lastError = error;
+        const hasNext = index + 1 < order.length;
+        if (!hasNext) throw error;
+
+        if (transport === 'direct' && isDirectNetworkError(error)) {
+          this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
+          continue;
+        }
+        if (transport === 'relay' && isRelayTransportError(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  private transportOrder(endpoints: RemoteEndpoints): RemoteTransportKind[] {
+    const hasDirect = Boolean(endpoints.hostUrl);
+    const hasRelay = Boolean(endpoints.relay);
+    if (hasDirect && hasRelay) {
+      return Date.now() >= this.directRetryAfter
+        ? ['direct', 'relay']
+        : ['relay', 'direct'];
+    }
+    if (hasDirect) return ['direct'];
+    if (hasRelay) return ['relay'];
+    return [];
+  }
+
+  private requestJsonOnTransport<T>(
+    endpoints: RemoteEndpoints,
+    transport: RemoteTransportKind,
+    operation: JsonOperation<T>,
+  ): Promise<T> {
+    if (transport === 'direct') {
+      if (!endpoints.hostUrl) {
+        return Promise.reject(
+          new RemoteHostError(
+            'DIRECT_ENDPOINT_UNAVAILABLE',
+            'Direct Mira Host endpoint is unavailable',
+          ),
+        );
+      }
+      return this.jsonTransport({
+        ...operation,
+        hostUrl: endpoints.hostUrl,
+        allowInsecureDevelopment: __DEV__,
+      });
+    }
+
+    if (!endpoints.relay) {
+      return Promise.reject(
+        new RemoteHostError(
+          'RELAY_ENDPOINT_UNAVAILABLE',
+          'Mira Relay endpoint is unavailable',
+        ),
+      );
+    }
+    return this.relayJsonTransport(endpoints.relay, {
+      ...operation,
+      hostUrl: endpoints.relay.endpoint,
+      allowInsecureDevelopment: false,
+    });
+  }
+
+  private openSseOnTransport<T>(
+    endpoints: RemoteEndpoints,
+    transport: RemoteTransportKind,
+    operation: SseOperation<T>,
+  ): PostSseSession<T> {
+    if (transport === 'direct') {
+      if (!endpoints.hostUrl) {
+        throw new RemoteHostError(
+          'DIRECT_ENDPOINT_UNAVAILABLE',
+          'Direct Mira Host endpoint is unavailable',
+        );
+      }
+      return this.sseTransport({
+        ...operation,
+        hostUrl: endpoints.hostUrl,
+        allowInsecureDevelopment: __DEV__,
+      });
+    }
+
+    if (!endpoints.relay) {
+      throw new RemoteHostError(
+        'RELAY_ENDPOINT_UNAVAILABLE',
+        'Mira Relay endpoint is unavailable',
+      );
+    }
+    return this.relaySseTransport(endpoints.relay, {
+      ...operation,
+      hostUrl: endpoints.relay.endpoint,
+      allowInsecureDevelopment: false,
+    });
   }
 
   private async withCredential<T>(
