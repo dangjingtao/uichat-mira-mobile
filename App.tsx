@@ -6,6 +6,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BootstrapScreen } from './src/screens/BootstrapScreen';
 import { SessionListScreen } from './src/screens/SessionListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { WorkspaceListScreen } from './src/screens/WorkspaceListScreen';
@@ -17,6 +18,13 @@ import { PersonalizationScreen } from './src/screens/PersonalizationScreen';
 import { ReportErrorScreen } from './src/screens/ReportErrorScreen';
 import { AboutScreen } from './src/screens/AboutScreen';
 import { LicenseScreen } from './src/screens/LicenseScreen';
+import {
+  PluginsScreen,
+  ShiyanHistoryScreen,
+  ShiyanHomeScreen,
+  ShiyanSceneConfigScreen,
+  ShiyanSceneSelectScreen,
+} from './src/shiyan/ShiyanScreens';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
@@ -104,9 +112,10 @@ function AppInner() {
     <>
       <TailscaleConnectivityLifecycle />
       <Stack.Navigator
-        initialRouteName={hasDeviceCredential ? 'SessionList' : 'HostConfig'}
+        initialRouteName={hasDeviceCredential ? 'SessionList' : 'Bootstrap'}
         screenOptions={{ headerShown: false }}
       >
+        <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
         <Stack.Screen name="SessionList" component={SessionListScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="WorkspaceList" component={WorkspaceListScreen} />
@@ -115,6 +124,11 @@ function AppInner() {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="Personalization" component={PersonalizationScreen} />
+        <Stack.Screen name="Plugins" component={PluginsScreen} />
+        <Stack.Screen name="ShiyanHome" component={ShiyanHomeScreen} />
+        <Stack.Screen name="ShiyanSceneSelect" component={ShiyanSceneSelectScreen} />
+        <Stack.Screen name="ShiyanHistory" component={ShiyanHistoryScreen} />
+        <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="License" component={LicenseScreen} />

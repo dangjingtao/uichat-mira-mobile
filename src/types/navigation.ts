@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  Bootstrap: undefined;
   SessionList: undefined;
   Chat: { sessionId: string; title: string };
   WorkspaceList: undefined;
@@ -17,6 +18,11 @@ export type RootStackParamList = {
   Settings: undefined;
   Search: undefined;
   Personalization: undefined;
+  Plugins: undefined;
+  ShiyanHome: undefined;
+  ShiyanSceneSelect: undefined;
+  ShiyanHistory: undefined;
+  ShiyanSceneConfig: undefined;
   ReportError: undefined;
   About: undefined;
   License: undefined;

@@ -139,6 +139,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     navigation.navigate('HostConfig');
   };
 
+  const handleOpenPlugins = () => {
+    onClose();
+    navigation.navigate('Plugins');
+  };
+
   const handleUiOnlyChat = useCallback(() => undefined, []);
 
   return (
@@ -177,19 +182,24 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.categories}>
           {categories.map((cat) => {
-            const interactive = cat.id === 'remote' || cat.id === 'workspaces';
+            const interactive =
+              cat.id === 'remote' || cat.id === 'workspaces' || cat.id === 'plugins';
             const onPress =
               cat.id === 'remote'
                 ? handleOpenRemoteConnection
                 : cat.id === 'workspaces'
                   ? handleOpenWorkspaces
-                  : undefined;
+                  : cat.id === 'plugins'
+                    ? handleOpenPlugins
+                    : undefined;
             const accessibilityLabel =
               cat.id === 'remote'
                 ? 'Remote connection'
                 : cat.id === 'workspaces'
                   ? '项目'
-                  : undefined;
+                  : cat.id === 'plugins'
+                    ? '插件'
+                    : undefined;
 
             return (
               <Pressable
