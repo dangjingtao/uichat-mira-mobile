@@ -6,6 +6,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BootstrapScreen } from './src/screens/BootstrapScreen';
 import { SessionListScreen } from './src/screens/SessionListScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { WorkspaceListScreen } from './src/screens/WorkspaceListScreen';
@@ -111,9 +112,10 @@ function AppInner() {
     <>
       <TailscaleConnectivityLifecycle />
       <Stack.Navigator
-        initialRouteName={hasDeviceCredential ? 'SessionList' : 'HostConfig'}
+        initialRouteName={hasDeviceCredential ? 'SessionList' : 'Bootstrap'}
         screenOptions={{ headerShown: false }}
       >
+        <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
         <Stack.Screen name="SessionList" component={SessionListScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="WorkspaceList" component={WorkspaceListScreen} />
