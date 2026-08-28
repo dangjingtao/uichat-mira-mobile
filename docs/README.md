@@ -10,7 +10,8 @@ Mobile 新能力仍只消费 Mira Host 的 canonical contract；跨到 Desktop /
 
 ## 功能设计
 
-- [会议采集 MVP 设计](meeting-capture-mvp.md) — Mobile 录音 → R2 → STT → LLM 整理 → GitHub Markdown；当前为设计草案，未进入施工。
+- [拾言（Shiyan）功能唯一真相](shiyan/README.md) — 拾言的产品定义、核心流程、任务状态语义、关键数据边界与跨仓库合同均以此为准。
+- [会议采集 MVP 早期技术草案](meeting-capture-mvp.md) — 保留早期讨论与技术探索；与拾言唯一真相冲突时，以 `docs/shiyan/README.md` 为准。
 
 ## 工程与发布
 
