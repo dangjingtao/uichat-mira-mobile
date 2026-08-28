@@ -16,6 +16,16 @@ describe('Shiyan navigation contract', () => {
     expect(app).toContain('<Stack.Screen name="ShiyanHome" component={ShiyanHomeScreen} />');
   });
 
+  it('keeps Shiyan reachable before Host pairing', () => {
+    const bootstrap = readSource('src/screens/BootstrapScreen.tsx');
+    const app = readSource('App.tsx');
+
+    expect(app).toContain("initialRouteName={hasDeviceCredential ? 'SessionList' : 'Bootstrap'}");
+    expect(app).toContain('<Stack.Screen name="Bootstrap" component={BootstrapScreen} />');
+    expect(bootstrap).toContain("navigation.navigate('HostConfig')");
+    expect(bootstrap).toContain("navigation.navigate('Plugins')");
+  });
+
   it('keeps both required Shiyan Home destinations registered and reachable', () => {
     const shiyan = readSource('src/shiyan/ShiyanScreens.tsx');
     const app = readSource('App.tsx');
