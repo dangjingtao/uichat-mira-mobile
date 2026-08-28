@@ -194,7 +194,6 @@ export function ChatScreen() {
     () =>
       StyleSheet.create({
         userBubble: { backgroundColor: colors.text.ink },
-        failedBubble: { backgroundColor: colors.status.errorBg },
       }),
     [colors],
   );
@@ -394,7 +393,6 @@ export function ChatScreen() {
                 styles.bubble,
                 isUser ? styles.userBubble : styles.assistantBubble,
                 isUser && themedStyles.userBubble,
-                isFailed && themedStyles.failedBubble,
               ]}
             >
               {isUser ? (
