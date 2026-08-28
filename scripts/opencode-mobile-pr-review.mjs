@@ -153,7 +153,7 @@ const prompt = `You are the independent, read-only pull-request reviewer for Mir
 
 Before reviewing, you MUST use OpenCode's skill tool to load the project skill named \`mira-mobile-pr-review\` and follow it. Do not substitute a generic mobile checklist for that skill.
 
-All required PR metadata, trusted base contracts, task context, and a bounded multi-file diff are supplied below. You may use read/glob/grep to inspect the PR head working tree when useful. You may not edit files, run shell commands, launch subagents, browse the web, or ask interactive questions.
+All required PR metadata, trusted base contracts, task context, and a bounded multi-file diff are supplied below. You may use read/glob/grep to inspect the sanitized PR head snapshot when useful. You may not edit files, run shell commands, launch subagents, browse the web, or ask interactive questions.
 
 Review high-confidence actionable defects only. The local Builder will independently verify every finding.
 
@@ -196,9 +196,10 @@ TRUSTED BASE PROJECT CONTEXT\n${projectContext}
 PULL REQUEST DIFF\n\`\`\`diff\n${diff.text}\n\`\`\``;
 
 const model = process.env.OPENCODE_REVIEW_MODEL?.trim() || DEFAULT_MODEL;
+const reviewDir = process.env.OPENCODE_REVIEW_DIR?.trim() || process.cwd();
 const result = spawnSync(
   'opencode',
-  ['run', '--model', model, '--format', 'default', '--dir', process.cwd(), prompt],
+  ['run', '--model', model, '--format', 'default', '--dir', reviewDir, prompt],
   {
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
