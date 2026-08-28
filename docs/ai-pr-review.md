@@ -51,7 +51,9 @@ The following review controls are loaded from the PR base SHA (`dev`) instead of
 
 This prevents a PR from weakening its own reviewer rules in the same run.
 
-The model job has `contents: read` only. OpenCode may read/search repository files and load the `mira-mobile-pr-review` skill, but cannot edit files, run shell commands, launch subagents, browse the web, or ask interactive questions.
+OpenCode does not start inside the raw PR worktree. The workflow creates a sanitized snapshot of the PR head for code inspection, removes PR-controlled OpenCode/Claude/Agent configuration and plugins (`.opencode`, `.claude`, `.agents`, `opencode.json*`, `CLAUDE.md`), then injects only the trusted base `AGENTS.md` and the trusted `mira-mobile-pr-review` skill. This prevents a PR from executing reviewer-side project plugins or overriding the review runtime before the model starts.
+
+The model job has `contents: read` only. OpenCode may read/search the sanitized snapshot and load the `mira-mobile-pr-review` skill, but cannot edit files, run shell commands, launch subagents, browse the web, or ask interactive questions.
 
 GitHub comment write permission belongs only to the deterministic publish job.
 
