@@ -34,8 +34,8 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme, type AccentColor, type ThemeMode } from '../theme/ThemeContext';
 import { themePresets } from '../theme/palette';
-import { remoteMiraHostClient } from '../api/remoteMiraHost';
-import { useHostStore } from '../store/hostStore';
+import { miraHostClient } from '../api/miraHostClient';
+import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
 import {
   SettingsGroup as RowGroup,
   SettingsRow as Row,
@@ -58,10 +58,6 @@ const accentOptionDefinitions: readonly SettingsChoice<AccentColor>[] = [
   { value: 'archive-green', label: themePresets['archive-green'].label, swatch: themePresets['archive-green'].swatch },
   { value: 'slate-ocean', label: themePresets['slate-ocean'].label, swatch: themePresets['slate-ocean'].swatch },
 ];
-
-/* ───────────────────────────────────────────────
-   Main Screen
-   ─────────────────────────────────────────────── */
 
 export function SettingsScreen() {
   const navigation = useNavigation<NavProp>();
@@ -91,10 +87,10 @@ export function SettingsScreen() {
           style: 'destructive',
           onPress: () => {
             setDisconnecting(true);
-            void remoteMiraHostClient
+            void miraHostClient
               .disconnect()
               .then(() => {
-                useHostStore.getState().clearConfig();
+                useTailscaleConnectivityStore.getState().reset();
                 navigation.reset({
                   index: 0,
                   routes: [{ name: 'HostConfig' }],
@@ -151,7 +147,6 @@ export function SettingsScreen() {
       style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
       edges={['top', 'bottom']}
     >
-      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -170,7 +165,6 @@ export function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Avatar ──────────────────────────── */}
         <View style={styles.profileSection}>
           <View style={styles.avatarWrap}>
             <View
@@ -187,7 +181,6 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* ── 我的 Mira ─────────────────────── */}
         <SectionHeader>我的 Mira</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast={false} />
@@ -195,7 +188,6 @@ export function SettingsScreen() {
           <Row icon={Grid3x3} title="插件" isLast />
         </RowGroup>
 
-        {/* ── 账户 ──────────────────────────── */}
         <SectionHeader>账户</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -207,7 +199,6 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 外观 ──────────────────────────── */}
         <SectionHeader>外观</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -246,7 +237,6 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 主机 ──────────────────────────── */}
         <SectionHeader>主机</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -259,7 +249,6 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 通用设置 ─────────────────────── */}
         <SectionHeader>通用</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row icon={GearIcon} title="常规" isFirst isLast={false} />
@@ -271,7 +260,6 @@ export function SettingsScreen() {
           <Row icon={Info} title="关于" actionId="about" isLast />
         </RowGroup>
 
-        {/* ── 退出登录 ─────────────────────── */}
         <View style={styles.logoutSpacer} />
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -292,14 +280,8 @@ export function SettingsScreen() {
   );
 }
 
-/* ───────────────────────────────────────────────
-   Styles
-   ─────────────────────────────────────────────── */
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-
-  // ── Header ─────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -314,15 +296,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerSpacer: { flex: 1 },
-
-  // ── Scroll ─────────────────────────────
   scrollContent: {
     paddingTop: 8,
     paddingHorizontal: 20,
     paddingBottom: 48,
   },
-
-  // ── Profile ────────────────────────────
   profileSection: {
     alignItems: 'center',
     paddingTop: 8,
@@ -347,8 +325,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 48,
   },
-
-  // ── Accent color row ───────────────────
   accentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -360,7 +336,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   logoutSpacer: { height: 8 },
-
-  // ── Bottom ─────────────────────────────
   bottomSpacer: { height: 32 },
 });
