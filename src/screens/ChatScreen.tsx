@@ -9,18 +9,37 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ChevronLeft, Send, Square } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  MoreVertical,
+  Send,
+  Share2,
+  Square,
+} from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
 import { miraHostClient } from '../api/miraHostClient';
+import { RemoteHostError } from '../api/remoteHttp';
+import { useThreadReadStore } from '../store/threadReadStore';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
+import { ConversationMenu } from '../components/ConversationMenu';
+import {
+  getChatHistoryErrorMessage,
+  readCanonicalSessionTitle,
+} from './chatSessionState';
 
 function ThinkingIndicator({ color }: { color: string }) {
   const dots = useRef([
@@ -67,6 +86,98 @@ function ThinkingIndicator({ color }: { color: string }) {
   );
 }
 
+function MessageHistorySkeleton({
+  colors,
+}: {
+  colors: ReturnType<typeof useTheme>['colors'];
+}) {
+  const opacity = useRef(new Animated.Value(0.55)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.55,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <View
+      style={styles.historySkeleton}
+      accessibilityLabel="正在加载聊天记录"
+      accessibilityRole="progressbar"
+    >
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonAssistant,
+          { backgroundColor: colors.bg.bubble, opacity },
+        ]}
+      >
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '78%' },
+          ]}
+        />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '54%' },
+          ]}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonUser,
+          { backgroundColor: colors.bg.soft, opacity },
+        ]}
+      >
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '64%' },
+          ]}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.skeletonBubble,
+          styles.skeletonAssistant,
+          { backgroundColor: colors.bg.bubble, opacity },
+        ]}
+      >
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '68%' },
+          ]}
+        />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.border.default, width: '42%' },
+          ]}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
 const createLocalMessageId = () =>
   `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -74,8 +185,11 @@ export function ChatScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
-  const { sessionId, title } = route.params;
+  const { sessionId, title: routeTitle } = route.params;
   const { colors } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const markThreadRead = useThreadReadStore((state) => state.markThreadRead);
+  const clearThreadRead = useThreadReadStore((state) => state.clearThread);
   const themedStyles = useMemo(
     () =>
       StyleSheet.create({
@@ -85,27 +199,75 @@ export function ChatScreen() {
     [colors],
   );
 
+  const [sessionTitle, setSessionTitle] = useState(routeTitle);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{
+    top: number;
+    right: number;
+  }>({ top: 0, right: spacing.sm });
   const [failedMessages, setFailedMessages] = useState<Map<string, string>>(
     new Map(),
   );
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
+  const menuButtonRef = useRef<View>(null);
   const abortRef = useRef(false);
 
-  const loadMessages = useCallback(async () => {
-    try {
-      setMessages(await miraHostClient.getMessages(sessionId));
-    } catch {
-      // Connection and authorization state are surfaced by the remote host flow.
+  const refreshSessionTitle = useCallback(async () => {
+    const canonicalTitle = await readCanonicalSessionTitle(
+      miraHostClient,
+      sessionId,
+    );
+    if (canonicalTitle !== null) {
+      setSessionTitle(canonicalTitle);
     }
   }, [sessionId]);
 
-  useEffect(() => {
-    void loadMessages();
-  }, [loadMessages]);
+  const loadMessages = useCallback(async (): Promise<ChatMessage[] | null> => {
+    setHistoryError(null);
+    try {
+      const canonicalMessages = await miraHostClient.getMessages(sessionId);
+      setMessages(canonicalMessages);
+      try {
+        await markThreadRead(sessionId, canonicalMessages, canonicalMessages.length);
+      } catch {
+        // A local persistence failure must not turn a valid Host history read
+        // into a fake chat error or falsely clear the unread state.
+      }
+      return canonicalMessages;
+    } catch (error) {
+      if (error instanceof RemoteHostError && error.status === 404) {
+        void clearThreadRead(sessionId).catch(() => undefined);
+      }
+      setHistoryError(getChatHistoryErrorMessage(error));
+      return null;
+    }
+  }, [clearThreadRead, markThreadRead, sessionId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setIsLoadingHistory(true);
+      void Promise.all([loadMessages(), refreshSessionTitle()]).finally(() => {
+        if (active) setIsLoadingHistory(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, [loadMessages, refreshSessionTitle]),
+  );
+
+  const retryHistory = useCallback(() => {
+    setIsLoadingHistory(true);
+    void Promise.all([loadMessages(), refreshSessionTitle()]).finally(() => {
+      setIsLoadingHistory(false);
+    });
+  }, [loadMessages, refreshSessionTitle]);
 
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
@@ -154,18 +316,21 @@ export function ChatScreen() {
           scrollToBottom();
         }
 
-        if (!abortRef.current && fullReply) {
-          const assistantMsg: ChatMessage = {
-            id: `local-assistant-${Date.now()}`,
-            role: 'assistant',
-            content: fullReply,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-        }
+        // The stream is a delivery channel only. Re-read canonical Thread /
+        // Message state so the UI never invents an Assistant message locally.
+        await loadMessages();
+        void refreshSessionTitle();
         setStreamingText('');
       } catch (error) {
-        if (!abortRef.current) {
+        setStreamingText('');
+        const canonicalMessages = await loadMessages();
+        void refreshSessionTitle();
+        const hasCanonicalAssistant = canonicalMessages?.some(
+          (message) =>
+            message.role === 'assistant' &&
+            message.timestamp.getTime() >= userMsg.timestamp.getTime(),
+        );
+        if (!abortRef.current && !hasCanonicalAssistant) {
           const message =
             error instanceof Error && error.message
               ? error.message
@@ -178,13 +343,30 @@ export function ChatScreen() {
         setIsLoading(false);
       }
     },
-    [inputText, isLoading, scrollToBottom, sessionId],
+    [
+      inputText,
+      isLoading,
+      loadMessages,
+      refreshSessionTitle,
+      scrollToBottom,
+      sessionId,
+    ],
   );
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
     miraHostClient.cancelCurrentSend();
   }, []);
+
+  const openMenu = useCallback(() => {
+    menuButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setMenuAnchor({
+        top: y + height + spacing.xs,
+        right: Math.max(spacing.sm, windowWidth - x - width),
+      });
+      setIsMenuVisible(true);
+    });
+  }, [windowWidth]);
 
   const handleRetry = useCallback(
     (msg: ChatMessage) => {
@@ -225,7 +407,9 @@ export function ChatScreen() {
             </View>
             {isFailed ? (
               <>
-                <Text style={[styles.failureText, { color: colors.status.error }]}>
+                <Text
+                  style={[styles.failureText, { color: colors.status.error }]}
+                >
                   {failureMessage}
                 </Text>
                 <Pressable
@@ -235,7 +419,9 @@ export function ChatScreen() {
                   ]}
                   onPress={() => handleRetry(item)}
                 >
-                  <Text style={[styles.retryText, { color: colors.status.error }]}>
+                  <Text
+                    style={[styles.retryText, { color: colors.status.error }]}
+                  >
                     点击重试
                   </Text>
                 </Pressable>
@@ -277,26 +463,72 @@ export function ChatScreen() {
           },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          hitSlop={8}
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [
-            styles.iconButton,
-            pressed && { backgroundColor: colors.bg.soft },
-          ]}
-        >
-          <ChevronLeft size={24} color={colors.text.ink} />
-        </Pressable>
+        <View style={styles.headerLeading}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="返回"
+            hitSlop={8}
+            onPress={() => navigation.goBack()}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && { backgroundColor: colors.bg.soft },
+            ]}
+          >
+            <ChevronLeft size={24} color={colors.text.ink} />
+          </Pressable>
+        </View>
         <Text
           style={[styles.headerTitle, { color: colors.text.ink }]}
           numberOfLines={1}
         >
-          {title}
+          {sessionTitle}
         </Text>
-        <View style={styles.iconButton} />
+        <View
+          style={[
+            styles.headerActionGroup,
+            {
+              backgroundColor: colors.bg.card,
+              borderColor: colors.border.default,
+            },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="分享会话，暂不可用"
+            accessibilityState={{ disabled: true }}
+            disabled
+            style={styles.groupButtonDisabled}
+          >
+            <Share2 size={19} color={colors.text.soft} strokeWidth={2} />
+          </Pressable>
+          <View
+            style={[
+              styles.groupDivider,
+              { backgroundColor: colors.border.default },
+            ]}
+          />
+          <Pressable
+            ref={menuButtonRef}
+            collapsable={false}
+            accessibilityRole="button"
+            accessibilityLabel="打开会话菜单"
+            onPress={openMenu}
+            style={({ pressed }) => [
+              styles.groupButton,
+              pressed && { backgroundColor: colors.bg.soft },
+            ]}
+          >
+            <MoreVertical size={20} color={colors.text.ink} strokeWidth={2.2} />
+          </Pressable>
+        </View>
       </View>
+
+      <ConversationMenu
+        visible={isMenuVisible}
+        title={sessionTitle}
+        anchor={menuAnchor}
+        onClose={() => setIsMenuVisible(false)}
+      />
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -310,6 +542,41 @@ export function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={scrollToBottom}
+          ListEmptyComponent={
+            isLoadingHistory ? (
+              <MessageHistorySkeleton colors={colors} />
+            ) : historyError ? (
+              <View style={styles.historyErrorState}>
+                <Text
+                  style={[styles.historyErrorText, { color: colors.text.muted }]}
+                >
+                  {historyError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重新加载聊天记录"
+                  onPress={retryHistory}
+                  style={({ pressed }) => [
+                    styles.historyRetryButton,
+                    {
+                      backgroundColor: pressed
+                        ? colors.primaryActive
+                        : colors.primary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.historyRetryText,
+                      { color: colors.onPrimary },
+                    ]}
+                  >
+                    重试
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null
+          }
           ListFooterComponent={renderFooter}
         />
 
@@ -408,6 +675,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerLeading: {
+    width: sizing.touchTarget * 2,
+    alignItems: 'flex-start',
+  },
+  headerActionGroup: {
+    width: sizing.touchTarget * 2,
+    height: sizing.buttonHeight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+  },
+  groupButton: {
+    flex: 1,
+    height: sizing.buttonHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupButtonDisabled: {
+    flex: 1,
+    height: sizing.buttonHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.55,
+  },
+  groupDivider: { width: StyleSheet.hairlineWidth, height: 20 },
   headerTitle: {
     flex: 1,
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
@@ -421,6 +715,47 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  historySkeleton: {
+    flex: 1,
+    minHeight: 300,
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  historyErrorState: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  historyErrorText: {
+    maxWidth: 320,
+    textAlign: 'center',
+    fontSize: fontSize.bodyMd,
+    lineHeight: 22,
+  },
+  historyRetryButton: {
+    minWidth: 96,
+    height: sizing.touchTarget,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyRetryText: { fontSize: fontSize.button, fontWeight: '600' },
+  skeletonBubble: {
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  skeletonAssistant: { width: '76%', alignSelf: 'flex-start' },
+  skeletonUser: { width: '58%', alignSelf: 'flex-end' },
+  skeletonLine: { height: 10, borderRadius: radius.full },
   messageRow: { marginBottom: spacing.lg, flexDirection: 'row' },
   messageRowLeft: { justifyContent: 'flex-start' },
   messageRowRight: { justifyContent: 'flex-end' },

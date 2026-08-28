@@ -1,7 +1,9 @@
 # Mira Mobile Relay 接入排期
 
-> 状态：Current plan  
-> 基线日期：2026-08-12  
+> 远程连接行为以 [远程连接唯一真相源 V1](remote-connection-canonical-v1.md) 为准；本文只记录实施排期与历史状态。
+
+> 状态：Design contract complete; implementation verification pending
+> 最近修订：2026-08-26
 > 主站真相源：`dangjingtao/uichat-mira@dev`
 
 ## 1. 定位
@@ -44,19 +46,28 @@ Relay connection credential 与 `mira_device_*` 必须保持分离。Relay 不�
 - pairing URI 在 Relay 启用时可以追加 `relay` 与 `relayId`；
 - 当前 Tailscale Remote Host V1 与 `mira_device_*` 业务鉴权保持不变。
 
-### 当前尚未完成
+### 当前状态边界
 
-- Mobile `RelayRemoteTransport`；
-- Mobile Relay connection credential 的安全下发与保存合同；
-- Relay-only pairing；
-- 同一设备保存 Direct + Relay 多 endpoint；
-- Direct -> Relay 自动 fallback；
-- pairing 去掉 “Tailscale 必须 ready” 的硬耦合；
-- Relay Chat streaming / cancel / reconnect 的 Mobile 实网验收。
+以下设计已经确定并以 canonical 文档为准：
 
-因此，当前 Mobile 截图里的“设备配对”仍然是 **Tailscale-gated pairing**。这不是 Relay 最终形态。
+- Mobile 不要求用户选择 Transport；
+- 首次配对 Relay-first，Direct 只在 claim 前作为兜底；
+- claim 发出后不得跨 Transport 自动重发；
+- 配对后 Direct-first，只有网络/传输层失败才回 Relay；
+- Direct 与 Relay 共用同一个 `mira_device_*` 业务身份；
+- Relay credential 与 `mira_device_*` 分离，并使用平台安全存储；
+- Transport 切换不清除凭证、不改变 scope、不重建设备身份。
+
+以下仍是实现或环境验收项，不能仅凭文档宣称完成：
+
+- Relay frame 级别的真实网络验收；
+- Android 与 iOS 的 Relay streaming / cancel / reconnect 真机验证；
+- iOS Keychain 原生桥和网络监听的构建验证；
+- 同一设备多 endpoint 持久化的跨重启验证。
 
 ## 3. 最终配对体验
+
+详细的 Relay-first 首次配对、claim 一次性副作用和日常 Direct-first 规则见唯一真相源，本文不重复定义另一套选择策略。
 
 目标不是让用户分别做一次 Tailscale 配对、再做一次 Relay 配对。
 
@@ -109,16 +120,17 @@ Transport 切换不能删除设备凭证，也不能重新创建业务身份。�
 
 该阶段不需要发明 Relay credential。
 
-### R1 — Relay JSON Transport
+### R1 — Relay JSON Transport（合同已冻结）
 
 日期：2026-08-13 ～ 08-14
 
-前置 Host 合同：
+前置 Host 合同（已确定）：
 
-- 明确 Mobile Relay connection credential 的签发/下发方式；
-- 明确 Mobile 如何得到 `relay endpoint + relayId`；
-- 明确 Relay client hello/auth frame；
-- 明确 Relay credential 的撤销/轮换边界。
+- 配对二维码携带 `relay`、`relayId` 和一次性 `relayToken`；缺少 token 的 Relay hint 不能直接打开 Relay；
+- Relay token 只用于 Relay Transport 建连，不替代 `mira_device_*`，不包含业务 scope；
+- client hello 必须携带协议版本、角色、`relayId` 和 Relay token；服务端以 `hello_ack` 明确接受或拒绝；
+- Relay token 过期、撤销或服务端返回认证失败时，Mobile 清除 Relay connection credential，但保留有效的 `mira_device_*`；
+- 轮换通过重新生成配对请求完成，不在客户端静默重发 claim。
 
 Mobile 交付：
 
@@ -160,7 +172,7 @@ Mobile 交付：
 - 能只通过 Relay 完成首次配对；
 - 已有 Tailscale pairing 深链继续兼容。
 
-### R4 — 自动选路
+### R4 — 自动选路（行为已冻结）
 
 日期：2026-08-16
 
@@ -170,7 +182,7 @@ Mobile 交付：
 - 默认模式 `auto`；
 - Direct ready -> Direct；
 - Direct unavailable -> Relay；
-- 可选高级模式：Auto / Tailscale / Mira Relay；
+- 主界面不提供 Auto / Tailscale / Mira Relay 选择；Transport 选择仅存在于内部策略和连接详情；
 - 网络恢复后允许回到 Direct；
 - 不因 transport 切换改变业务身份。
 

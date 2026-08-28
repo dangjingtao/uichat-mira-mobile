@@ -9,13 +9,24 @@ import {
   remoteMiraHostClient,
   type RemoteMiraHostClient,
 } from './remoteMiraHost';
-import type { RemoteMessage, RemoteThread } from '../protocol/remoteHostV1';
+import type {
+  RemoteChatStreamEvent,
+  RemoteMessage,
+  RemoteThread,
+} from '../protocol/remoteHostV1';
+import { RemoteHostError } from './remoteHttp';
 import type { MiraHostApi } from './miraHost';
 
 const threadToSession = (thread: RemoteThread): Session => ({
   id: thread.id,
   title: thread.title,
   updatedAt: new Date(thread.updatedAt),
+  workspaceId: thread.workspaceId,
+  knowledgeBaseId: thread.knowledgeBaseId,
+  roleId: thread.roleId,
+  agentEnabled: thread.agentEnabled,
+  status: thread.status,
+  messageCount: thread.messageCount,
 });
 
 const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
@@ -37,6 +48,28 @@ const unsupportedMutation = (operation: string): never => {
 const createMessageId = () =>
   `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+const toContextMessage = (message: RemoteMessage) => {
+  if (message.role === 'tool') return null;
+
+  const text =
+    message.content.trim() ||
+    message.parts
+      .filter((part): part is Extract<typeof part, { type: 'text' }> =>
+        part.type === 'text',
+      )
+      .map(part => part.text)
+      .join('\n')
+      .trim();
+
+  if (!text) return null;
+
+  return {
+    id: message.id,
+    role: message.role,
+    parts: [{ type: 'text' as const, text }],
+  };
+};
+
 /**
  * Mobile runtime compatibility adapter.
  *
@@ -47,8 +80,11 @@ const createMessageId = () =>
  * This adapter preserves the older screen-facing MiraHostApi shape while all
  * supported operations are delegated to RemoteMiraHostClient.
  */
-class PairedRemoteMiraHostClient implements MiraHostApi {
+export class PairedRemoteMiraHostClient implements MiraHostApi {
   private currentSendAbort: (() => void) | null = null;
+  private lastRuntimeEvents: Array<
+    Extract<RemoteChatStreamEvent, { type: 'data-tool-event' | 'data-execution-node' }>
+  > = [];
 
   constructor(private readonly remote: RemoteMiraHostClient) {}
 
@@ -117,17 +153,61 @@ class PairedRemoteMiraHostClient implements MiraHostApi {
       throw new Error('A stable message id is required');
     }
 
+    const canonicalMessages = await this.remote.getMessages(sessionId);
+    const contextMessages = canonicalMessages
+      .filter(message => message.id !== stableMessageId)
+      .map(toContextMessage)
+      .filter((message): message is NonNullable<typeof message> => Boolean(message));
+    contextMessages.push({
+      id: stableMessageId,
+      role: 'user',
+      parts: [{ type: 'text', text: content }],
+    });
+
     const session = await this.remote.sendMessage({
       threadId: sessionId,
       messageId: stableMessageId,
       content,
+      messages: contextMessages,
     });
+    this.lastRuntimeEvents = [];
     this.currentSendAbort = session.abort;
 
     const self = this;
     return (async function* () {
+      let sawFinish = false;
       try {
         for await (const event of session.events) {
+          if (
+            (event.type === 'data-tool-event' || event.type === 'data-execution-node') &&
+            event.data &&
+            typeof event.data === 'object' &&
+            !Array.isArray(event.data)
+          ) {
+            self.lastRuntimeEvents.push(
+              event as Extract<
+                RemoteChatStreamEvent,
+                { type: 'data-tool-event' | 'data-execution-node' }
+              >,
+            );
+            continue;
+          }
+          if (event.type === 'finish') {
+            sawFinish = true;
+            if (event.finishReason === 'error') {
+              throw new RemoteHostError(
+                'CHAT_FINISHED_WITH_ERROR',
+                'Mira Host finished the chat with an error',
+              );
+            }
+            if (event.finishReason !== 'stop') {
+              throw new RemoteHostError(
+                'INVALID_FINISH_REASON',
+                `Mira Host returned unsupported finish reason: ${event.finishReason}`,
+              );
+            }
+            continue;
+          }
           if (event.type === 'text-delta' && typeof event.delta === 'string') {
             yield event.delta;
             continue;
@@ -137,8 +217,16 @@ class PairedRemoteMiraHostClient implements MiraHostApi {
               'errorText' in event && typeof event.errorText === 'string'
                 ? event.errorText
                 : 'Mira Host stream failed';
-            throw new Error(errorText);
+            throw new RemoteHostError('CHAT_STREAM_ERROR', errorText);
           }
+        }
+        // [DONE] only closes the SSE reader. A successful chat must also have
+        // an explicit finish event from the shared Host stream contract.
+        if (!sawFinish) {
+          throw new RemoteHostError(
+            'CHAT_STREAM_INCOMPLETE',
+            'Mira Host closed the chat stream before finish was received',
+          );
         }
       } finally {
         if (self.currentSendAbort === session.abort) {
@@ -152,6 +240,11 @@ class PairedRemoteMiraHostClient implements MiraHostApi {
     const abort = this.currentSendAbort;
     this.currentSendAbort = null;
     abort?.();
+  }
+
+  /** Structured tool/execution events retained for a compact runtime status UI. */
+  getLastRuntimeEvents() {
+    return [...this.lastRuntimeEvents];
   }
 }
 

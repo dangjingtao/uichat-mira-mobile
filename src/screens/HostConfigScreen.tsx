@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,22 +18,15 @@ import {
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  AlertTriangle,
   CheckCircle2,
   ChevronLeft,
   KeyRound,
-  RefreshCw,
   ScanLine,
   ShieldCheck,
-  Wifi,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useHostStore } from '../store/hostStore';
 import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
-import {
-  tailscaleConnectivityMessage,
-  type TailscaleConnectivityState,
-} from '../connectivity/tailscaleConnectivity';
 import {
   parsePairingUriV1,
   type PairingDescriptorV1,
@@ -42,19 +35,6 @@ import { remoteMiraHostClient } from '../api/remoteMiraHost';
 import { useRemotePairing } from '../pairing/useRemotePairing';
 import { useTheme } from '../theme/ThemeContext';
 import { PairingScannerModal } from '../components/PairingScannerModal';
-
-const connectivityTitle = (state: TailscaleConnectivityState) => {
-  switch (state) {
-    case 'idle':
-      return '尚未检查';
-    case 'probing':
-      return '正在检查连接';
-    case 'ready':
-      return 'Tailscale Direct 已联通';
-    default:
-      return 'Direct 联通失败';
-  }
-};
 
 const buildPairingUriFromRoute = (
   params: RootStackParamList['HostConfig'],
@@ -82,37 +62,23 @@ export function HostConfigScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'HostConfig'>>();
   const { colors } = useTheme();
   const { config, setConfig, clearConfig, setConnectionStatus } = useHostStore();
-  const connectivityState = useTailscaleConnectivityStore(state => state.state);
-  const connectivityResult = useTailscaleConnectivityStore(state => state.result);
   const setConnectivityHostUrl = useTailscaleConnectivityStore(
     state => state.setHostUrl,
   );
-  const probe = useTailscaleConnectivityStore(state => state.probe);
   const resetConnectivity = useTailscaleConnectivityStore(state => state.reset);
 
-  const [hostUrl, setHostUrl] = useState(config?.hostUrl ?? '');
   const [pairingDescriptor, setPairingDescriptor] =
     useState<PairingDescriptorV1 | null>(null);
+  const [pairingUriInput, setPairingUriInput] = useState('');
   const [pairingLinkError, setPairingLinkError] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
-
-  const isProbing = connectivityState === 'probing';
-  const isDirectReady =
-    connectivityState === 'ready' && connectivityResult?.hostUrl != null;
-  const hasDirectEndpoint = Boolean(pairingDescriptor?.hostUrl);
-  const hasRelayEndpoint = Boolean(pairingDescriptor?.relay);
-  const isPairingTransportReady = isDirectReady || hasRelayEndpoint;
-  const hasTransportError =
-    connectivityState !== 'idle' &&
-    connectivityState !== 'probing' &&
-    connectivityState !== 'ready';
 
   const {
     state: pairingState,
     start: startPairing,
     reset: resetPairing,
     secureStorageAvailable,
-  } = useRemotePairing(pairingDescriptor, isDirectReady);
+  } = useRemotePairing(pairingDescriptor);
 
   const loadPairingUri = useCallback(
     (uri: string) => {
@@ -122,7 +88,6 @@ export function HostConfigScreen() {
         setPairingLinkError(null);
 
         if (descriptor.hostUrl) {
-          setHostUrl(descriptor.hostUrl);
           setConnectivityHostUrl(descriptor.hostUrl);
           const current = useTailscaleConnectivityStore.getState();
           if (
@@ -130,12 +95,12 @@ export function HostConfigScreen() {
             (current.state !== 'probing' && current.state !== 'ready')
           ) {
             void current.probe(descriptor.hostUrl, 'manual').catch(() => {
-              // Relay may still be usable. Direct probe failure is reflected by
-              // the connectivity store and must not invalidate the pairing URI.
+              // Pairing transport selection owns the final Direct/Relay choice.
+              // This warm-up probe must not invalidate an otherwise valid URI.
             });
           }
         } else {
-          setHostUrl('');
+          setConnectivityHostUrl('');
         }
         return true;
       } catch (error) {
@@ -185,32 +150,12 @@ export function HostConfigScreen() {
     setConnectionStatus,
   ]);
 
-  const statusColor =
-    connectivityState === 'ready'
-      ? colors.status.success
-      : connectivityState === 'idle' || connectivityState === 'probing'
-        ? colors.status.warning
-        : colors.status.error;
-
-  const statusMessage = useMemo(() => {
-    if (connectivityState === 'idle') {
-      return hasDirectEndpoint
-        ? '已获得 Direct endpoint，等待检查 Tailscale 传输。'
-        : '当前配对请求没有 Direct endpoint；如果包含 Mira Relay，可直接通过 Relay 配对。';
-    }
-    if (connectivityState === 'probing') {
-      return '正在检查 Tailscale / HTTPS / Mira Host 是否可达。';
-    }
-    return tailscaleConnectivityMessage(connectivityState);
-  }, [connectivityState, hasDirectEndpoint]);
-
   const pairingBusy =
     pairingState.phase === 'claiming' ||
     pairingState.phase === 'waiting_approval';
   const pairingCompleted = pairingState.phase === 'paired';
   const pairingActionDisabled =
     !pairingDescriptor ||
-    !isPairingTransportReady ||
     !secureStorageAvailable ||
     pairingBusy ||
     pairingCompleted;
@@ -231,10 +176,7 @@ export function HostConfigScreen() {
       case 'blocked':
         return '设备配对未完成';
       default:
-        if (!pairingDescriptor) return '等待桌面配对请求';
-        if (hasRelayEndpoint && !isDirectReady) return '可以通过 Mira Relay 配对';
-        if (isDirectReady) return '可以申请设备授权';
-        return '正在等待可用传输';
+        return pairingDescriptor ? '可以申请设备授权' : '等待桌面配对请求';
     }
   })();
 
@@ -243,26 +185,17 @@ export function HostConfigScreen() {
     (!secureStorageAvailable
       ? '当前构建没有可用的系统安全存储，不能领取一次性设备凭证。'
       : pairingDescriptor
-        ? `可用连接：${[
-            hasDirectEndpoint ? 'Tailscale Direct' : null,
-            hasRelayEndpoint ? 'Mira Relay' : null,
-          ]
-            .filter(Boolean)
-            .join(' + ')}。业务身份仍由同一个 mira_device_* 设备凭证负责。`
-        : '请在 Mira Desktop 的“远程连接”中生成一次性配对二维码，再用手机扫描。');
+        ? '配对请求已就绪。提交申请后，请在 Mira Desktop 明确批准本设备。'
+        : '请在 Mira Desktop 的“远程连接”中生成一次性配对二维码或复制配对链接。');
 
-  const handleCheck = async () => {
-    const target = hostUrl.trim();
-    if (!target || isProbing) return;
-    setConnectivityHostUrl(target);
-    setConnectionStatus('connecting');
-    try {
-      await probe(target, 'manual');
-    } finally {
-      if (pairingState.phase !== 'paired') {
-        setConnectionStatus('disconnected');
-      }
+  const handlePastePairingUri = () => {
+    const uri = pairingUriInput.trim();
+    if (!uri) {
+      setPairingDescriptor(null);
+      setPairingLinkError('请粘贴完整的 Mira 配对链接');
+      return;
     }
+    loadPairingUri(uri);
   };
 
   const handleDisconnect = async () => {
@@ -270,7 +203,7 @@ export function HostConfigScreen() {
     clearConfig();
     resetConnectivity();
     resetPairing();
-    setHostUrl('');
+    setPairingUriInput('');
     setPairingDescriptor(null);
     setPairingLinkError(null);
     setConnectionStatus('disconnected');
@@ -319,7 +252,7 @@ export function HostConfigScreen() {
             </View>
             <Text style={[styles.heroTitle, { color: colors.text.ink }]}>设备配对</Text>
             <Text style={[styles.heroSubtitle, { color: colors.text.muted }]}> 
-              同一个设备身份，可通过 Tailscale Direct 或 Mira Relay 连接桌面端。
+              扫描 Mira Desktop 生成的二维码，桌面批准后即可完成连接。
             </Text>
           </View>
 
@@ -346,125 +279,71 @@ export function HostConfigScreen() {
               <Text style={[styles.scanBtnText, { color: colors.onPrimary }]}>扫码配对</Text>
             </Pressable>
 
-            {pairingLinkError ? (
-              <Text style={[styles.bodyText, { color: colors.status.error }]}> 
-                {pairingLinkError}
-              </Text>
-            ) : pairingDescriptor ? (
-              <>
-                <Text style={[styles.cardTitle, { color: colors.text.ink }]}> 
-                  已载入一次性请求
-                </Text>
-                <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
-                  请求 {pairingDescriptor.challengeId.slice(0, 8)}… · {hasDirectEndpoint ? 'Direct' : ''}
-                  {hasDirectEndpoint && hasRelayEndpoint ? ' + ' : ''}
-                  {hasRelayEndpoint ? 'Relay' : ''} · 有效后仍需在桌面明确批准。
-                </Text>
-              </>
-            ) : (
-              <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
-                还没有配对请求。请从 Mira Desktop 生成配对二维码。
-              </Text>
-            )}
-          </View>
-
-          <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
-            <View style={styles.sectionHeading}>
-              <Wifi size={20} color={colors.text.ink} />
-              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Tailscale Direct</Text>
-            </View>
-
-            <Text style={[styles.label, { color: colors.text.muted }]}>Mira Host 地址</Text>
+            <Text style={[styles.label, { color: colors.text.muted }]}>无法扫码？粘贴配对链接</Text>
             <TextInput
+              accessibilityLabel="Mira 配对链接"
               style={[
                 styles.input,
                 {
-                  borderColor: colors.border.default,
+                  borderColor: pairingLinkError
+                    ? colors.status.error
+                    : colors.border.default,
                   backgroundColor: colors.bg.input,
                   color: colors.text.ink,
                 },
               ]}
-              value={hostUrl}
+              value={pairingUriInput}
               onChangeText={value => {
-                setHostUrl(value);
-                setConnectivityHostUrl(value);
+                setPairingUriInput(value);
+                setPairingDescriptor(null);
+                setConnectivityHostUrl('');
+                if (pairingLinkError) setPairingLinkError(null);
               }}
-              placeholder="https://mira-desktop.tailnet-name.ts.net"
+              placeholder="mira://pair?..."
               placeholderTextColor={colors.text.placeholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              editable={!isProbing && !pairingDescriptor}
+              editable={!pairingBusy && !pairingCompleted}
+              onSubmitEditing={handlePastePairingUri}
+              returnKeyType="go"
             />
 
-            <View
-              style={[
-                styles.statusBox,
-                {
-                  backgroundColor: hasTransportError
-                    ? colors.status.errorBg
-                    : colors.bg.soft,
-                  borderColor: statusColor,
-                },
-              ]}
-            >
-              <View style={styles.statusHeader}>
-                {isProbing ? (
-                  <ActivityIndicator size="small" color={statusColor} />
-                ) : connectivityState === 'ready' ? (
-                  <CheckCircle2 size={18} color={statusColor} />
-                ) : connectivityState === 'idle' ? (
-                  <Wifi size={18} color={statusColor} />
-                ) : (
-                  <AlertTriangle size={18} color={statusColor} />
-                )}
-                <Text style={[styles.statusTitle, { color: colors.text.ink }]}> 
-                  {connectivityTitle(connectivityState)}
-                </Text>
-              </View>
-              <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
-                {statusMessage}
-              </Text>
-              {connectivityResult?.identity ? (
-                <Text style={[styles.detailText, { color: colors.text.soft }]}> 
-                  {connectivityResult.identity.displayName} · v{connectivityResult.identity.version} ·{' '}
-                  {connectivityResult.latencyMs ?? 0} ms
-                </Text>
-              ) : null}
-            </View>
-
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="继续配对"
               style={({ pressed }) => [
                 styles.secondaryBtn,
                 { borderColor: colors.primary },
                 pressed && { backgroundColor: colors.bg.soft },
+                !pairingUriInput.trim() && { opacity: 0.5 },
               ]}
-              onPress={handleCheck}
-              disabled={isProbing || !hostUrl.trim()}
+              onPress={handlePastePairingUri}
+              disabled={!pairingUriInput.trim() || pairingBusy || pairingCompleted}
             >
-              {isProbing ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <RefreshCw size={18} color={colors.primary} />
-              )}
-              <Text style={[styles.secondaryBtnText, { color: colors.primary }]}> 
-                {isProbing ? '正在检查' : '重新检查 Direct'}
-              </Text>
+              <KeyRound size={18} color={colors.primary} />
+              <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>继续配对</Text>
             </Pressable>
-          </View>
 
-          {hasRelayEndpoint ? (
-            <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
-              <View style={styles.sectionHeading}>
-                <Wifi size={20} color={colors.primary} />
-                <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Mira Relay</Text>
-              </View>
-              <Text style={[styles.cardTitle, { color: colors.text.ink }]}>Relay endpoint 已包含在配对请求中</Text>
-              <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
-                {pairingDescriptor?.relay?.endpoint} · {pairingDescriptor?.relay?.relayId.slice(0, 8)}…
+            {pairingLinkError ? (
+              <Text style={[styles.inlineError, { color: colors.status.error }]}> 
+                {pairingLinkError}
               </Text>
-            </View>
-          ) : null}
+            ) : pairingDescriptor ? (
+              <View style={styles.loadedRequest}>
+                <Text style={[styles.cardTitle, { color: colors.text.ink }]}> 
+                  已载入一次性请求
+                </Text>
+                <Text style={[styles.bodyText, { color: colors.text.muted }]}> 
+                  请求 {pairingDescriptor.challengeId.slice(0, 8)}… · 有效后仍需在桌面明确批准。
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.helperText, { color: colors.text.muted }]}> 
+                还没有配对请求。请从 Mira Desktop 生成二维码或复制配对链接。
+              </Text>
+            )}
+          </View>
 
           <View style={[styles.card, { backgroundColor: colors.bg.card }]}>
             <View style={styles.sectionHeading}>
@@ -593,7 +472,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 14,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   scanBtn: {
     minHeight: 48,
@@ -603,22 +482,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   scanBtnText: { fontSize: 15, fontWeight: '700' },
-  statusBox: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 14,
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  statusTitle: { fontSize: 15, fontWeight: '700' },
   secondaryBtn: {
     minHeight: 46,
     borderRadius: 12,
@@ -630,6 +496,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   secondaryBtnText: { fontSize: 14, fontWeight: '700' },
+  inlineError: { fontSize: 13, lineHeight: 20, marginTop: 10 },
+  loadedRequest: { marginTop: 14 },
+  helperText: { fontSize: 13, lineHeight: 20, marginTop: 14 },
   primaryBtn: {
     minHeight: 48,
     marginTop: 16,

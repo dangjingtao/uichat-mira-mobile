@@ -1,25 +1,30 @@
 # Mira Mobile 文档
 
+## 当前工程主线
+
+- [Mobile 工作台账](work-ledger.md)
+
+`docs/work-ledger.md` 是当前移动端线程、项目与角色展示工作的任务事实来源。任务状态、Host 依赖、产品决定和验收结果统一在台账维护。
+
+Mobile 新能力仍只消费 Mira Host 的 canonical contract；跨到 Desktop / Server 的协议问题只记录为依赖，未经明确授权不在本仓库越界修改。
+
 ## 工程与发布
 
 - [GitHub Actions 构建与发布](github-build-release.md)
 - [依赖安全技术债务](dependency-security-debt.md)
 
-## 当前工程主线
+## 历史工程归档
 
-- [Mobile API 接入清单与排期](remote-access/mobile-api-rollout-plan.md)
-- [Tailscale Connectivity V1 合同](remote-access/tailscale-connectivity-v1.md)
-- [Tailscale 联通工程进度](remote-access/tailscale-connectivity-progress.md)
+旧 Remote / Relay / Tailscale 联通工程线已于 **2026-08-27** 归档。相关文档保留为历史协议、实现和验收证据，不再作为当前任务排期或剩余工作真相源。
 
-Mobile 新能力必须以 Mira 主项目 `dev` 的 canonical Remote contract 为真相源。接口排期文档用于记录当前手机端视觉能力对应的 Host API、接入优先级和阻塞条件，不扩大设备凭证权限。
+- [Remote / Relay / Tailscale 工程归档说明](remote-access/README.md)
+- [远程连接唯一真相源 V1（历史）](remote-access/remote-connection-canonical-v1.md)
+- [Mobile API 接入清单与排期（历史）](remote-access/mobile-api-rollout-plan.md)
+- [Tailscale Connectivity V1 合同（历史）](remote-access/tailscale-connectivity-v1.md)
+- [Tailscale 联通工程进度（历史）](remote-access/tailscale-connectivity-progress.md)
+- [Trae Host V1 交接（历史）](remote-access/trae-host-v1-handoff.md)
 
-当前由 `feature/tomz-tailscale` 接管 Mira Mobile 与 Mira Desktop Host 的 Tailscale 联通、生命周期恢复、深链配对和设备授权。主链代码已经落地，但尚未完成本地构建、自动化测试和 Android / iOS 真机验收。
-
-## 历史工程交接
-
-- [Trae 交接：接入 Mira Desktop Host V1](remote-access/trae-host-v1-handoff.md)
-
-该文档保留为 Host V1 应用协议与早期施工输入。当前实际施工不再交给 Trae，进度与剩余任务以“Tailscale 联通工程进度”为准。
+归档文档中的“当前”“下一阶段”“排期”等措辞均按其原始日期理解，不覆盖 `docs/work-ledger.md` 的当前状态。
 
 ## 设计体系
 

@@ -1,6 +1,7 @@
 import type { RemoteJsonRequest } from './remoteHttp';
 import { RemoteHostError } from './remoteHttp';
 import { RemoteMiraHostClient, type PendingPairing } from './remoteMiraHost';
+import type { PostSseRequest, PostSseSession } from './postSse';
 import { MemoryDeviceCredentialStore } from '../security/deviceCredentialStore';
 import type { RemoteRelayEndpoint } from '../protocol/remotePairingV1';
 
@@ -57,6 +58,21 @@ const manifestPayload = {
     eventCursor: false,
   },
   serverTime: '2026-08-02T00:00:00.000Z',
+};
+
+const pairingDescriptor = {
+  version: 1 as const,
+  hostUrl: 'https://mira.example.ts.net',
+  relay,
+  challengeId: 'challenge-1',
+  code: 'ABCD2345',
+};
+
+const claimPayload = {
+  claimId: 'claim-1',
+  pollToken: 'poll-token',
+  status: 'claimed' as const,
+  expiresAt: '2026-08-02T00:05:00.000Z',
 };
 
 describe('RemoteMiraHostClient pairing credential retention', () => {
@@ -122,6 +138,91 @@ describe('RemoteMiraHostClient pairing credential retention', () => {
 });
 
 describe('RemoteMiraHostClient transport selection', () => {
+  it('prefers Relay for pairing and reports the selected transport', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      return request.parse({ status: 'ok' });
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (endpoint, request) => {
+      relayJsonMock(endpoint, request);
+      return request.path === '/health'
+        ? request.parse({ status: 'ok' })
+        : request.parse(claimPayload);
+    };
+    const client = new RemoteMiraHostClient(store, direct, undefined, relayJson);
+
+    await expect(
+      client.claimPairing(pairingDescriptor, {
+        name: 'Android phone',
+        platform: 'android',
+      }),
+    ).resolves.toMatchObject({ ...claimPayload, transport: 'relay' });
+    expect(directMock).not.toHaveBeenCalled();
+    expect(relayJsonMock.mock.calls.map(call => call[1].path)).toEqual([
+      '/health',
+      '/remote/pairing/claim',
+    ]);
+    expect(relayJsonMock.mock.calls[1][1].body).toMatchObject({ transport: 'relay' });
+  });
+
+  it('falls back to Direct only when the Relay preflight fails', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      return request.path === '/health'
+        ? request.parse({ status: 'ok' })
+        : request.parse(claimPayload);
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (endpoint, request) => {
+      relayJsonMock(endpoint, request);
+      throw new RemoteHostError('RELAY_NETWORK_ERROR', 'relay unavailable');
+    };
+    const client = new RemoteMiraHostClient(store, direct, undefined, relayJson);
+
+    await expect(
+      client.claimPairing(pairingDescriptor, {
+        name: 'Android phone',
+        platform: 'android',
+      }),
+    ).resolves.toMatchObject({ ...claimPayload, transport: 'direct' });
+    expect(relayJsonMock).toHaveBeenCalledTimes(1);
+    expect(directMock.mock.calls.map(call => call[0].path)).toEqual([
+      '/health',
+      '/remote/pairing/claim',
+    ]);
+    expect(directMock.mock.calls[1][0].body).toMatchObject({ transport: 'direct' });
+  });
+
+  it('does not retry a dispatched Relay claim through Direct', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      return request.parse(claimPayload);
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (endpoint, request) => {
+      relayJsonMock(endpoint, request);
+      if (request.path === '/health') return request.parse({ status: 'ok' });
+      throw new RemoteHostError('RELAY_DISCONNECTED', 'relay disconnected');
+    };
+    const client = new RemoteMiraHostClient(store, direct, undefined, relayJson);
+
+    await expect(
+      client.claimPairing(pairingDescriptor, {
+        name: 'Android phone',
+        platform: 'android',
+      }),
+    ).rejects.toMatchObject({ code: 'PAIRING_CLAIM_UNCERTAIN' });
+    expect(relayJsonMock).toHaveBeenCalledTimes(2);
+    expect(directMock).not.toHaveBeenCalled();
+  });
+
   it('falls back from Direct network failure to Relay for idempotent JSON requests', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
@@ -189,5 +290,81 @@ describe('RemoteMiraHostClient transport selection', () => {
     await expect(client.restoreConnection()).rejects.toMatchObject({ status: 403 });
     expect(relayJsonMock).not.toHaveBeenCalled();
     await expect(store.load()).resolves.toBeNull();
+  });
+});
+
+describe('RemoteMiraHostClient chat request', () => {
+  it('forwards the supplied canonical history in the SSE request body', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'messages:read', 'messages:write'],
+      savedAt: '2026-08-27T00:00:00.000Z',
+    });
+
+    const json: JsonTransport = async request => request.parse(manifestPayload);
+    const sseMock = jest.fn();
+    const sse = <T>(request: PostSseRequest<T>): PostSseSession<T> => {
+      sseMock(request);
+      return {
+        abort: jest.fn(),
+        events: (async function* () {})(),
+      };
+    };
+    const client = new RemoteMiraHostClient(store, json, sse);
+    await client.restoreConnection();
+
+    await client.sendMessage({
+      threadId: 'thread-1',
+      messageId: 'user-new',
+      content: 'continue',
+      messages: [
+        {
+          id: 'user-old',
+          role: 'user',
+          parts: [{ type: 'text', text: 'remember this' }],
+        },
+        {
+          id: 'assistant-old',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'I remember' }],
+        },
+        {
+          id: 'user-new',
+          role: 'user',
+          parts: [{ type: 'text', text: 'continue' }],
+        },
+      ],
+    });
+
+    expect(sseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/proxy/chat/default',
+        body: expect.objectContaining({
+          id: 'thread-1',
+          messageId: 'user-new',
+          messages: [
+            {
+              id: 'user-old',
+              role: 'user',
+              parts: [{ type: 'text', text: 'remember this' }],
+            },
+            {
+              id: 'assistant-old',
+              role: 'assistant',
+              parts: [{ type: 'text', text: 'I remember' }],
+            },
+            {
+              id: 'user-new',
+              role: 'user',
+              parts: [{ type: 'text', text: 'continue' }],
+            },
+          ],
+        }),
+      }),
+    );
   });
 });

@@ -1,5 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -21,10 +23,30 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
+import { useThreadPinStore } from '../store/threadPinStore';
+import {
+  isThreadPinned,
+  sortSessionsByLocalPin,
+} from '../store/threadPinning';
+import {
+  selectThreadUnread,
+  useThreadReadStore,
+} from '../store/threadReadStore';
 import { miraHostClient } from '../api/miraHostClient';
+import { getSessionRoleName } from '../api/roleApi';
+import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
+import {
+  getSessionVisualKindLabel,
+  SessionKindIcon,
+} from '../components/SessionKindIcon';
+import {
+  getSessionLoadErrorMessage,
+  resolveSessionCollectionState,
+} from './sessionCollectionState';
+import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 
@@ -57,74 +79,116 @@ function getStatusColor(
 
 interface SessionRowProps {
   item: Session;
+  roleName: string | null;
   connectionStatus: string;
-  showUnreadIndicator: boolean;
-  showPinnedIndicator: boolean;
   colors: ReturnType<typeof useTheme>['colors'];
+  isPinned: boolean;
+  isUnread: boolean;
   onOpen: () => void;
+  onTogglePin: () => void;
 }
 
 function SessionRow({
   item,
+  roleName,
   connectionStatus,
-  showUnreadIndicator,
-  showPinnedIndicator,
   colors,
+  isPinned,
+  isUnread,
   onOpen,
+  onTogglePin,
 }: SessionRowProps) {
+  const belongsToWorkspace =
+    typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
+  const preview = belongsToWorkspace
+    ? `项目会话${roleName ? ` · ${roleName}` : ''} · 从项目中打开`
+    : roleName
+      ? `角色 · ${roleName}`
+      : connectionStatus === 'connected'
+        ? '继续与 Mira 对话'
+        : '连接 Mira Host 后继续对话';
+
   return (
-    <Pressable
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.sessionItem,
         {
           backgroundColor: colors.bg.canvas,
           borderColor: colors.border.soft,
         },
-        pressed && { backgroundColor: colors.bg.soft },
       ]}
-      onPress={onOpen}
     >
-      <View
-        style={[
-          styles.avatar,
-          {
-            backgroundColor: colors.bg.card,
-            borderColor: colors.border.default,
-          },
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
+        style={({ pressed }) => [
+          styles.sessionOpen,
+          pressed && { backgroundColor: colors.bg.soft },
         ]}
+        onPress={onOpen}
       >
-        <MessageSquare size={22} strokeWidth={1.7} color={colors.primary} />
-      </View>
-      <View style={styles.sessionContent}>
-        <View style={styles.sessionTopRow}>
-          <View style={styles.sessionTitleGroup}>
-            {showUnreadIndicator ? (
-              <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
-            ) : null}
-            <Text
-              style={[styles.sessionTitle, { color: colors.text.ink }]}
-              numberOfLines={1}
-            >
-              {item.title}
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: colors.bg.card,
+              borderColor: colors.border.default,
+            },
+          ]}
+        >
+          <SessionKindIcon
+            session={item}
+            size={22}
+            strokeWidth={1.7}
+            color={colors.primary}
+          />
+        </View>
+        <View style={styles.sessionContent}>
+          <View style={styles.sessionTopRow}>
+            <View style={styles.sessionTitleGroup}>
+              <Text
+                style={[styles.sessionTitle, { color: colors.text.ink }]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              {isUnread ? (
+                <View
+                  accessibilityElementsHidden
+                  style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+                />
+              ) : null}
+            </View>
+            <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
+              {formatTime(item.updatedAt)}
             </Text>
-            {showPinnedIndicator ? (
-              <Pin size={14} strokeWidth={1.7} color={colors.text.soft} />
-            ) : null}
           </View>
-          <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
-            {formatTime(item.updatedAt)}
+          <Text
+            style={[styles.sessionPreview, { color: colors.text.muted }]}
+            numberOfLines={1}
+          >
+            {isPinned ? `本机置顶 · ${preview}` : preview}
           </Text>
         </View>
-        <Text
-          style={[styles.sessionPreview, { color: colors.text.muted }]}
-          numberOfLines={1}
-        >
-          {connectionStatus === 'connected'
-            ? '继续与 Mira 对话'
-            : '连接 Mira Host 后继续对话'}
-        </Text>
-      </View>
-    </Pressable>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
+        accessibilityState={{ selected: isPinned }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={onTogglePin}
+        style={({ pressed }) => [
+          styles.pinButton,
+          pressed && { backgroundColor: colors.bg.soft },
+        ]}
+      >
+        <Pin
+          size={18}
+          strokeWidth={isPinned ? 2.2 : 1.7}
+          color={isPinned ? colors.primary : colors.text.soft}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -133,8 +197,18 @@ export function SessionListScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
   const { connectionStatus } = useHostStore();
+  const roleNames = useRoleNameMap();
+  const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
+  const hydratePins = useThreadPinStore((state) => state.hydrate);
+  const pinThread = useThreadPinStore((state) => state.pinThread);
+  const unpinThread = useThreadPinStore((state) => state.unpinThread);
+  const progressByThreadId = useThreadReadStore((state) => state.progressByThreadId);
+  const hydrateReads = useThreadReadStore((state) => state.hydrate);
+  const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const backdropAnim = useState(new Animated.Value(0))[0];
@@ -171,18 +245,37 @@ export function SessionListScreen() {
   }, [drawerAnim, backdropAnim]);
 
   const loadSessions = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
-    } catch {
-      // Connection state and authorization are surfaced elsewhere.
+      void syncUnreadSessions(list).catch(() => undefined);
+    } catch (error) {
+      setSessions([]);
+      setLoadError(getSessionLoadErrorMessage(error));
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [syncUnreadSessions]);
 
   useFocusEffect(
     useCallback(() => {
+      void hydratePins().catch(() => undefined);
+      void hydrateReads().catch(() => undefined);
       void loadSessions();
-    }, [loadSessions]),
+    }, [hydratePins, hydrateReads, loadSessions]),
+  );
+
+  const orderedSessions = useMemo(
+    () => sortSessionsByLocalPin(sessions, pinnedAtByThreadId),
+    [pinnedAtByThreadId, sessions],
+  );
+
+  const collectionState = resolveSessionCollectionState(
+    isLoading,
+    loadError,
+    sessions.length,
   );
 
   const listContentStyle = useMemo(
@@ -193,6 +286,34 @@ export function SessionListScreen() {
     ],
     [insets.bottom, sessions.length],
   );
+
+  const openSession = (session: Session) => {
+    const target = resolveSessionOpenTarget(session);
+    if (target.kind === 'workspace-list') {
+      navigation.navigate('WorkspaceList');
+      return;
+    }
+    if (target.kind === 'contract-error') {
+      Alert.alert('无法打开会话', target.message);
+      return;
+    }
+    navigation.navigate('Chat', {
+      sessionId: session.id,
+      title: session.title,
+    });
+  };
+
+  const togglePin = async (session: Session) => {
+    try {
+      if (isThreadPinned(pinnedAtByThreadId, session.id)) {
+        await unpinThread(session.id);
+      } else {
+        await pinThread(session.id);
+      }
+    } catch {
+      Alert.alert('置顶操作失败', '无法保存本机置顶状态，请重试。');
+    }
+  };
 
   return (
     <SafeAreaView
@@ -232,59 +353,80 @@ export function SessionListScreen() {
       </View>
 
       <FlatList
-        data={sessions}
+        data={orderedSessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
-        ListHeaderComponent={
-          sessions.length > 0 ? (
-            <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>置顶</Text>
-          ) : null
-        }
-        renderItem={({ item, index }) => (
-          <>
-            {index === 1 ? (
-              <Text style={[styles.recentSectionLabel, { color: colors.text.soft }]}>
-                最近对话
+        renderItem={({ item }) => (
+          <SessionRow
+            item={item}
+            roleName={getSessionRoleName(item, roleNames)}
+            connectionStatus={connectionStatus}
+            colors={colors}
+            isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
+            isUnread={selectThreadUnread(progressByThreadId, item.id)}
+            onOpen={() => openSession(item)}
+            onTogglePin={() => void togglePin(item)}
+          />
+        )}
+        ListEmptyComponent={() => {
+          if (collectionState === 'loading') {
+            return (
+              <View
+                style={styles.loadingState}
+                accessibilityLabel="正在加载线程列表"
+                accessibilityRole="progressbar"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            );
+          }
+
+          if (collectionState === 'error') {
+            return (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>加载会话失败</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+                  {loadError}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="重试加载会话"
+                  onPress={() => void loadSessions()}
+                  style={({ pressed }) => [
+                    styles.retryButton,
+                    { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+                  ]}
+                >
+                  <Text style={[styles.retryButtonLabel, { color: colors.onPrimary }]}>重试</Text>
+                </Pressable>
+              </View>
+            );
+          }
+
+          return (
+            <View style={styles.emptyState}>
+              <View
+                style={[
+                  styles.emptyIllustration,
+                  {
+                    backgroundColor: colors.bg.card,
+                    borderColor: colors.border.default,
+                  },
+                ]}
+              >
+                <MessageSquare
+                  size={48}
+                  strokeWidth={1.25}
+                  color={colors.border.default}
+                />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
+                Remote Host V1 当前只展示桌面端已有会话
               </Text>
-            ) : null}
-            <SessionRow
-              item={item}
-              connectionStatus={connectionStatus}
-              showUnreadIndicator={index === 0}
-              showPinnedIndicator={index === 0}
-              colors={colors}
-              onOpen={() =>
-                navigation.navigate('Chat', {
-                  sessionId: item.id,
-                  title: item.title,
-                })
-              }
-            />
-          </>
-        )}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            <View
-              style={[
-                styles.emptyIllustration,
-                {
-                  backgroundColor: colors.bg.card,
-                  borderColor: colors.border.default,
-                },
-              ]}
-            >
-              <MessageSquare
-                size={48}
-                strokeWidth={1.25}
-                color={colors.border.default}
-              />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
-              Remote Host V1 当前只展示桌面端已有会话
-            </Text>
-          </View>
-        )}
+          );
+        }}
       />
 
       {drawerOpen ? (
@@ -349,25 +491,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: { paddingHorizontal: spacing.lg },
-  sectionLabel: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    fontSize: fontSize.captionUppercase,
-  },
-  recentSectionLabel: {
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    fontSize: fontSize.captionUppercase,
-  },
   sessionItem: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sessionOpen: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 72,
-    paddingHorizontal: spacing.xs,
+    paddingLeft: spacing.xs,
     paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pinButton: {
+    width: sizing.touchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    marginVertical: spacing.sm,
   },
   avatar: {
     width: 48,
@@ -391,14 +534,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: spacing.sm,
-  },
-  unreadDot: {
-    width: spacing.sm,
-    height: spacing.sm,
-    borderRadius: radius.full,
-    marginRight: spacing.sm,
+    gap: spacing.xs,
   },
   sessionTitle: { fontSize: fontSize.bodyMd, fontWeight: '600', flex: 1 },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.full,
+    flexShrink: 0,
+  },
   sessionTime: { fontSize: fontSize.xs },
   sessionPreview: { fontSize: fontSize.button },
   emptyState: {
@@ -407,6 +551,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.section,
     paddingBottom: 80,
+  },
+  loadingState: {
+    flex: 1,
+    minHeight: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyIllustration: {
     width: 112,
@@ -423,6 +573,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   emptySubtitle: { fontSize: fontSize.button, textAlign: 'center' },
+  retryButton: {
+    minHeight: sizing.touchTarget,
+    minWidth: 96,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonLabel: { fontSize: fontSize.bodyMd, fontWeight: '600' },
   drawerBackdrop: { ...StyleSheet.absoluteFill },
   drawerPanel: {
     position: 'absolute',
