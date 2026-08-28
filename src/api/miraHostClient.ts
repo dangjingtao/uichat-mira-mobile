@@ -131,8 +131,8 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     return unsupportedMutation('Creating a thread');
   }
 
-  async deleteSession(_sessionId: string): Promise<void> {
-    return unsupportedMutation('Deleting a thread');
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.remote.deleteThread(sessionId);
   }
 
   async renameSession(_sessionId: string, _title: string): Promise<Session> {
