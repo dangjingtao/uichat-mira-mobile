@@ -8,7 +8,7 @@ build/
 *.pbxuser
 !default.pbxuser
 *.mode1v3
-!default.mode1v3
+!default.pbxuser
 *.mode2v3
 !default.mode2v3
 *.perspectivev3
@@ -91,3 +91,6 @@ Thumbs.db
 
 # NativeWind cache
 .nativewind/
+
+# Local AI review inbox
+.ai/reviews/
