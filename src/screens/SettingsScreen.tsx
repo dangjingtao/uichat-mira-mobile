@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -33,6 +34,8 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme, type AccentColor, type ThemeMode } from '../theme/ThemeContext';
 import { themePresets } from '../theme/palette';
+import { miraHostClient } from '../api/miraHostClient';
+import { useTailscaleConnectivityStore } from '../store/tailscaleConnectivityStore';
 import {
   SettingsGroup as RowGroup,
   SettingsRow as Row,
@@ -56,15 +59,56 @@ const accentOptionDefinitions: readonly SettingsChoice<AccentColor>[] = [
   { value: 'slate-ocean', label: themePresets['slate-ocean'].label, swatch: themePresets['slate-ocean'].swatch },
 ];
 
-/* ───────────────────────────────────────────────
-   Main Screen
-   ─────────────────────────────────────────────── */
-
 export function SettingsScreen() {
   const navigation = useNavigation<NavProp>();
-  const { colors, theme, mode, accentColor, setMode, setAccentColor } = useTheme();
+  const {
+    colors,
+    theme,
+    mode,
+    accentColor,
+    persistenceError,
+    setMode,
+    setAccentColor,
+  } = useTheme();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [accentOpen, setAccentOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const requestDisconnect = () => {
+    if (disconnecting) return;
+
+    Alert.alert(
+      '断开 Mira Host？',
+      '这会清除本机配对凭据并断开当前 Host，不会删除桌面端的会话、项目或其它数据。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '断开',
+          style: 'destructive',
+          onPress: () => {
+            setDisconnecting(true);
+            void miraHostClient
+              .disconnect()
+              .then(() => {
+                useTailscaleConnectivityStore.getState().reset();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'HostConfig' }],
+                });
+              })
+              .catch((error: unknown) => {
+                const message =
+                  error instanceof Error ? error.message : '无法断开 Mira Host，请稍后重试。';
+                Alert.alert('断开失败', message);
+              })
+              .finally(() => {
+                setDisconnecting(false);
+              });
+          },
+        },
+      ],
+    );
+  };
 
   const handleSettingAction = (actionId: string) => {
     switch (actionId) {
@@ -80,6 +124,9 @@ export function SettingsScreen() {
       case 'host-config':
         navigation.navigate('HostConfig');
         break;
+      case 'disconnect-host':
+        requestDisconnect();
+        break;
       case 'report-error':
         navigation.navigate('ReportError');
         break;
@@ -93,13 +140,13 @@ export function SettingsScreen() {
   const accentOption =
     accentOptionDefinitions.find((option) => option.value === accentColor) ??
     accentOptionDefinitions[0];
+  const persistenceSuffix = persistenceError ? ' · 本次设置未保存' : '';
 
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}
       edges={['top', 'bottom']}
     >
-      {/* Header */}
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -118,7 +165,6 @@ export function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Avatar ──────────────────────────── */}
         <View style={styles.profileSection}>
           <View style={styles.avatarWrap}>
             <View
@@ -135,7 +181,6 @@ export function SettingsScreen() {
           </View>
         </View>
 
-        {/* ── 我的 Mira ─────────────────────── */}
         <SectionHeader>我的 Mira</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast={false} />
@@ -143,7 +188,6 @@ export function SettingsScreen() {
           <Row icon={Grid3x3} title="插件" isLast />
         </RowGroup>
 
-        {/* ── 账户 ──────────────────────────── */}
         <SectionHeader>账户</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -155,13 +199,12 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 外观 ──────────────────────────── */}
         <SectionHeader>外观</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
             icon={theme === 'light' ? Sun : Moon}
             title="外观"
-            subtitle={appearanceLabel}
+            subtitle={`${appearanceLabel}${persistenceSuffix}`}
             actionId="appearance"
             isFirst
             isLast={false}
@@ -175,7 +218,7 @@ export function SettingsScreen() {
           <Row
             icon={Palette}
             title="重点色"
-            subtitle={accentOption.label}
+            subtitle={`${accentOption.label}${persistenceSuffix}`}
             actionId="accent"
             isLast={false}
             right={
@@ -194,7 +237,6 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 主机 ──────────────────────────── */}
         <SectionHeader>主机</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row
@@ -207,7 +249,6 @@ export function SettingsScreen() {
           />
         </RowGroup>
 
-        {/* ── 通用设置 ─────────────────────── */}
         <SectionHeader>通用</SectionHeader>
         <RowGroup onAction={handleSettingAction}>
           <Row icon={GearIcon} title="常规" isFirst isLast={false} />
@@ -219,12 +260,12 @@ export function SettingsScreen() {
           <Row icon={Info} title="关于" actionId="about" isLast />
         </RowGroup>
 
-        {/* ── 退出登录 ─────────────────────── */}
         <View style={styles.logoutSpacer} />
         <RowGroup onAction={handleSettingAction}>
           <Row
             icon={LogOut}
-            title="退出登录"
+            title={disconnecting ? '正在断开…' : '退出登录'}
+            actionId="disconnect-host"
             isFirst
             isLast
             destructive
@@ -239,14 +280,8 @@ export function SettingsScreen() {
   );
 }
 
-/* ───────────────────────────────────────────────
-   Styles
-   ─────────────────────────────────────────────── */
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-
-  // ── Header ─────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,15 +296,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerSpacer: { flex: 1 },
-
-  // ── Scroll ─────────────────────────────
   scrollContent: {
     paddingTop: 8,
     paddingHorizontal: 20,
     paddingBottom: 48,
   },
-
-  // ── Profile ────────────────────────────
   profileSection: {
     alignItems: 'center',
     paddingTop: 8,
@@ -294,8 +325,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 48,
   },
-
-  // ── Accent color row ───────────────────
   accentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,7 +336,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   logoutSpacer: { height: 8 },
-
-  // ── Bottom ─────────────────────────────
   bottomSpacer: { height: 32 },
 });
