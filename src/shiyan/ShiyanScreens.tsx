@@ -128,7 +128,7 @@ export function ShiyanHomeScreen() {
         <View style={[styles.hero, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
           <Sparkles size={28} color={colors.primary} />
           <Text style={[styles.heroTitle, { color: colors.text.ink }]}>先说下来，再慢慢整理。</Text>
-          <Text style={[styles.heroText, { color: colors.text.soft }]}>选择一个场景开始采集；录音能力由下一阶段接入，这里先固定拾言的产品与导航边界。</Text>
+          <Text style={[styles.heroText, { color: colors.text.soft }]}>选择一个场景开始。录音接入后，会从这里继续进入采集与确认流程。</Text>
         </View>
         <ActionCard
           icon={Mic2}
@@ -195,7 +195,7 @@ export function ShiyanSceneSelectScreen() {
         <View style={[styles.pendingBox, { backgroundColor: colors.bg.soft }]}>
           <Clock3 size={18} color={colors.text.soft} />
           <Text style={[styles.pendingText, { color: colors.text.soft }]}>
-            已选场景会在录音接入后进入采集流程；本卡不伪造录音或云端任务。
+            场景选择已就绪；录音能力接入后会从这里继续进入采集流程。
           </Text>
         </View>
       </ScrollView>
@@ -210,7 +210,7 @@ export function ShiyanHistoryScreen() {
       <View style={styles.emptyState}>
         <FileText size={34} color={colors.text.soft} />
         <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>还没有拾言任务</Text>
-        <Text style={[styles.emptyText, { color: colors.text.soft }]}>这里会挂载真实 CaptureTask：标题、场景、时间、阶段状态和可打开的真实去向链接。当前不会用假数据冒充处理结果。</Text>
+        <Text style={[styles.emptyText, { color: colors.text.soft }]}>完成首次真实采集后，这里会显示任务标题、场景、时间、当前阶段和可打开的投递去向。</Text>
       </View>
     </ScreenShell>
   );
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '650' },
+  headerTitle: { fontSize: 18, fontWeight: '600' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
   eyebrow: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   hero: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.sm },
@@ -294,18 +294,18 @@ const styles = StyleSheet.create({
   card: { minHeight: 88, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   iconWrap: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   cardText: { flex: 1, gap: 5 },
-  cardTitle: { fontSize: 16, fontWeight: '650' },
+  cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDescription: { fontSize: 14, lineHeight: 20 },
   sceneCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: 7 },
   structureText: { fontSize: 12, lineHeight: 18 },
   pendingBox: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.base, alignItems: 'flex-start' },
   pendingText: { flex: 1, fontSize: 13, lineHeight: 19 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, gap: spacing.sm },
-  emptyTitle: { fontSize: 18, fontWeight: '650', marginTop: spacing.sm },
+  emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: spacing.sm },
   emptyText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginTop: spacing.sm },
   input: { minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.base, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 15 },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
   primaryButton: { minHeight: 48, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md },
-  primaryButtonText: { fontSize: 15, fontWeight: '650' },
+  primaryButtonText: { fontSize: 15, fontWeight: '600' },
 });
