@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
@@ -151,10 +151,22 @@ export function ShiyanSceneSelectScreen() {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const custom = getCustomSceneDraft();
+  const [customScene, setCustomScene] = useState<ShiyanSceneDefinition | null>(() =>
+    getCustomSceneDraft(),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setCustomScene(getCustomSceneDraft());
+    }, []),
+  );
+
   const scenes = useMemo(
-    () => (custom ? [...SHIYAN_BUILT_IN_SCENES, custom] : [...SHIYAN_BUILT_IN_SCENES]),
-    [custom],
+    () =>
+      customScene
+        ? [...SHIYAN_BUILT_IN_SCENES, customScene]
+        : [...SHIYAN_BUILT_IN_SCENES],
+    [customScene],
   );
 
   return (
@@ -194,9 +206,7 @@ export function ShiyanSceneSelectScreen() {
 
         <View style={[styles.pendingBox, { backgroundColor: colors.bg.soft }]}>
           <Clock3 size={18} color={colors.text.soft} />
-          <Text style={[styles.pendingText, { color: colors.text.soft }]}>
-            场景选择已就绪；录音能力接入后会从这里继续进入采集流程。
-          </Text>
+          <Text style={[styles.pendingText, { color: colors.text.soft }]}>场景选择已就绪；录音能力接入后会从这里继续进入采集流程。</Text>
         </View>
       </ScrollView>
     </ScreenShell>
