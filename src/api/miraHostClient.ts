@@ -11,6 +11,7 @@ import {
 } from './remoteMiraHost';
 import type {
   RemoteChatStreamEvent,
+  RemoteManifest,
   RemoteMessage,
   RemoteThread,
 } from '../protocol/remoteHostV1';
@@ -38,6 +39,10 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
   content: message.content,
   timestamp: new Date(message.createdAt),
 });
+
+const supportsThreadDeletion = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('messages:write') &&
+  manifest.routes.threads.includes('DELETE /threads/:id');
 
 const unsupportedMutation = (operation: string): never => {
   throw new Error(
@@ -131,7 +136,22 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     return unsupportedMutation('Creating a thread');
   }
 
+  async canDeleteSession(): Promise<boolean> {
+    try {
+      return supportsThreadDeletion(await this.remote.getManifest());
+    } catch {
+      return false;
+    }
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadDeletion(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_DELETE_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端删除会话',
+      );
+    }
     await this.remote.deleteThread(sessionId);
   }
 
