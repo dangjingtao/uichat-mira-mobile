@@ -171,11 +171,13 @@ const canonicalThread = {
 const makeSessionClient = () => {
   const listThreads = jest.fn().mockResolvedValue([canonicalThread]);
   const getThread = jest.fn().mockResolvedValue(canonicalThread);
-  const remote = { listThreads, getThread } as never;
+  const deleteThread = jest.fn().mockResolvedValue(undefined);
+  const remote = { listThreads, getThread, deleteThread } as never;
   return {
     client: new PairedRemoteMiraHostClient(remote),
     listThreads,
     getThread,
+    deleteThread,
   };
 };
 
@@ -210,5 +212,12 @@ describe('PairedRemoteMiraHostClient session mapping', () => {
       messageCount: 7,
     });
     expect(getThread).toHaveBeenCalledWith('thread-1');
+  });
+
+  it('delegates thread deletion to the paired Remote Host client', async () => {
+    const { client, deleteThread } = makeSessionClient();
+
+    await expect(client.deleteSession('thread-1')).resolves.toBeUndefined();
+    expect(deleteThread).toHaveBeenCalledWith('thread-1');
   });
 });
