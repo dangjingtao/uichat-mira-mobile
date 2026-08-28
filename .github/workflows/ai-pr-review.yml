@@ -49,19 +49,41 @@ jobs:
           curl -fsSL https://opencode.ai/install | bash
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Load trusted Mobile reviewer and skill from base
+      - name: Prepare trusted reviewer and sanitized PR snapshot
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         shell: bash
         run: |
-          mkdir -p .opencode/skills/mira-mobile-pr-review
+          REVIEW_DIR="$RUNNER_TEMP/mira-mobile-review-snapshot"
+          rm -rf "$REVIEW_DIR"
+          mkdir -p "$REVIEW_DIR"
+
+          git archive "$HEAD_SHA" | tar -x -C "$REVIEW_DIR"
+
+          rm -rf \
+            "$REVIEW_DIR/.opencode" \
+            "$REVIEW_DIR/.claude" \
+            "$REVIEW_DIR/.agents"
+          rm -f \
+            "$REVIEW_DIR/opencode.json" \
+            "$REVIEW_DIR/opencode.jsonc" \
+            "$REVIEW_DIR/CLAUDE.md" \
+            "$REVIEW_DIR/AGENTS.md"
+
+          mkdir -p "$REVIEW_DIR/.opencode/skills/mira-mobile-pr-review"
+          git show "$BASE_SHA:AGENTS.md" > "$REVIEW_DIR/AGENTS.md"
+          git show "$BASE_SHA:.opencode/skills/mira-mobile-pr-review/SKILL.md" > "$REVIEW_DIR/.opencode/skills/mira-mobile-pr-review/SKILL.md"
           git show "$BASE_SHA:scripts/opencode-mobile-pr-review.mjs" > "$RUNNER_TEMP/opencode-mobile-pr-review.mjs"
-          git show "$BASE_SHA:.opencode/skills/mira-mobile-pr-review/SKILL.md" > .opencode/skills/mira-mobile-pr-review/SKILL.md
+
+          echo "OPENCODE_REVIEW_DIR=$REVIEW_DIR" >> "$GITHUB_ENV"
 
       - name: Run read-only Mira Mobile review
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_REVIEW_MODEL: ${{ vars.OPENCODE_REVIEW_MODEL || 'opencode-go/gpt-5.6-luna' }}
+          OPENCODE_DISABLE_CLAUDE_CODE: 'true'
+          OPENCODE_DISABLE_LSP_DOWNLOAD: 'true'
           OPENCODE_PERMISSION: '{"read":"allow","glob":"allow","grep":"allow","edit":"deny","bash":"deny","task":"deny","lsp":"deny","question":"deny","webfetch":"deny","websearch":"deny","skill":{"*":"deny","mira-mobile-pr-review":"allow"}}'
         run: node "$RUNNER_TEMP/opencode-mobile-pr-review.mjs"
 
