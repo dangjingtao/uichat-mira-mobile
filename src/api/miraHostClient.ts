@@ -16,7 +16,10 @@ import type {
   RemoteThread,
 } from '../protocol/remoteHostV1';
 import { RemoteHostError } from './remoteHttp';
+import { readThreadMediaText } from './threadMedia';
 import type { MiraHostApi } from './miraHost';
+
+const THREAD_MEDIA_ROUTE = 'GET /threads/:id/media/:mediaId/content';
 
 const threadToSession = (thread: RemoteThread): Session => ({
   id: thread.id,
@@ -38,12 +41,19 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
       : message.role,
   content: message.content,
   timestamp: new Date(message.createdAt),
+  ...(message.role === 'user' || message.role === 'assistant'
+    ? { parts: message.parts }
+    : {}),
   metadata: message.metadata,
 });
 
 const supportsThreadDeletion = (manifest: RemoteManifest): boolean =>
   manifest.device.scopes.includes('messages:write') &&
   manifest.routes.threads.includes('DELETE /threads/:id');
+
+const supportsThreadMediaRead = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('artifacts:read') &&
+  manifest.routes.artifacts.includes(THREAD_MEDIA_ROUTE);
 
 const unsupportedMutation = (operation: string): never => {
   throw new Error(
@@ -195,6 +205,32 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     );
     this.publishMessageSnapshot(sessionId, messages);
     return messages;
+  }
+
+  async getThreadMediaRequest(sessionId: string, mediaId: string) {
+    const stableMediaId = mediaId.trim();
+    if (!stableMediaId) {
+      throw new RemoteHostError(
+        'MEDIA_ID_REQUIRED',
+        'A canonical media id is required to read an attachment',
+      );
+    }
+
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadMediaRead(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_MEDIA_READ_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端读取会话附件',
+        403,
+      );
+    }
+
+    return this.remote.getThreadMediaRequest(sessionId, stableMediaId);
+  }
+
+  async getThreadMediaText(sessionId: string, mediaId: string): Promise<string> {
+    const request = await this.getThreadMediaRequest(sessionId, mediaId);
+    return readThreadMediaText(request);
   }
 
   async sendMessage(
