@@ -1,9 +1,9 @@
 import { readThreadMediaText } from './threadMedia';
 
-const originalFetch = global.fetch;
+const originalFetch = globalThis.fetch;
 
 afterEach(() => {
-  global.fetch = originalFetch;
+  globalThis.fetch = originalFetch;
   jest.restoreAllMocks();
 });
 
@@ -15,7 +15,7 @@ describe('readThreadMediaText', () => {
         headers: { 'content-length': '15' },
       }),
     );
-    global.fetch = fetchMock as typeof fetch;
+    globalThis.fetch = fetchMock as typeof fetch;
 
     await expect(
       readThreadMediaText({
@@ -35,7 +35,7 @@ describe('readThreadMediaText', () => {
   });
 
   test('rejects oversized text before using it as preview content', async () => {
-    global.fetch = jest.fn(async () =>
+    globalThis.fetch = jest.fn(async () =>
       new Response('ignored', {
         status: 200,
         headers: { 'content-length': '1001' },
@@ -51,7 +51,7 @@ describe('readThreadMediaText', () => {
   });
 
   test('keeps HTTP failures as truthful RemoteHost errors', async () => {
-    global.fetch = jest.fn(async () => new Response('', { status: 404 })) as typeof fetch;
+    globalThis.fetch = jest.fn(async () => new Response('', { status: 404 })) as typeof fetch;
 
     await expect(
       readThreadMediaText({
