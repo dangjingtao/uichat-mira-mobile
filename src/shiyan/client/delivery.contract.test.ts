@@ -1,4 +1,5 @@
 import {
+  hasCanonicalGithubDeliveryEvidence,
   parseShiyanDeliveriesResult,
   type ShiyanDeliveryView,
   type ShiyanFinalDraftView,
@@ -81,5 +82,11 @@ describe('Shiyan Delivery contract', () => {
     expect(
       deliveryBelongsToFinalDraft(delivery({ taskId: 'task-other' }), finalDraft),
     ).toBe(false);
+  });
+
+  it('requires URL and commit evidence before a succeeded delivery is canonical', () => {
+    expect(hasCanonicalGithubDeliveryEvidence(delivery())).toBe(true);
+    expect(hasCanonicalGithubDeliveryEvidence(delivery({ commitSha: null }))).toBe(false);
+    expect(hasCanonicalGithubDeliveryEvidence(delivery({ fileUrl: null }))).toBe(false);
   });
 });
