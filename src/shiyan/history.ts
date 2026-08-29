@@ -1,4 +1,6 @@
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
+import { parseShiyanDeliveriesResult } from './client/contracts';
+import { deliveryBelongsToFinalDraft } from './client/delivery';
 import { localCaptureRepository } from './recording/localCaptureRepository';
 import { canonicalShiyanSceneId, shiyanSceneNameForId } from './scenes';
 import { shiyanSubmissionRepository } from './submissionRepository';
@@ -27,18 +29,28 @@ export interface ShiyanHistoryDataSource {
 
 const destinationUrlFor = async (taskId: string): Promise<string | null> => {
   try {
-    const result = await shiyanClient.getDeliveries(taskId);
+    const [{ draft }, rawDeliveries] = await Promise.all([
+      shiyanClient.getFinalDraft(taskId),
+      shiyanClient.getDeliveries(taskId),
+    ]);
+    const deliveries = parseShiyanDeliveriesResult(rawDeliveries, taskId);
+    if (!deliveries) return null;
     return (
-      result.deliveries.find(
-        (delivery) => delivery.status === 'succeeded' && Boolean(delivery.fileUrl),
+      deliveries.deliveries.find(
+        (delivery) =>
+          deliveryBelongsToFinalDraft(delivery, draft) &&
+          delivery.status === 'succeeded' &&
+          Boolean(delivery.fileUrl),
       )?.fileUrl ?? null
     );
   } catch (error) {
-    // MOB-022's handler exists but public router wiring may lag the Mobile build.
-    // Missing route/evidence means “no canonical URL yet”, never a fabricated URL.
+    // Missing route, task, Final Draft, or canonical evidence means “no canonical URL yet”.
+    // Never fall back to an older delivery or fabricate a URL.
     if (
       error instanceof ShiyanClientError &&
-      (error.code === 'route_not_found' || error.code === 'task_not_found')
+      (error.code === 'route_not_found' ||
+        error.code === 'task_not_found' ||
+        error.code === 'final_draft_not_ready')
     ) {
       return null;
     }
