@@ -60,8 +60,9 @@ GitHub 是拾言 MVP 第一优先 Destination。它只保存用户确认后的�
 - Cloud `feature/mob-022-github-destination` 已实现 `DestinationAdapter`、GitHub adapter、Delivery Record persistence、Delivery Stage 错误 / 重试语义与读取 handler；
 - 同一幂等键成功后直接返回已保存 canonical evidence，不再次调用 Destination；
 - 不确定网络结果下，若目标路径已有完全一致内容则恢复已有文件 / commit，不重复创建；若同一路径内容不同则明确 `path_conflict`，不随机改名、不自动覆盖正式文档；
+- 并发写入时，D1 唯一键冲突会读取已创建的 Delivery Record；GitHub PUT 遇到 409 / 422 会二次读取目标路径，内容一致则恢复为同一次成功投递；
 - 网络 / 408 / 5xx / rate limit 为可重试，401 / 普通 403 / 路径冲突为明确失败；
-- Cloud PR #4 当前保持 Draft，最新 CI run `33238963871` 全绿：typecheck、Destination / Delivery recovery tests、两个 Worker dry-run、D1 migrations 均通过；
+- Cloud PR #4 当前保持 Draft，最新 CI run `33239152910` 全绿：typecheck、Destination / Delivery recovery tests、并发恢复测试、两个 Worker dry-run、D1 migrations 均通过；
 - 第一轮 CI 曾暴露缺失 `Retry-After` 被 `Number(null)` 错判为 rate limit 的真实问题，已修正后复验通过。
 
 尚未越权补造的依赖接线：
