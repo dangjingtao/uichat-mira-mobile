@@ -1,5 +1,6 @@
 import type { LocalCaptureMetadata } from './recording/localCaptureRepository';
 import { localCaptureRepository } from './recording/localCaptureRepository';
+import { canonicalShiyanSceneId } from './scenes';
 import {
   shiyanClient,
   ShiyanClientError,
@@ -18,7 +19,7 @@ type CaptureSubmissionRepository = Pick<
 >;
 
 export interface SubmitCaptureProgress {
-  phase: 'creating_task' | 'uploading' | 'confirming';
+  phase: 'registering_scene' | 'creating_task' | 'uploading' | 'confirming';
   uploadFraction?: number;
 }
 
@@ -42,13 +43,27 @@ export async function submitLocalCapture(
           title: capture.title,
           sceneId: capture.sceneId,
           sceneName: capture.sceneName,
+          ...(capture.sceneSnapshot ? { sceneSnapshot: capture.sceneSnapshot } : {}),
         });
+
+  const sceneId = canonicalShiyanSceneId(
+    confirmedCapture.sceneSnapshot?.id ?? confirmedCapture.sceneId,
+  );
+  if (confirmedCapture.sceneSnapshot && !confirmedCapture.sceneSnapshot.builtIn) {
+    options.onProgress?.({ phase: 'registering_scene' });
+    await client.createScene({
+      id: sceneId,
+      name: confirmedCapture.sceneSnapshot.name,
+      instruction: confirmedCapture.sceneSnapshot.instruction,
+      sections: confirmedCapture.sceneSnapshot.sections,
+    });
+  }
 
   options.onProgress?.({ phase: 'creating_task' });
   const created = await client.createCaptureTask({
     idempotencyKey: `mobile-capture:${confirmedCapture.id}`,
     title: confirmedCapture.title,
-    sceneId: confirmedCapture.sceneId,
+    sceneId,
     audio: {
       contentType: CONTENT_TYPE,
       sizeBytes: confirmedCapture.fileSizeBytes,
