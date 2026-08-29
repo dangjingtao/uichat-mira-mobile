@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -96,15 +96,12 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   useFocusEffect(
     useCallback(() => {
       void refreshDeliveryState();
+      const timer = setInterval(() => {
+        void refreshDeliveryState();
+      }, 5000);
+      return () => clearInterval(timer);
     }, [refreshDeliveryState]),
   );
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      void refreshDeliveryState();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [refreshDeliveryState]);
 
   const deliveryBlocked = editorState.dirty || editorState.saving;
 
@@ -113,7 +110,12 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     setBusy(true);
     setDeliveryError('');
     try {
-      const result = await deliverFinalDraftToGithub(taskId, finalDraft);
+      // Saving happens inside the child screen. Always reload the authoritative
+      // Final Draft immediately before delivery so a fast tap after save cannot
+      // reuse the previous confirmedAt/idempotency identity.
+      const latest = await shiyanClient.getFinalDraft(taskId);
+      setFinalDraft(latest.draft);
+      const result = await deliverFinalDraftToGithub(taskId, latest.draft);
       setDelivery(result.record);
       Alert.alert('已投递 GitHub', 'Final Draft 已写入真实 GitHub 文档。');
     } catch (error) {
