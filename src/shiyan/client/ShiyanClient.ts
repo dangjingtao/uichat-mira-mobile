@@ -1,9 +1,15 @@
 import { loadShiyanRuntimeConfig, type ShiyanRuntimeConfig } from './runtimeConfig';
 import type {
+  ShiyanAiDraftResult,
   ShiyanApiEnvelope,
   ShiyanAudioRetentionView,
   ShiyanCreateCaptureTaskInput,
   ShiyanCreateCaptureTaskResult,
+  ShiyanDeliveriesResult,
+  ShiyanFinalDraftResult,
+  ShiyanOrganizeRetryView,
+  ShiyanSceneResult,
+  ShiyanScenesResult,
   ShiyanSttRetryView,
   ShiyanTaskResult,
   ShiyanTranscriptResult,
@@ -27,6 +33,22 @@ export interface ShiyanCloudClient {
   getCaptureTask(taskId: string): Promise<ShiyanTaskResult>;
   getTranscript(taskId: string): Promise<ShiyanTranscriptResult>;
   retryStt(taskId: string): Promise<ShiyanSttRetryView>;
+  retryOrganize(taskId: string): Promise<ShiyanOrganizeRetryView>;
+  getAiDraft(taskId: string): Promise<ShiyanAiDraftResult>;
+  adjustAiDraft(taskId: string, instruction: string, idempotencyKey: string): Promise<ShiyanAiDraftResult>;
+  getFinalDraft(taskId: string): Promise<ShiyanFinalDraftResult>;
+  saveFinalDraft(
+    taskId: string,
+    input: { markdown: string; title?: string; baseVersion?: number },
+  ): Promise<ShiyanFinalDraftResult>;
+  listScenes(): Promise<ShiyanScenesResult>;
+  createScene(input: {
+    id: string;
+    name: string;
+    instruction: string;
+    sections: Array<{ id: string; title: string; description: string }>;
+  }): Promise<ShiyanSceneResult>;
+  getDeliveries(taskId: string): Promise<ShiyanDeliveriesResult>;
   setAudioRetention(taskId: string, retained: boolean): Promise<ShiyanAudioRetentionView>;
   uploadLocalAudio(
     grant: ShiyanUploadGrant,
@@ -95,6 +117,70 @@ export class HttpShiyanClient implements ShiyanCloudClient {
     return this.request<ShiyanSttRetryView>(
       `/v1/capture-tasks/${encodeURIComponent(taskId)}/stt/retry`,
       { method: 'POST' },
+    );
+  }
+
+  async retryOrganize(taskId: string) {
+    return this.request<ShiyanOrganizeRetryView>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/organize/retry`,
+      { method: 'POST' },
+    );
+  }
+
+  async getAiDraft(taskId: string) {
+    return this.request<ShiyanAiDraftResult>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/ai-draft`,
+    );
+  }
+
+  async adjustAiDraft(taskId: string, instruction: string, idempotencyKey: string) {
+    return this.request<ShiyanAiDraftResult>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/ai-draft/adjust`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ instruction, idempotencyKey }),
+      },
+    );
+  }
+
+  async getFinalDraft(taskId: string) {
+    return this.request<ShiyanFinalDraftResult>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/final-draft`,
+    );
+  }
+
+  async saveFinalDraft(
+    taskId: string,
+    input: { markdown: string; title?: string; baseVersion?: number },
+  ) {
+    return this.request<ShiyanFinalDraftResult>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/final-draft`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  async listScenes() {
+    return this.request<ShiyanScenesResult>('/v1/scenes');
+  }
+
+  async createScene(input: {
+    id: string;
+    name: string;
+    instruction: string;
+    sections: Array<{ id: string; title: string; description: string }>;
+  }) {
+    return this.request<ShiyanSceneResult>('/v1/scenes', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async getDeliveries(taskId: string) {
+    return this.request<ShiyanDeliveriesResult>(
+      `/v1/capture-tasks/${encodeURIComponent(taskId)}/deliveries`,
     );
   }
 
