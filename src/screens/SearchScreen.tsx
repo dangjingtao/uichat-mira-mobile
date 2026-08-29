@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,11 @@ import {
   resolveSessionCollectionState,
 } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
+import {
+  GlobalSearchController,
+  SEARCH_DEBOUNCE_MS,
+  type GlobalSearchState,
+} from '../search/globalSearch';
 
 const tabs = [
   { id: 'all', label: '全部', implemented: true },
@@ -60,6 +65,13 @@ export function SearchScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchState, setSearchState] = useState<GlobalSearchState>({
+    status: 'idle',
+    query: '',
+    threadMatches: [],
+    messageMatches: [],
+  });
+  const searchControllerRef = useRef<GlobalSearchController | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -82,13 +94,33 @@ export function SearchScreen() {
     void loadSessions();
   }, [hydratePins, hydrateReads, loadSessions]);
 
-  const results = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return sessions;
-    return sessions.filter((session) =>
-      session.title.toLowerCase().includes(normalizedQuery),
-    );
-  }, [query, sessions]);
+  useEffect(() => {
+    const controller = new GlobalSearchController({
+      listSessions: () => miraHostClient.listSessions(),
+      getMessages: (sessionId) => miraHostClient.getMessages(sessionId),
+      onStateChange: setSearchState,
+    });
+    searchControllerRef.current = controller;
+    return () => {
+      searchControllerRef.current = null;
+      controller.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = searchControllerRef.current;
+    if (!controller) return;
+    if (!query.trim()) {
+      controller.search('');
+      return;
+    }
+    const timer = setTimeout(() => controller.search(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const hasQuery = query.trim().length > 0;
+  const threadResults = hasQuery ? searchState.threadMatches : sessions;
+  const messageResults = hasQuery ? searchState.messageMatches : [];
 
   const openSession = (session: Session) => {
     const target = resolveSessionOpenTarget(session);
@@ -172,8 +204,38 @@ export function SearchScreen() {
               <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
             </Pressable>
           </View>
-        ) : results.length > 0 ? (
-          results.map((session) => {
+        ) : hasQuery && searchState.status === 'failed' ? (
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索失败</Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+              无法连接 Mira Host 完成搜索，请重试。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试搜索"
+              onPress={() => searchControllerRef.current?.search(query)}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
+        ) : hasQuery && searchState.status === 'searching' ? (
+          <View
+            style={styles.centerState}
+            accessibilityLabel="正在搜索"
+            accessibilityRole="progressbar"
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : threadResults.length > 0 || messageResults.length > 0 ? (
+          <>
+            {threadResults.length > 0 && hasQuery ? (
+              <Text style={[styles.resultSectionLabel, { color: colors.text.soft }]}>对话</Text>
+            ) : null}
+            {threadResults.map((session) => {
             const belongsToWorkspace =
               typeof session.workspaceId === 'string' &&
               session.workspaceId.trim().length > 0;
@@ -233,7 +295,53 @@ export function SearchScreen() {
                 </View>
               </Pressable>
             );
-          })
+          })}
+            {messageResults.length > 0 ? (
+              <Text style={[styles.resultSectionLabel, { color: colors.text.soft }]}>消息</Text>
+            ) : null}
+            {messageResults.map((match) => (
+              <Pressable
+                key={`${match.session.id}:${match.message.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`消息命中：${match.session.title}，${match.message.role === 'user' ? '你' : 'Mira'}的消息`}
+                style={styles.result}
+                onPress={() => openSession(match.session)}
+              >
+                <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]}>
+                  <SessionKindIcon
+                    session={match.session}
+                    size={20}
+                    strokeWidth={1.8}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
+                  <View style={styles.resultTitleRow}>
+                    <Text
+                      style={[styles.resultTitle, { color: colors.text.ink }]}
+                      numberOfLines={1}
+                    >
+                      {match.session.title}
+                    </Text>
+                    <Text style={[styles.messageRole, { color: colors.text.soft }]}>
+                      {match.message.role === 'user' ? '你' : 'Mira'}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.messageSnippet, { color: colors.text.muted }]}
+                    numberOfLines={2}
+                  >
+                    {match.snippet}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+            {searchState.status === 'degraded' ? (
+              <Text style={[styles.degradedHint, { color: colors.text.soft }]}>
+                部分会话未能完成搜索，结果可能不完整。
+              </Text>
+            ) : null}
+          </>
         ) : (
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
@@ -241,7 +349,7 @@ export function SearchScreen() {
                 ? '暂无会话'
                 : `没有找到“${query.trim()}”`}
             </Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}> 
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
               {collectionState === 'empty'
                 ? 'Remote Host V1 当前只搜索桌面端已有会话'
                 : '换个关键词再试试'}
@@ -347,6 +455,23 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   projectHintText: { fontSize: fontSize.xs },
+  resultSectionLabel: {
+    fontSize: fontSize.captionUppercase,
+    fontWeight: '600',
+    paddingHorizontal: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  messageRole: { fontSize: fontSize.xs, flexShrink: 0 },
+  messageSnippet: {
+    marginTop: 2,
+    fontSize: fontSize.button,
+  },
+  degradedHint: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    fontSize: fontSize.button,
+    textAlign: 'center',
+  },
   placeholderText: {
     textAlign: 'center',
     marginTop: spacing.xl,
