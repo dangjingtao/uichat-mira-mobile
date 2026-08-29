@@ -32,6 +32,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
 import type {
+  ShiyanAdjustmentCandidate,
   ShiyanCaptureTaskView,
   ShiyanTaskContentView,
   ShiyanTranscriptView,
@@ -71,9 +72,10 @@ export function ShiyanTaskDetailScreen() {
   const [content, setContent] = useState<ShiyanTaskContentView | null>(null);
   const [contentUnavailable, setContentUnavailable] = useState(false);
   const [adjustInstruction, setAdjustInstruction] = useState('');
-  const [candidateMarkdown, setCandidateMarkdown] = useState<string | null>(null);
+  const [candidate, setCandidate] = useState<ShiyanAdjustmentCandidate | null>(null);
   const [finalEditorOpen, setFinalEditorOpen] = useState(false);
   const [finalMarkdown, setFinalMarkdown] = useState('');
+  const [finalBaseVersion, setFinalBaseVersion] = useState<number | null>(null);
   const [savedFinalMarkdown, setSavedFinalMarkdown] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
@@ -86,9 +88,7 @@ export function ShiyanTaskDetailScreen() {
         setTask(result.task);
         setTaskError('');
       } catch (error) {
-        if (!silent) {
-          setTaskError(error instanceof Error ? error.message : '无法读取拾言任务。');
-        }
+        if (!silent) setTaskError(error instanceof Error ? error.message : '无法读取拾言任务。');
       } finally {
         if (!silent) setLoading(false);
       }
@@ -148,20 +148,27 @@ export function ShiyanTaskDetailScreen() {
   }, [loadTask, loadTranscript, shouldPoll]);
 
   useEffect(() => {
-    if (task?.lifecycle === 'ready' || task?.lifecycle === 'completed') {
-      void loadContent();
-    }
+    if (task?.lifecycle === 'ready' || task?.lifecycle === 'completed') void loadContent();
   }, [loadContent, task?.lifecycle]);
 
   const retryCurrentStage = async () => {
-    if (!currentStage || retryActionForStage(currentStage) !== 'transcribe') return;
+    if (!currentStage) return;
+    const action = retryActionForStage(currentStage);
+    if (!action) return;
     setBusyAction('retry');
     try {
-      await shiyanClient.retryStt(taskId);
+      if (action === 'transcribe') {
+        await shiyanClient.retryStt(taskId);
+        await loadTranscript();
+      } else {
+        await shiyanClient.retryOrganize(taskId);
+      }
       await loadTask();
-      await loadTranscript();
     } catch (error) {
-      Alert.alert('无法重试转写', error instanceof Error ? error.message : '请稍后重试。');
+      Alert.alert(
+        action === 'transcribe' ? '无法重试转写' : '无法重试 AI 整理',
+        error instanceof Error ? error.message : '请稍后重试。',
+      );
     } finally {
       setBusyAction(null);
     }
@@ -192,8 +199,8 @@ export function ShiyanTaskDetailScreen() {
     if (!instruction) return;
     setBusyAction('adjust');
     try {
-      const candidate = await getShiyanContentDataSource().adjustAiDraft(taskId, instruction);
-      setCandidateMarkdown(candidate.markdown);
+      const nextCandidate = await getShiyanContentDataSource().adjustAiDraft(taskId, instruction);
+      setCandidate(nextCandidate);
       setAdjustInstruction('');
     } catch (error) {
       Alert.alert('AI 调整暂不可用', error instanceof Error ? error.message : '请稍后重试。');
@@ -203,8 +210,11 @@ export function ShiyanTaskDetailScreen() {
   };
 
   const openFinalEditor = () => {
-    setFinalMarkdown(
-      savedFinalMarkdown ?? candidateMarkdown ?? content?.aiDraftMarkdown ?? '',
+    setFinalMarkdown(savedFinalMarkdown ?? candidate?.markdown ?? content?.aiDraftMarkdown ?? '');
+    setFinalBaseVersion(
+      savedFinalMarkdown
+        ? content?.finalDraftBaseVersion ?? content?.aiDraftVersion ?? null
+        : candidate?.version ?? content?.aiDraftVersion ?? null,
     );
     setFinalEditorOpen(true);
   };
@@ -217,12 +227,16 @@ export function ShiyanTaskDetailScreen() {
     }
     setBusyAction('save-final');
     try {
-      const next = await getShiyanContentDataSource().saveFinalDraft(taskId, markdown);
+      const next = await getShiyanContentDataSource().saveFinalDraft(taskId, markdown, {
+        ...(task?.title ? { title: task.title } : {}),
+        ...(finalBaseVersion ? { baseVersion: finalBaseVersion } : {}),
+      });
       const saved = next.finalDraftMarkdown ?? markdown;
       setContent(next);
       setSavedFinalMarkdown(saved);
       setFinalMarkdown(saved);
-      Alert.alert('最终稿已保存', '后续后台 AI 刷新不会自动覆盖这份人工最终稿。');
+      setFinalBaseVersion(next.finalDraftBaseVersion);
+      Alert.alert('最终稿已保存', '后续 AI 调整只会生成候选，不会覆盖这份人工最终稿。');
     } catch (error) {
       Alert.alert('无法保存最终稿', error instanceof Error ? error.message : '请稍后重试。');
     } finally {
@@ -233,10 +247,7 @@ export function ShiyanTaskDetailScreen() {
   const shareFinalDraft = async () => {
     if (!savedFinalMarkdown || !task) return;
     try {
-      await Share.share({
-        title: task.title,
-        message: `# ${task.title}\n\n${savedFinalMarkdown}`,
-      });
+      await Share.share({ title: task.title, message: `# ${task.title}\n\n${savedFinalMarkdown}` });
     } catch {
       Alert.alert('分享失败', '暂时无法打开系统分享。');
     }
@@ -248,9 +259,7 @@ export function ShiyanTaskDetailScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => navigation.goBack()} style={styles.headerButton}>
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>
-          {task?.title ?? '拾言任务'}
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>{task?.title ?? '拾言任务'}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="刷新拾言任务" onPress={() => void refreshAll()} style={styles.headerButton}>
           <RefreshCw size={19} color={colors.text.ink} />
         </Pressable>
@@ -283,18 +292,17 @@ export function ShiyanTaskDetailScreen() {
             {task.stages.map((stage) => {
               const failed = stage.status === 'failed';
               const failure = stageFailureText(stage);
+              const retryAction = retryActionForStage(stage);
               return (
                 <View key={stage.stage} style={[styles.stageRow, { borderColor: failed ? colors.status.error : colors.border.default, backgroundColor: colors.bg.card }]}>
                   <View style={styles.stageMain}>
                     <Text style={[styles.stageTitle, { color: colors.text.ink }]}>{shiyanStageLabel(stage.stage)}</Text>
-                    <Text style={[styles.muted, { color: failed ? colors.status.error : colors.text.soft }]}>
-                      {shiyanStageStatusLabel(stage.status)}{stage.retryCount > 0 ? ` · 已重试 ${stage.retryCount} 次` : ''}
-                    </Text>
+                    <Text style={[styles.muted, { color: failed ? colors.status.error : colors.text.soft }]}>{shiyanStageStatusLabel(stage.status)}{stage.retryCount > 0 ? ` · 已重试 ${stage.retryCount} 次` : ''}</Text>
                     {failure ? <Text style={[styles.failureText, { color: colors.status.error }]}>{failure}</Text> : null}
                   </View>
-                  {retryActionForStage(stage) === 'transcribe' ? (
+                  {retryAction ? (
                     <Pressable accessibilityRole="button" disabled={busyAction === 'retry'} onPress={() => void retryCurrentStage()} style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}>
-                      <Text style={{ color: colors.primary, fontWeight: '600' }}>重试转写</Text>
+                      <Text style={{ color: colors.primary, fontWeight: '600' }}>{retryAction === 'transcribe' ? '重试转写' : '重试 AI 整理'}</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -321,9 +329,7 @@ export function ShiyanTaskDetailScreen() {
               </View>
             ) : (
               <View style={[styles.readonlyBox, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
-                <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>
-                  {transcript.status === 'ready' ? transcript.value.text : 'Transcript 尚未生成。'}
-                </Text>
+                <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{transcript.status === 'ready' ? transcript.value.text : 'Transcript 尚未生成。'}</Text>
               </View>
             )
           ) : null}
@@ -334,24 +340,22 @@ export function ShiyanTaskDetailScreen() {
               <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{content.aiDraftMarkdown}</Text>
             </View>
           ) : (
-            <Text style={[styles.muted, { color: colors.text.soft }]}>
-              {contentUnavailable ? 'AI Draft Cloud 合同等待 MOB-020 接线；其它任务状态仍可正常使用。' : 'AI Draft 尚未生成。'}
-            </Text>
+            <Text style={[styles.muted, { color: colors.text.soft }]}>{contentUnavailable ? 'AI Draft 暂时读取失败，请稍后刷新。' : 'AI Draft 尚未生成。'}</Text>
           )}
 
-          {candidateMarkdown ? (
+          {candidate ? (
             <View style={[styles.candidateBox, { backgroundColor: colors.bg.soft }]}>
               <View style={styles.candidateTitleRow}>
                 <Sparkles size={16} color={colors.primary} />
-                <Text style={[styles.stageTitle, { color: colors.text.ink }]}>AI 调整候选</Text>
+                <Text style={[styles.stageTitle, { color: colors.text.ink }]}>AI 调整候选 · v{candidate.version}</Text>
               </View>
-              <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{candidateMarkdown}</Text>
+              <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{candidate.markdown}</Text>
               <Text style={[styles.muted, { color: colors.text.soft }]}>候选不会自动覆盖人工最终稿。</Text>
             </View>
           ) : null}
 
           <TextInput value={adjustInstruction} onChangeText={setAdjustInstruction} multiline placeholder="轻量调整，例如：更短一些；把风险放前面" placeholderTextColor={colors.text.soft} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
-          <Pressable accessibilityRole="button" disabled={!adjustInstruction.trim() || busyAction === 'adjust'} onPress={() => void adjustDraft()} style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}>
+          <Pressable accessibilityRole="button" disabled={!adjustInstruction.trim() || busyAction === 'adjust' || !content?.aiDraftMarkdown} onPress={() => void adjustDraft()} style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}>
             <Sparkles size={17} color={colors.primary} />
             <Text style={{ color: colors.primary, fontWeight: '600' }}>{busyAction === 'adjust' ? '正在调整' : '生成调整候选'}</Text>
           </Pressable>
@@ -359,7 +363,7 @@ export function ShiyanTaskDetailScreen() {
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Final Draft</Text>
             {!finalEditorOpen ? (
-              <Pressable accessibilityRole="button" onPress={openFinalEditor} style={styles.compactButton}>
+              <Pressable accessibilityRole="button" disabled={!savedFinalMarkdown && !candidate && !content?.aiDraftMarkdown} onPress={openFinalEditor} style={styles.compactButton}>
                 <Text style={{ color: colors.primary, fontWeight: '600' }}>进入最终编辑</Text>
               </Pressable>
             ) : null}
@@ -376,7 +380,7 @@ export function ShiyanTaskDetailScreen() {
               <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{savedFinalMarkdown}</Text>
             </View>
           ) : (
-            <Text style={[styles.muted, { color: colors.text.soft }]}>确认 AI 内容后再进入最终人工编辑。</Text>
+            <Text style={[styles.muted, { color: colors.text.soft }]}>AI Draft 生成后，可进入最终人工编辑。</Text>
           )}
 
           {savedFinalMarkdown ? (
