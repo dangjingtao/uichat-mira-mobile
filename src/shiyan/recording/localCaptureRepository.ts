@@ -2,6 +2,7 @@ import {
   localKeyValueStore,
   type LocalKeyValueStore,
 } from '../../storage/localKeyValueStore';
+import type { ShiyanSceneSnapshot } from '../scenes';
 import type { CompletedRecording } from './RecordingAdapter';
 import { nativeAudioRecorder } from './nativeAudioRecorder';
 
@@ -17,6 +18,7 @@ export interface LocalCaptureMetadata {
   filePath: string;
   sceneId: string;
   sceneName: string;
+  sceneSnapshot?: ShiyanSceneSnapshot;
   title: string;
   startedAt: string;
   endedAt: string;
@@ -35,6 +37,26 @@ const nativeRecordingFileStore: RecordingFileStore = {
   deleteFile: (path) => nativeAudioRecorder.deleteFile(path),
 };
 
+const isSceneSnapshot = (value: unknown): value is ShiyanSceneSnapshot => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Partial<ShiyanSceneSnapshot>;
+  return (
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.instruction === 'string' &&
+    typeof item.builtIn === 'boolean' &&
+    Array.isArray(item.sections) &&
+    item.sections.every(
+      (section) =>
+        !!section &&
+        typeof section === 'object' &&
+        typeof section.id === 'string' &&
+        typeof section.title === 'string' &&
+        typeof section.description === 'string',
+    )
+  );
+};
+
 const isCapture = (value: unknown): value is LocalCaptureMetadata => {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<LocalCaptureMetadata>;
@@ -43,6 +65,7 @@ const isCapture = (value: unknown): value is LocalCaptureMetadata => {
     typeof item.filePath === 'string' &&
     typeof item.sceneId === 'string' &&
     typeof item.sceneName === 'string' &&
+    (item.sceneSnapshot === undefined || isSceneSnapshot(item.sceneSnapshot)) &&
     typeof item.title === 'string' &&
     typeof item.startedAt === 'string' &&
     typeof item.endedAt === 'string' &&
@@ -91,6 +114,7 @@ export class LocalCaptureRepository {
     id: string;
     sceneId: string;
     sceneName: string;
+    sceneSnapshot?: ShiyanSceneSnapshot;
     recording: CompletedRecording;
   }): Promise<LocalCaptureMetadata> {
     const capture: LocalCaptureMetadata = {
@@ -98,6 +122,7 @@ export class LocalCaptureRepository {
       filePath: input.recording.filePath,
       sceneId: input.sceneId,
       sceneName: input.sceneName,
+      ...(input.sceneSnapshot ? { sceneSnapshot: input.sceneSnapshot } : {}),
       title: '',
       startedAt: input.recording.startedAt,
       endedAt: input.recording.endedAt,
@@ -115,6 +140,7 @@ export class LocalCaptureRepository {
     title: string;
     sceneId: string;
     sceneName: string;
+    sceneSnapshot?: ShiyanSceneSnapshot;
   }): Promise<LocalCaptureMetadata> {
     const title = input.title.trim();
     if (!title) throw new Error('请填写录音标题。');
@@ -128,6 +154,7 @@ export class LocalCaptureRepository {
           title,
           sceneId: input.sceneId,
           sceneName: input.sceneName,
+          ...(input.sceneSnapshot ? { sceneSnapshot: input.sceneSnapshot } : {}),
           status: 'ready_for_submission',
         };
         return updated;
