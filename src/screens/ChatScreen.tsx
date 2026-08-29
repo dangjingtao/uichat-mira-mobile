@@ -36,6 +36,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
 import { ConversationMenu } from '../components/ConversationMenu';
+import { MessageAttachments } from '../components/MessageAttachments';
 import {
   getChatHistoryErrorMessage,
   readCanonicalSessionTitle,
@@ -402,6 +403,7 @@ export function ChatScreen() {
               ) : (
                 <AssistantMarkdown content={item.content} />
               )}
+              <MessageAttachments threadId={sessionId} parts={item.parts} />
             </View>
             {isFailed ? (
               <>
@@ -429,7 +431,7 @@ export function ChatScreen() {
         </View>
       );
     },
-    [colors, failedMessages, handleRetry, themedStyles],
+    [colors, failedMessages, handleRetry, sessionId, themedStyles],
   );
 
   const renderFooter = useCallback(() => {

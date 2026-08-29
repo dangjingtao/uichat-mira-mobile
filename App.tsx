@@ -8,7 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootstrapScreen } from './src/screens/BootstrapScreen';
 import { SessionListScreen } from './src/screens/SessionListScreen';
-import { ChatScreen } from './src/screens/ChatScreen';
+import { AgentChatScreen } from './src/screens/AgentChatScreen';
 import { WorkspaceListScreen } from './src/screens/WorkspaceListScreen';
 import { WorkspaceDetailScreen } from './src/screens/WorkspaceDetailScreen';
 import { HostConfigScreen } from './src/screens/HostConfigScreen';
@@ -21,10 +21,15 @@ import { LicenseScreen } from './src/screens/LicenseScreen';
 import {
   PluginsScreen,
   ShiyanHistoryScreen,
-  ShiyanHomeScreen,
   ShiyanSceneConfigScreen,
-  ShiyanSceneSelectScreen,
 } from './src/shiyan/ShiyanScreens';
+import {
+  ShiyanCaptureConfirmScreen,
+  ShiyanHomeScreen,
+  ShiyanLocalDraftsScreen,
+  ShiyanRecordScreen,
+  ShiyanSceneSelectScreen,
+} from './src/shiyan/ShiyanRecordingScreens';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
@@ -117,7 +122,7 @@ function AppInner() {
       >
         <Stack.Screen name="Bootstrap" component={BootstrapScreen} />
         <Stack.Screen name="SessionList" component={SessionListScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Chat" component={AgentChatScreen} />
         <Stack.Screen name="WorkspaceList" component={WorkspaceListScreen} />
         <Stack.Screen name="WorkspaceDetail" component={WorkspaceDetailScreen} />
         <Stack.Screen name="HostConfig" component={HostConfigScreen} />
@@ -127,6 +132,9 @@ function AppInner() {
         <Stack.Screen name="Plugins" component={PluginsScreen} />
         <Stack.Screen name="ShiyanHome" component={ShiyanHomeScreen} />
         <Stack.Screen name="ShiyanSceneSelect" component={ShiyanSceneSelectScreen} />
+        <Stack.Screen name="ShiyanRecord" component={ShiyanRecordScreen} />
+        <Stack.Screen name="ShiyanCaptureConfirm" component={ShiyanCaptureConfirmScreen} />
+        <Stack.Screen name="ShiyanLocalDrafts" component={ShiyanLocalDraftsScreen} />
         <Stack.Screen name="ShiyanHistory" component={ShiyanHistoryScreen} />
         <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
