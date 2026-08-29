@@ -11,7 +11,7 @@
 - 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-023，其中 MOB-012～MOB-015 为 0.2.1 当前新增授权卡，MOB-016～MOB-023 为拾言（Shiyan）MVP 新增授权卡。
 - MOB-007 / MOB-008 已完成并合入 `dev`。
 - MOB-009 / MOB-010 / MOB-011 已完成代码施工并合入 `dev`，仍保留各自真机 / 跨端人工验收项，因此当前为有条件完成。
-- MOB-012 已有独立施工分支，但目前只有稳定 runId 读取 / Agent Run 动作辅助层，尚未形成 Chat `waiting_approval` 展示与 approve / reject / cancel 完整闭环；MOB-013 / MOB-014 继续等待该 Chat 边界冻结后施工。
+- MOB-012 已有独立施工分支；Desktop `dev` 已核实稳定 runId 权威来源：Agent 运行结果会把 `run.id` 持久化到 Assistant Message `metadata.agent.runId`，Remote manifest 正式开放 Agent Run read / approve / reject / cancel，配对 scope 也包含 `agent:read` / `agent:approve` / `agent:control`。因此 Host 前置已解除；当前只剩 Mobile Chat `waiting_approval` 展示与 approve / reject / cancel 完整闭环施工。MOB-013 / MOB-014 仅因共享 Chat 边界继续等待 MOB-012 收口，不再等待 Desktop 能力。
 - MOB-015 已随 Mobile PR #54 合入 `dev`，当前为有条件完成；仅保留 Android / iOS 真机设置持久化、system 主题切换与断开 / 重配对人工验收。
 - MOB-016 已随 Mobile PR #55 合入 `dev`，当前为有条件完成；最新 Review 无阻塞 finding，自动化门禁已通过，剩余真机 / UI 人工验收不重新阻塞拾言后续施工。
 - MOB-017 仍待实施，当前没有现成施工分支 / PR；其 Mobile Native 录音链可独立于 Cloud 推进，40 分钟真实录音属于最终人工验收而非施工前置。
@@ -39,7 +39,7 @@
 | MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 扫码 / 粘贴 `mira://pair?...`，隐藏 transport 细节 | **有条件完成**：代码与自动化通过；真机五路径待验收 | `mob_009_pairing_screen` | Remote Pairing V1 |
 | MOB-010 | Desktop Remote 合同接入收口 | Workspace / Role / Workspace Thread 正式 Remote 合同 | **有条件完成**：代码与自动化通过；真实 Desktop 配对联调待验收 | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
 | MOB-011 | 0.2.0 会话交互回归修复 | 全局 Thread 直达 Chat、旧版置顶右划、真实删除、失败态视觉 | **有条件完成**：Mobile PR #46 / Host PR #87 已合入；0.2.1 真机回归待验收 | `mob_011_conversation_ux_regression` | 单线程删除 Remote 放行已随本卡完成 |
-| MOB-012 | Agent 手机审批闭环 | `waiting_approval` 展示与 approve / reject / cancel | **施工中，未 Gate**：已有 runId / Agent Run 动作辅助层；尚缺 Chat 审批闭环与稳定 runId 权威证据 | `mob_012_agent_mobile_approval` | 现有 Agent Remote；必须证明稳定 `runId` 来源 |
+| MOB-012 | Agent 手机审批闭环 | `waiting_approval` 展示与 approve / reject / cancel | **施工中，Host 前置已解除**：Desktop `dev` 已验证 Assistant `metadata.agent.runId` 持久化及 Agent Remote read / approve / reject / cancel scope；当前仅缺 Mobile Chat 审批闭环 | `mob_012_agent_mobile_approval` | 现有 Agent Remote 已满足；继续 Mobile 实现 |
 | MOB-013 | 会话媒体与附件读取 | Message image/file parts、只读媒体 / 附件展示与打开 | **待实施**：当前按 Lane A 等待 MOB-012 Chat 边界冻结 | `mob_013_media_attachment_reading` | 现有 `artifacts:read` 与线程媒体读取 |
 | MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **待实施**：当前按 Lane A 等待 MOB-012 Chat 边界冻结 | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
 | MOB-015 | 设备设置与连接收口 | Theme / Accent 持久化、system 主题响应、真实断开 Host | **有条件完成**：Mobile PR #54 已合入；剩余真机持久化 / system 切换 / 断开重配对验收 | `mob_015_device_settings_connection` | 无新增 Host 依赖 |
@@ -84,8 +84,8 @@
 ### MOB-012：Agent 手机审批闭环
 
 - 最高价值优先项。
-- 施工前必须证明现有 SSE / Thread / Message 真相中能稳定得到 `runId`。
-- 若拿不到稳定 `runId`，停止施工并登记 Host 依赖；不得解析文案、客户端造 ID 或发明新接口。
+- Desktop `dev` 已完成前置证据核对：Agent 执行时将 `run.id` 写入 Assistant Message `metadata.agent.runId` 并随消息持久化；Remote manifest 与 device scope 已开放 Agent Run read / approve / reject / cancel。
+- 因此 MOB-012 不再等待 Host 新接口或 runId 合同；禁止再次把这一点登记为阻塞。当前任务是基于现有 Remote 真相完成 Mobile `waiting_approval` 展示与 approve / reject / cancel 闭环。
 - MOB-012 优先拥有 Chat Agent 运行态与审批状态机改动。
 
 详细卡：`docs/task-cards/MOB-012-agent-mobile-approval.md`
@@ -154,7 +154,7 @@ MOB-021 与 MOB-022 只有在 MOB-020 已冻结 Final Draft / structured content
 
 ```text
 现有 0.2.1：
-MOB-012  ← 当前施工中，先收 Chat 审批闭环
+MOB-012  ← Host 前置已解除，当前直接收 Chat 审批闭环
    ↓
 MOB-013 ─┐
          ├─ 在 Chat 边界明确后推进
