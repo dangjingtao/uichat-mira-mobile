@@ -4,12 +4,12 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { FileText, ImageIcon, X } from 'lucide-react-native';
-import { WebView } from 'react-native-webview';
 import { miraHostClient } from '../api/miraHostClient';
 import { RemoteHostError } from '../api/remoteHttp';
 import { getFilePreviewKind } from '../media/messageAttachmentPolicy';
@@ -19,6 +19,8 @@ import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
 type MediaRequest = { url: string; headers: Record<string, string> };
 type AttachmentPart = Extract<RemoteMessagePart, { type: 'image' | 'file' }>;
+
+const MAX_TEXT_PREVIEW_BYTES = 1_000_000;
 
 const mediaErrorMessage = (error: unknown) => {
   if (error instanceof RemoteHostError) {
@@ -82,6 +84,87 @@ function useMediaRequest(
   }, [enabled, part.fileId, threadId]);
 
   return { request, error, loading };
+}
+
+function TextAttachmentViewer({
+  source,
+  onFailure,
+}: {
+  source: MediaRequest;
+  onFailure: (message: string) => void;
+}) {
+  const { colors } = useTheme();
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setText(null);
+    setError(null);
+
+    const load = async () => {
+      try {
+        const response = await fetch(source.url, {
+          method: 'GET',
+          headers: source.headers,
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const declaredLength = Number(response.headers.get('content-length') ?? '0');
+        if (Number.isFinite(declaredLength) && declaredLength > MAX_TEXT_PREVIEW_BYTES) {
+          throw new Error('TOO_LARGE');
+        }
+
+        const body = await response.text();
+        if (body.length > MAX_TEXT_PREVIEW_BYTES) {
+          throw new Error('TOO_LARGE');
+        }
+        if (active) setText(body);
+      } catch (loadError) {
+        if (!active || controller.signal.aborted) return;
+        const message =
+          loadError instanceof Error && loadError.message === 'TOO_LARGE'
+            ? '文本附件过大，暂不支持应用内预览'
+            : '附件加载失败，请检查连接后重试';
+        setError(message);
+        onFailure(message);
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [onFailure, source]);
+
+  if (error) {
+    return (
+      <View style={styles.viewerState}>
+        <Text style={[styles.viewerStateText, { color: colors.status.error }]}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (text === null) {
+    return (
+      <View style={styles.viewerState}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.textViewer} contentContainerStyle={styles.textViewerContent}>
+      <Text selectable style={[styles.textViewerText, { color: colors.text.ink }]}>
+        {text}
+      </Text>
+    </ScrollView>
+  );
 }
 
 function ImageAttachment({
@@ -162,7 +245,7 @@ function FileAttachment({
     ? request
       ? { uri: request.url, headers: request.headers }
       : !part.fileId && standaloneUri
-        ? { uri: standaloneUri }
+        ? { uri: standaloneUri, headers: {} }
         : null
     : null;
   const unavailableMessage =
@@ -174,9 +257,8 @@ function FileAttachment({
         ? '附件没有可读取的媒体地址'
         : null);
 
-  const handleViewerFailure = () => {
-    setViewerVisible(false);
-    setViewerError('附件加载失败，请检查连接后重试');
+  const handleViewerFailure = (message: string = '附件加载失败，请检查连接后重试') => {
+    setViewerError(message);
   };
 
   return (
@@ -251,16 +333,13 @@ function FileAttachment({
                 source={viewerSource}
                 resizeMode="contain"
                 style={styles.viewerImage}
-                onError={handleViewerFailure}
+                onError={() => handleViewerFailure()}
               />
             </View>
           ) : viewerSource && previewKind === 'text' ? (
-            <WebView
+            <TextAttachmentViewer
               source={viewerSource}
-              style={styles.webView}
-              originWhitelist={['https://*', 'http://*', 'data:*']}
-              onError={handleViewerFailure}
-              onHttpError={handleViewerFailure}
+              onFailure={handleViewerFailure}
             />
           ) : null}
         </View>
@@ -368,7 +447,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  viewerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  viewerStateText: { fontSize: fontSize.bodyMd, textAlign: 'center' },
   viewerImageContainer: { flex: 1, padding: spacing.md },
   viewerImage: { flex: 1, width: '100%' },
-  webView: { flex: 1 },
+  textViewer: { flex: 1 },
+  textViewerContent: { padding: spacing.lg },
+  textViewerText: { fontSize: fontSize.bodyMd, lineHeight: 24 },
 });
