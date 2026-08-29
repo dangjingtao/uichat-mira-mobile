@@ -20,16 +20,10 @@ import { deliverFinalDraftToGithub } from './client/delivery';
 
 type DetailRoute = RouteProp<RootStackParamList, 'ShiyanTaskDetail'>;
 
-const isCurrentDelivery = (
+const belongsToFinalDraft = (
   delivery: ShiyanDeliveryView,
   finalDraft: ShiyanFinalDraftView,
-): boolean => {
-  if (delivery.status !== 'succeeded' || !delivery.fileUrl || !delivery.deliveredAt) return false;
-  const deliveredAt = Date.parse(delivery.deliveredAt);
-  const confirmedAt = Date.parse(finalDraft.confirmedAt);
-  if (!Number.isFinite(deliveredAt) || !Number.isFinite(confirmedAt)) return false;
-  return deliveredAt >= confirmedAt;
-};
+): boolean => delivery.finalDraftId === finalDraft.id;
 
 export function ShiyanTaskDetailWithDeliveryScreen() {
   const route = useRoute<DetailRoute>();
@@ -58,15 +52,18 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
     try {
       const result = await shiyanClient.getDeliveries(taskId);
-      const succeeded = result.deliveries.find((item) =>
-        nextFinalDraft ? isCurrentDelivery(item, nextFinalDraft) : false,
+      const matching = result.deliveries.filter((item) =>
+        nextFinalDraft ? belongsToFinalDraft(item, nextFinalDraft) : false,
+      );
+      const succeeded = matching.find(
+        (item) => item.status === 'succeeded' && Boolean(item.fileUrl),
       );
       if (succeeded) {
         setDelivery(succeeded);
         setDeliveryError('');
         return;
       }
-      const failed = result.deliveries.find((item) => item.status === 'failed') ?? null;
+      const failed = matching.find((item) => item.status === 'failed') ?? null;
       setDelivery(failed);
       setDeliveryError(failed?.errorMessage ?? '');
     } catch (error) {
@@ -115,7 +112,11 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   };
 
   const currentSucceeded = Boolean(
-    finalDraft && delivery && isCurrentDelivery(delivery, finalDraft),
+    finalDraft &&
+      delivery &&
+      belongsToFinalDraft(delivery, finalDraft) &&
+      delivery.status === 'succeeded' &&
+      delivery.fileUrl,
   );
 
   return (
