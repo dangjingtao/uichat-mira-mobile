@@ -21,6 +21,9 @@ export type RootStackParamList = {
   Plugins: undefined;
   ShiyanHome: undefined;
   ShiyanSceneSelect: undefined;
+  ShiyanRecord: { sceneId: string; sceneName: string };
+  ShiyanCaptureConfirm: { captureId: string };
+  ShiyanLocalDrafts: undefined;
   ShiyanHistory: undefined;
   ShiyanSceneConfig: undefined;
   ReportError: undefined;

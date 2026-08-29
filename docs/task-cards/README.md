@@ -18,7 +18,7 @@
 | MOB-014 | 会话手机工具 | 待实施 | Mobile；系统分享与本地查找 |
 | MOB-015 | 设备设置与连接收口 | 待实施 | Mobile；本地存储与现有 `disconnect()` |
 | MOB-016 | 拾言插件入口与任务壳 | 待实施 | Mobile；Shiyan PRD / Technical Design |
-| MOB-017 | 拾言录音与本地恢复 | 待实施 | Mobile；无 Cloud 依赖，需真实 40 分钟录音验证 |
+| MOB-017 | 拾言录音与本地恢复 | **有条件通过（放行后续）**：PR #56 代码与自动化 Gate 已通过；真机短录音重启恢复与约 40 分钟长录音继续挂人工验收 | Mobile；无 Cloud 依赖，需真实 40 分钟录音验证 |
 | MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | 待实施 | `mira-shiyan-cloud`；Mobile canonical truth |
 | MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | 待实施 | `mira-shiyan-cloud`；依赖 MOB-018 |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | 待实施 | `mira-shiyan-cloud`；依赖 MOB-018 / MOB-019 |

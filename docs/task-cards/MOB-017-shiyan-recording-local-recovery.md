@@ -1,6 +1,6 @@
 # MOB-017：拾言录音与本地恢复
 
-状态：待实施
+状态：有条件通过（放行后续；PR #56）
 
 负责人：`mob_017_shiyan_recording_local_recovery`
 
@@ -60,6 +60,17 @@
 - iOS release / unsigned device build 或等价真实原生构建
 - 真机短录音：开始 -> 结束 -> 重启 App -> 仍能恢复本地草稿
 - 真机长录音 smoke：约 40 分钟，不崩溃、不产生 0 字节文件、结束后文件可读
+
+## 有条件通过记录
+
+2026-08-29：PR #56 的代码施工与自动化 Gate 已达到后续施工放行条件。
+
+- `RecordingAdapter`、Android `MediaRecorder`、iOS `AVAudioRecorder`、两端麦克风权限、本地私有目录落盘与重启恢复均已实现；
+- iOS Objective-C++ 编译问题已修复；
+- Mobile CI #623 全绿：typecheck / lint / Jest、Android debug、iOS simulator、iOS unsigned device build 全部通过；
+- OpenCode Review 的 `spawnSync opencode E2BIG` 为评审基建参数长度问题，不是本卡代码 finding，不作为 MOB-017 失败判据；
+- 真机短录音重启恢复与约 40 分钟长录音仍属于最终人工验收 Gate，继续挂账，不伪造证据；
+- 上述人工尾项不改变已冻结的录音边界、metadata、本地恢复或 Cloud 边界，因此 MOB-017 判定为**有条件通过（放行后续）**。
 
 ## 验收
 
