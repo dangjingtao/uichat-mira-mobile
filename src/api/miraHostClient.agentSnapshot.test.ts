@@ -32,6 +32,23 @@ const canonicalMessage = {
   createdAt: '2026-08-29T00:00:00.000Z',
 };
 
+const hiddenToolMessage = {
+  id: 'tool-1',
+  threadId: 'thread-1',
+  role: 'tool' as const,
+  content: 'tool evidence',
+  parts: [
+    {
+      type: 'file' as const,
+      data: 'opaque-tool-file',
+      filename: 'tool-output.bin',
+      fileId: 'tool-media-1',
+      mimeType: 'application/octet-stream',
+    },
+  ],
+  createdAt: '2026-08-29T00:00:01.000Z',
+};
+
 const manifest = (options: { artifactsScope?: boolean; mediaRoute?: boolean } = {}) => ({
   protocolVersion: 1 as const,
   device: {
@@ -53,7 +70,7 @@ const manifest = (options: { artifactsScope?: boolean; mediaRoute?: boolean } = 
 });
 
 describe('PairedRemoteMiraHostClient canonical message snapshots', () => {
-  test('preserves canonical metadata and mixed message parts', async () => {
+  test('preserves canonical metadata and mixed user-visible message parts', async () => {
     const remote = {
       getMessages: jest.fn(async () => [canonicalMessage]),
     } as unknown as RemoteMiraHostClient;
@@ -75,6 +92,19 @@ describe('PairedRemoteMiraHostClient canonical message snapshots', () => {
     unsubscribe();
     await client.getMessages('thread-1');
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not expose tool/system media parts as user-visible attachments', async () => {
+    const remote = {
+      getMessages: jest.fn(async () => [hiddenToolMessage]),
+    } as unknown as RemoteMiraHostClient;
+    const client = new PairedRemoteMiraHostClient(remote);
+
+    const messages = await client.getMessages('thread-1');
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.role).toBe('system');
+    expect(messages[0]?.parts).toBeUndefined();
   });
 });
 
