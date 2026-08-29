@@ -20,6 +20,8 @@ const STATUS_LABELS: Record<ShiyanCaptureStageView['status'], string> = {
   skipped: '已跳过',
 };
 
+export type ShiyanRetryAction = 'transcribe' | 'organize';
+
 export const shiyanStageLabel = (stage: string) => STAGE_LABELS[stage] ?? stage;
 export const shiyanStageStatusLabel = (status: ShiyanCaptureStageView['status']) =>
   STATUS_LABELS[status];
@@ -41,9 +43,11 @@ export function shiyanTaskStatusText(task: ShiyanCaptureTaskView): string {
   return `${shiyanStageLabel(stage.stage)} · ${shiyanStageStatusLabel(stage.status)}`;
 }
 
-export function retryActionForStage(stage: ShiyanCaptureStageView): 'transcribe' | null {
+export function retryActionForStage(stage: ShiyanCaptureStageView): ShiyanRetryAction | null {
   if (stage.status !== 'failed' || !stage.retryable) return null;
-  return stage.stage === 'transcribe' ? 'transcribe' : null;
+  if (stage.stage === 'transcribe') return 'transcribe';
+  if (stage.stage === 'organize') return 'organize';
+  return null;
 }
 
 export function stageFailureText(stage: ShiyanCaptureStageView): string | null {
