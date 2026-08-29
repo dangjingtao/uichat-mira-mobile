@@ -25,7 +25,7 @@
 | MOB-021 | 拾言处理状态、结果编辑与历史任务 | **PR #63 待合入**：Mobile CI run #721 全绿 | Mobile；OpenCode Review `E2BIG` 基建问题待处理后 merge |
 | MOB-022 | 拾言 GitHub Destination | **核心已合入，最终接线待完成** | `mira-shiyan-cloud` + `mira-shiyan`；待 MOB-020 合入后接 Final Draft / public routes + real GitHub smoke |
 | MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 021 / 022 达到可联调基线 |
-| MOB-024 | Mobile 新建会话与动态 Remote Capability | **施工完成，待双仓 PR / CI / Review** | Mobile + Desktop Host；`POST /threads` + `messages:write`，旧固定 V1 allowlist 已宣告失效 |
+| MOB-024 | Mobile 新建会话与动态 Remote Capability | **有条件完成**：Desktop #88 / Mobile #65 已合入 | Mobile + Desktop Host；真实已配对设备新建 Thread 跨端 smoke |
 
 ## 既有产品决策
 

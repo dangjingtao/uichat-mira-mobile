@@ -11,6 +11,7 @@
 - Mobile 集成分支：`dev`；每张 Mobile 卡从最新 `dev` 开独立分支并向 `dev` 发 PR。
 - 拾言 Cloud 当前开发主线：`dangjingtao/mira-shiyan-cloud:dev`；`mira-shiyan` 只作为 Destination 内容仓库，不建立第二套任务台账。
 - 不把设计稿、占位 UI、客户端已有方法或 Agent 推断当作真实远端能力。
+- Remote Host V1 的旧固定 route allowlist 自 2026-08-29 起不再是规范能力边界；远端能力以 Remote Gateway 显式 method/path -> scope 映射 + 当前设备 scope + Host runtime manifest + canonical route 业务校验为准。协议版本仍保持 `1`，未显式发布的 route 继续默认拒绝。
 - 真机、Secret、正式部署和真实 Provider smoke 可以作为明确挂账项，但不得伪造为已验证。
 - Stage 失败只影响该 Stage；已经成功的录音、Transcript、Draft、Final Draft 或 Delivery 证据不得被后续失败抹掉。
 
@@ -24,6 +25,7 @@
 - MOB-013：有条件完成，Mobile PR #58 已合入 `dev`；媒体 / 附件读取与错误边界已落地，真机 / Host 媒体联调挂账。
 - MOB-014：有条件完成，Mobile PR #62 已 squash 合入 `dev`，merge commit `cfff6b3f61d2469a279e1579f8c080c48c829a7a`；Share Sheet / 当前聊天查找代码与双平台自动构建已通过，真实 Share Sheet、长会话查找与关闭搜索后的交互 smoke 挂账。
 - MOB-015：有条件完成，Mobile PR #54 已合入 `dev`；真机设置持久化、system 主题切换、断开 / 重配对挂账。
+- MOB-024：有条件完成。Desktop PR #88 已合入 `dev`，merge commit `e1752500cafd300bb6c9c82e9b5a610beb985d2c`；Mobile PR #65 已 squash 合入 `dev`，merge commit `a668bf503b3d540a1bd521e3792684af258de0d4`。`POST /threads` 通过现有 `messages:write` 兼容 scope 正式发布，Mobile 以 runtime manifest + device scope 做 capability guard，Drawer“聊天”已接真实 canonical Thread 创建；创建 POST 响应不确定时不会跨 Direct / Relay 重放。Desktop `pnpm check` 已通过；Mobile typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding。真实已配对设备无需重配对的新建 Thread 跨端 smoke 挂账。
 
 ### 拾言 MVP
 
@@ -63,6 +65,7 @@
 | MOB-021 | 拾言 Mobile 结果 / Final Draft / 历史 | PR #63 待 Review / 合入；Mobile CI 全绿 | 解决 Review E2BIG，合入 `dev` |
 | MOB-022 | 拾言 GitHub Destination | 核心已合入；Final Draft / public route 待接 | MOB-020 合入后补 route + real GitHub smoke |
 | MOB-023 | 拾言 E2E 验收与加固 | 待启动 | 等 020/021/022 达到可联调基线 |
+| MOB-024 | Mobile 新建会话与动态 Remote Capability | 有条件完成；Desktop #88 / Mobile #65 已合入 | 真实已配对设备新建 Thread 跨端 smoke |
 
 ## 拾言 canonical 产品规则
 
@@ -111,7 +114,7 @@ MOB-021 已基于 MOB-020 PR #6 的冻结合同施工，因此它不需要重新
 
 ## 详细任务卡
 
-`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-023 的详细范围均在 `docs/task-cards/`。
+`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-024 的详细范围均在 `docs/task-cards/`。
 
 ## 历史追溯
 
