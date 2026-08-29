@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -29,6 +31,8 @@ import {
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { ChatMessage } from '../types';
+import type { ConversationMatch } from '../chat/conversationTools';
+import { buildConversationShareText } from '../chat/conversationTools';
 import { miraHostClient } from '../api/miraHostClient';
 import { RemoteHostError } from '../api/remoteHttp';
 import { useThreadReadStore } from '../store/threadReadStore';
@@ -36,6 +40,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
 import { ConversationMenu } from '../components/ConversationMenu';
+import { ConversationSearchBar } from '../components/ConversationSearchBar';
 import { MessageAttachments } from '../components/MessageAttachments';
 import {
   getChatHistoryErrorMessage,
@@ -207,6 +212,10 @@ export function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchFocusMessageId, setSearchFocusMessageId] = useState<string | null>(
+    null,
+  );
   const [menuAnchor, setMenuAnchor] = useState<{
     top: number;
     right: number;
@@ -217,6 +226,11 @@ export function ChatScreen() {
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const menuButtonRef = useRef<View>(null);
   const abortRef = useRef(false);
+
+  useEffect(() => {
+    setIsSearchVisible(false);
+    setSearchFocusMessageId(null);
+  }, [sessionId]);
 
   const refreshSessionTitle = useCallback(async () => {
     const canonicalTitle = await readCanonicalSessionTitle(
@@ -234,7 +248,11 @@ export function ChatScreen() {
       const canonicalMessages = await miraHostClient.getMessages(sessionId);
       setMessages(canonicalMessages);
       try {
-        await markThreadRead(sessionId, canonicalMessages, canonicalMessages.length);
+        await markThreadRead(
+          sessionId,
+          canonicalMessages,
+          canonicalMessages.length,
+        );
       } catch {
         // A local persistence failure must not turn a valid Host history read
         // into a fake chat error or falsely clear the unread state.
@@ -270,7 +288,44 @@ export function ChatScreen() {
   }, [loadMessages, refreshSessionTitle]);
 
   const scrollToBottom = useCallback(() => {
+    if (isSearchVisible) return;
     flatListRef.current?.scrollToEnd({ animated: true });
+  }, [isSearchVisible]);
+
+  const handleShare = useCallback(async () => {
+    const shareText = buildConversationShareText(messages, sessionTitle);
+    if (!shareText) {
+      Alert.alert('暂无可分享内容', '当前会话还没有可分享的消息。');
+      return;
+    }
+
+    try {
+      await Share.share({ message: shareText, title: sessionTitle });
+    } catch {
+      Alert.alert('分享失败', '暂时无法分享当前会话，请稍后重试。');
+    }
+  }, [messages, sessionTitle]);
+
+  const closeSearch = useCallback(() => {
+    setIsSearchVisible(false);
+    setSearchFocusMessageId(null);
+  }, []);
+
+  const openSearch = useCallback(() => {
+    setIsSearchVisible(true);
+  }, []);
+
+  const clearSearchFocus = useCallback(() => {
+    setSearchFocusMessageId(null);
+  }, []);
+
+  const focusSearchMatch = useCallback((match: ConversationMatch) => {
+    setSearchFocusMessageId(match.messageId);
+    flatListRef.current?.scrollToIndex({
+      index: match.messageIndex,
+      animated: true,
+      viewPosition: 0.45,
+    });
   }, []);
 
   const sendMessage = useCallback(
@@ -380,12 +435,17 @@ export function ChatScreen() {
       const isUser = item.role === 'user';
       const failureMessage = isUser ? failedMessages.get(item.id) : undefined;
       const isFailed = failureMessage !== undefined;
+      const isSearchFocused = item.id === searchFocusMessageId;
 
       return (
         <View
           style={[
             styles.messageRow,
             isUser ? styles.messageRowRight : styles.messageRowLeft,
+            isSearchFocused && [
+              styles.searchFocusedRow,
+              { backgroundColor: colors.bg.soft },
+            ],
           ]}
         >
           <View>
@@ -431,7 +491,14 @@ export function ChatScreen() {
         </View>
       );
     },
-    [colors, failedMessages, handleRetry, sessionId, themedStyles],
+    [
+      colors,
+      failedMessages,
+      handleRetry,
+      searchFocusMessageId,
+      sessionId,
+      themedStyles,
+    ],
   );
 
   const renderFooter = useCallback(() => {
@@ -494,12 +561,14 @@ export function ChatScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="分享会话，暂不可用"
-            accessibilityState={{ disabled: true }}
-            disabled
-            style={styles.groupButtonDisabled}
+            accessibilityLabel="分享会话"
+            onPress={() => void handleShare()}
+            style={({ pressed }) => [
+              styles.groupButton,
+              pressed && { backgroundColor: colors.bg.soft },
+            ]}
           >
-            <Share2 size={19} color={colors.text.soft} strokeWidth={2} />
+            <Share2 size={19} color={colors.text.ink} strokeWidth={2} />
           </Pressable>
           <View
             style={[
@@ -528,7 +597,18 @@ export function ChatScreen() {
         title={sessionTitle}
         anchor={menuAnchor}
         onClose={() => setIsMenuVisible(false)}
+        onShare={() => void handleShare()}
+        onFindInChat={openSearch}
       />
+
+      {isSearchVisible ? (
+        <ConversationSearchBar
+          messages={messages}
+          onFocusMatch={focusSearchMatch}
+          onClearFocus={clearSearchFocus}
+          onClose={closeSearch}
+        />
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -542,6 +622,12 @@ export function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={scrollToBottom}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            flatListRef.current?.scrollToOffset({
+              offset: Math.max(0, averageItemLength * index),
+              animated: true,
+            });
+          }}
           ListEmptyComponent={
             isLoadingHistory ? (
               <MessageHistorySkeleton colors={colors} />
@@ -694,13 +780,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupButtonDisabled: {
-    flex: 1,
-    height: sizing.buttonHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.55,
-  },
   groupDivider: { width: StyleSheet.hairlineWidth, height: 20 },
   headerTitle: {
     flex: 1,
@@ -759,6 +838,7 @@ const styles = StyleSheet.create({
   messageRow: { marginBottom: spacing.lg, flexDirection: 'row' },
   messageRowLeft: { justifyContent: 'flex-start' },
   messageRowRight: { justifyContent: 'flex-end' },
+  searchFocusedRow: { borderRadius: radius.sm },
   bubble: { flexShrink: 1 },
   userBubble: {
     maxWidth: 272,
