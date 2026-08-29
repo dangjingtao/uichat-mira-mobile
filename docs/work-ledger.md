@@ -11,8 +11,12 @@
 - 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-023，其中 MOB-012～MOB-015 为 0.2.1 当前新增授权卡，MOB-016～MOB-023 为拾言（Shiyan）MVP 新增授权卡。
 - MOB-007 / MOB-008 已完成并合入 `dev`。
 - MOB-009 / MOB-010 / MOB-011 已完成代码施工并合入 `dev`，仍保留各自真机 / 跨端人工验收项，因此当前为有条件完成。
-- MOB-012 / MOB-013 / MOB-014 / MOB-015 已派卡，状态为待实施。
-- MOB-016～MOB-023 已完成任务拆分并派卡，状态为待实施；拾言产品、技术与施工真相统一以 Mobile `docs/shiyan/` 与本台账为准。
+- MOB-012 已有独立施工分支，但目前只有稳定 runId 读取 / Agent Run 动作辅助层，尚未形成 Chat `waiting_approval` 展示与 approve / reject / cancel 完整闭环；MOB-013 / MOB-014 继续等待该 Chat 边界冻结后施工。
+- MOB-015 已随 Mobile PR #54 合入 `dev`，当前为有条件完成；仅保留 Android / iOS 真机设置持久化、system 主题切换与断开 / 重配对人工验收。
+- MOB-016 已随 Mobile PR #55 合入 `dev`，当前为有条件完成；最新 Review 无阻塞 finding，自动化门禁已通过，剩余真机 / UI 人工验收不重新阻塞拾言后续施工。
+- MOB-017 仍待实施，当前没有现成施工分支 / PR；其 Mobile Native 录音链可独立于 Cloud 推进，40 分钟真实录音属于最终人工验收而非施工前置。
+- MOB-018 已随 `mira-shiyan-cloud` PR #1 合入 Cloud `main`，当前为有条件完成；Review 阻塞已修复并关闭，Cloud CI 已通过。真实 D1 / R2 / Workflow 资源、Secret 与部署联调继续挂账，不阻塞 MOB-019 施工。
+- MOB-019 已由 MOB-018 Gate 解锁；MOB-020 继续等待 MOB-019，MOB-021 / MOB-022 / MOB-023 按既定依赖继续等待。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威 Thread、Workspace、Role、Agent Run、Message Part 与 Artifact 数据，不猜测远端字段或状态。
 - 拾言是 Mira Mobile 官方内置生产力插件，但其云端链路独立于 Desktop / Host 在线状态；`mira-shiyan-cloud` 与 `mira-shiyan` 不建立第二套产品或施工台账。
 - 设备级本地能力可以复用 Mobile 现有系统 API 与本地存储，但必须明确其设备级语义，不伪装成账户级或跨端统一状态。
@@ -35,14 +39,14 @@
 | MOB-009 | 简化桌面配对页与 Mira 链接兜底 | 扫码 / 粘贴 `mira://pair?...`，隐藏 transport 细节 | **有条件完成**：代码与自动化通过；真机五路径待验收 | `mob_009_pairing_screen` | Remote Pairing V1 |
 | MOB-010 | Desktop Remote 合同接入收口 | Workspace / Role / Workspace Thread 正式 Remote 合同 | **有条件完成**：代码与自动化通过；真实 Desktop 配对联调待验收 | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
 | MOB-011 | 0.2.0 会话交互回归修复 | 全局 Thread 直达 Chat、旧版置顶右划、真实删除、失败态视觉 | **有条件完成**：Mobile PR #46 / Host PR #87 已合入；0.2.1 真机回归待验收 | `mob_011_conversation_ux_regression` | 单线程删除 Remote 放行已随本卡完成 |
-| MOB-012 | Agent 手机审批闭环 | `waiting_approval` 展示与 approve / reject / cancel | **待实施** | `mob_012_agent_mobile_approval` | 现有 Agent Remote；施工前必须证明稳定 `runId` 来源 |
-| MOB-013 | 会话媒体与附件读取 | Message image/file parts、只读媒体 / 附件展示与打开 | **待实施** | `mob_013_media_attachment_reading` | 现有 `artifacts:read` 与线程媒体读取 |
-| MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **待实施** | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
-| MOB-015 | 设备设置与连接收口 | Theme / Accent 持久化、system 主题响应、真实断开 Host | **待实施** | `mob_015_device_settings_connection` | 无新增 Host 依赖 |
-| MOB-016 | 拾言插件入口与任务壳 | Mobile；插件入口、场景、历史任务 UI 壳 | **待实施** | `mob_016_shiyan_plugin_shell` | Shiyan PRD / Technical Design |
-| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **待实施** | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
-| MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | `mira-shiyan-cloud`；`shiyan-api` / `shiyan-llm` 壳、D1/R2/Workflow、设备身份、直传 | **待实施** | `mob_018_shiyan_cloud_foundation` | Shiyan canonical truth |
-| MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | `mira-shiyan-cloud`；STT Provider、Transcript、3 天录音保留 | **待实施** | `mob_019_shiyan_stt_transcript` | MOB-018 |
+| MOB-012 | Agent 手机审批闭环 | `waiting_approval` 展示与 approve / reject / cancel | **施工中，未 Gate**：已有 runId / Agent Run 动作辅助层；尚缺 Chat 审批闭环与稳定 runId 权威证据 | `mob_012_agent_mobile_approval` | 现有 Agent Remote；必须证明稳定 `runId` 来源 |
+| MOB-013 | 会话媒体与附件读取 | Message image/file parts、只读媒体 / 附件展示与打开 | **待实施**：当前按 Lane A 等待 MOB-012 Chat 边界冻结 | `mob_013_media_attachment_reading` | 现有 `artifacts:read` 与线程媒体读取 |
+| MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **待实施**：当前按 Lane A 等待 MOB-012 Chat 边界冻结 | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
+| MOB-015 | 设备设置与连接收口 | Theme / Accent 持久化、system 主题响应、真实断开 Host | **有条件完成**：Mobile PR #54 已合入；剩余真机持久化 / system 切换 / 断开重配对验收 | `mob_015_device_settings_connection` | 无新增 Host 依赖 |
+| MOB-016 | 拾言插件入口与任务壳 | Mobile；插件入口、场景、历史任务 UI 壳 | **有条件完成**：Mobile PR #55 已合入 `dev`；Review 无阻塞 finding，自动化门禁通过；真机 / UI 验收挂账 | `mob_016_shiyan_plugin_shell` | Shiyan PRD / Technical Design |
+| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **待实施**：无现成分支 / PR；可独立于 Cloud 开工 | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
+| MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | `mira-shiyan-cloud`；`shiyan-api` / `shiyan-llm` 壳、D1/R2/Workflow、设备身份、直传 | **有条件完成**：Cloud PR #1 已合入 `main`；Review 阻塞已修复，CI 全绿；真实资源 / Secret / 部署联调挂账 | `mob_018_shiyan_cloud_foundation` | Shiyan canonical truth |
+| MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | `mira-shiyan-cloud`；STT Provider、Transcript、3 天录音保留 | **已解锁，待实施** | `mob_019_shiyan_stt_transcript` | MOB-018 已 Gate |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | `mira-shiyan-cloud`；私有 LLM Gateway、场景整理、JSON + Markdown Draft | **待实施** | `mob_020_shiyan_llm_organization` | MOB-018, MOB-019 |
 | MOB-021 | 拾言处理状态、结果编辑与历史任务 | Mobile；提交上传、Stage UI、Transcript、AI Draft、Final Draft、分享 | **待实施** | `mob_021_shiyan_mobile_results_history` | MOB-016～MOB-020 |
 | MOB-022 | 拾言 GitHub Destination | `mira-shiyan-cloud` + `mira-shiyan`；幂等投递、Delivery Record、canonical link | **待实施** | `mob_022_shiyan_github_destination` | MOB-018, MOB-020 |
@@ -123,9 +127,9 @@
 ### 第二波：Cloud 主链串行
 
 ```text
-MOB-018
+MOB-018  ✓ Gate
    ↓
-MOB-019  STT / Transcript
+MOB-019  STT / Transcript  ← 当前已解锁
    ↓
 MOB-020  LLM 整理 / AI Draft
 ```
@@ -150,20 +154,20 @@ MOB-021 与 MOB-022 只有在 MOB-020 已冻结 Final Draft / structured content
 
 ```text
 现有 0.2.1：
-MOB-012
+MOB-012  ← 当前施工中，先收 Chat 审批闭环
    ↓
 MOB-013 ─┐
          ├─ 在 Chat 边界明确后推进
 MOB-014 ─┘
 
-MOB-015  ── 可独立并行
+MOB-015  ✓ 有条件完成
 
 拾言 MVP：
-MOB-016 ─┐
-MOB-017 ─┼─ 第一波并行
-MOB-018 ─┘
+MOB-016  ✓ 有条件完成
+MOB-017  ← 可独立开工
+MOB-018  ✓ 有条件完成 / Cloud Gate
            ↓
-        MOB-019
+        MOB-019  ← 当前 Cloud 主链施工入口
            ↓
         MOB-020
          ↙   ↘
@@ -172,7 +176,7 @@ MOB-018 ─┘
         MOB-023
 ```
 
-如果有第二施工组进入，现有 0.2.1 优先分配 MOB-015；拾言则优先把第一波三张卡按 Mobile UI / Mobile Native / Cloud 三个责任域分开。任何 Builder 在开始前仍必须按派卡 Skill 读取当前仓库事实和实际 HEAD，旧派卡不得覆盖新代码事实。
+如果有第二施工组进入，现有 0.2.1 优先收口 MOB-012；拾言当前优先并行 MOB-017 与 MOB-019。任何 Builder 在开始前仍必须按派卡 Skill 读取当前仓库事实和实际 HEAD，旧派卡不得覆盖新代码事实。
 
 ## 0.2.1 验收原则
 
