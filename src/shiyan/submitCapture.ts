@@ -1,6 +1,10 @@
 import type { LocalCaptureMetadata } from './recording/localCaptureRepository';
 import { localCaptureRepository } from './recording/localCaptureRepository';
-import { shiyanClient, type ShiyanCloudClient } from './client/ShiyanClient';
+import {
+  shiyanClient,
+  ShiyanClientError,
+  type ShiyanCloudClient,
+} from './client/ShiyanClient';
 import {
   shiyanSubmissionRepository,
   type ShiyanSubmissionRepository,
@@ -54,7 +58,12 @@ export async function submitLocalCapture(
   const existing = await submissions.get(confirmedCapture.id);
   const assetId = created.upload?.assetId ?? existing?.assetId;
   if (!assetId) {
-    throw new Error('云端任务存在，但缺少可恢复的录音资源标识。');
+    throw new ShiyanClientError(
+      '云端任务存在，但缺少可恢复的录音资源标识。',
+      'audio_asset_missing',
+      true,
+      created.task.id,
+    );
   }
 
   await submissions.save({
@@ -71,6 +80,18 @@ export async function submitLocalCapture(
       options.onProgress?.({ phase: 'uploading', uploadFraction });
     });
     await submissions.setUploadState(confirmedCapture.id, 'uploaded');
+  } else {
+    const uploadStage = created.task.stages.find((stage) => stage.stage === 'upload');
+    const cloudAlreadyAcceptedAudio =
+      created.task.currentStage !== 'upload' || uploadStage?.status === 'succeeded';
+    if (!cloudAlreadyAcceptedAudio) {
+      throw new ShiyanClientError(
+        '云端暂未返回新的录音上传授权，可以直接重试。',
+        'upload_grant_unavailable',
+        true,
+        created.task.id,
+      );
+    }
   }
 
   options.onProgress?.({ phase: 'confirming' });
