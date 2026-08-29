@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RefreshCw } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
@@ -39,6 +40,7 @@ const EMPTY_EDITOR_STATE: ShiyanFinalEditorState = {
 export function ShiyanTaskDetailWithDeliveryScreen() {
   const route = useRoute<DetailRoute>();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const taskId = route.params.taskId;
   const [finalDraft, setFinalDraft] = useState<ShiyanFinalDraftView | null>(null);
   const [delivery, setDelivery] = useState<ShiyanDeliveryView | null>(null);
@@ -159,7 +161,11 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
         <View
           style={[
             styles.deliveryBar,
-            { backgroundColor: colors.bg.card, borderColor: colors.border.default },
+            {
+              backgroundColor: colors.bg.card,
+              borderColor: colors.border.default,
+              paddingBottom: Math.max(spacing.sm, insets.bottom),
+            },
           ]}
         >
           <View style={styles.deliveryCopy}>
@@ -205,7 +211,7 @@ const styles = StyleSheet.create({
     minHeight: 76,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
