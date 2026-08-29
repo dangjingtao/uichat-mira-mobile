@@ -288,8 +288,9 @@ export function ChatScreen() {
   }, [loadMessages, refreshSessionTitle]);
 
   const scrollToBottom = useCallback(() => {
+    if (isSearchVisible) return;
     flatListRef.current?.scrollToEnd({ animated: true });
-  }, []);
+  }, [isSearchVisible]);
 
   const handleShare = useCallback(async () => {
     const shareText = buildConversationShareText(messages, sessionTitle);
