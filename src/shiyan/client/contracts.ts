@@ -86,11 +86,14 @@ export interface ShiyanAudioRetentionView {
   deletedAt: string | null;
 }
 
-export interface ShiyanSttRetryView {
+export interface ShiyanStageRetryView {
   taskId: string;
-  stage: 'transcribe';
+  stage: 'transcribe' | 'organize';
   retryCount: number;
 }
+
+export type ShiyanSttRetryView = ShiyanStageRetryView & { stage: 'transcribe' };
+export type ShiyanOrganizeRetryView = ShiyanStageRetryView & { stage: 'organize' };
 
 export interface ShiyanCreateCaptureTaskInput {
   idempotencyKey: string;
@@ -115,18 +118,97 @@ export interface ShiyanTranscriptResult {
   transcript: ShiyanTranscriptView;
 }
 
-/**
- * MOB-020 owns the concrete Cloud persistence/HTTP contract for AI Draft and
- * Final Draft. MOB-021 consumes this domain shape only; it deliberately does
- * not invent endpoint paths before that Cloud contract exists.
- */
+export interface ShiyanSceneSectionView {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface ShiyanSceneView {
+  id: string;
+  name: string;
+  instruction: string;
+  sections: ShiyanSceneSectionView[];
+  builtIn: boolean;
+}
+
+export interface ShiyanSceneResult {
+  scene: ShiyanSceneView;
+}
+
+export interface ShiyanScenesResult {
+  scenes: ShiyanSceneView[];
+}
+
+export interface ShiyanAiDraftView {
+  id: string;
+  taskId: string;
+  kind: 'ai';
+  version: number;
+  source: 'organize' | 'adjust';
+  baseVersion: number | null;
+  instruction: string | null;
+  markdown: string;
+  sceneId: string;
+  createdAt: string;
+}
+
+export interface ShiyanFinalDraftView {
+  id: string;
+  taskId: string;
+  kind: 'final';
+  version: number;
+  title: string;
+  markdown: string;
+  sceneId: string;
+  baseVersion: number | null;
+  confirmedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiyanAiDraftResult {
+  draft: ShiyanAiDraftView;
+}
+
+export interface ShiyanFinalDraftResult {
+  draft: ShiyanFinalDraftView;
+}
+
+export interface ShiyanDeliveryView {
+  id: string;
+  taskId: string;
+  finalDraftId: string;
+  destination: 'github';
+  status: 'pending' | 'succeeded' | 'failed';
+  retryable: boolean;
+  retryCount: number;
+  repository: string | null;
+  path: string | null;
+  commitSha: string | null;
+  fileUrl: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiyanDeliveriesResult {
+  taskId: string;
+  deliveries: ShiyanDeliveryView[];
+}
+
 export interface ShiyanTaskContentView {
   aiDraftMarkdown: string | null;
+  aiDraftVersion: number | null;
   finalDraftMarkdown: string | null;
+  finalDraftBaseVersion: number | null;
   canonicalDestinationUrl: string | null;
 }
 
 export interface ShiyanAdjustmentCandidate {
   markdown: string;
+  version: number;
   createdAt: string;
 }
