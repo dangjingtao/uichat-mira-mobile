@@ -127,6 +127,11 @@ describe('submitLocalCapture', () => {
       captures: captures(),
     });
 
-    expect(cloud.createScene).toHaveBeenCalledWith(customCapture.sceneSnapshot);
+    expect(cloud.createScene).toHaveBeenCalledWith({
+      id: 'custom-abc12',
+      name: '客户访谈',
+      instruction: '区分事实与推测',
+      sections: [{ id: 'section-1', title: '摘要', description: '摘要' }],
+    });
   });
 });
