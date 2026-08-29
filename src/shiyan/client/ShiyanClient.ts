@@ -38,6 +38,8 @@ export interface ShiyanCloudClient {
 
 type ConfigLoader = () => Promise<ShiyanRuntimeConfig | null>;
 
+const UPLOAD_TIMEOUT_MS = 12 * 60 * 1000;
+
 const requestId = () =>
   `mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -105,6 +107,7 @@ export class HttpShiyanClient implements ShiyanCloudClient {
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', grant.url);
+      xhr.timeout = UPLOAD_TIMEOUT_MS;
       Object.entries(grant.headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
       xhr.upload.onprogress = (event) => {
         if (!onProgress || !event.lengthComputable || event.total <= 0) return;
@@ -112,8 +115,10 @@ export class HttpShiyanClient implements ShiyanCloudClient {
       };
       xhr.onerror = () =>
         reject(new ShiyanClientError('录音上传失败，请检查网络后重试。', 'upload_network_error', true));
-      xhr.ontimeout = () =>
+      xhr.ontimeout = () => {
+        xhr.abort();
         reject(new ShiyanClientError('录音上传超时，可以直接重试。', 'upload_timeout', true));
+      };
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           onProgress?.(1);
