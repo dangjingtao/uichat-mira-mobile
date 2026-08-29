@@ -25,12 +25,14 @@
 | MOB-021 | 拾言处理状态、结果编辑与历史任务 | **PR #63 待合入**：Mobile CI run #721 全绿 | Mobile；OpenCode Review `E2BIG` 基建问题待处理后 merge |
 | MOB-022 | 拾言 GitHub Destination | **核心已合入，最终接线待完成** | `mira-shiyan-cloud` + `mira-shiyan`；待 MOB-020 合入后接 Final Draft / public routes + real GitHub smoke |
 | MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 021 / 022 达到可联调基线 |
+| MOB-024 | Mobile 新建会话与动态 Remote Capability | **施工完成，待双仓 PR / CI / Review** | Mobile + Desktop Host；`POST /threads` + `messages:write`，旧固定 V1 allowlist 已宣告失效 |
 
 ## 既有产品决策
 
 - 线程置顶与未读首轮均为**设备级本地状态**，不伪装成账户级 / 跨设备状态。
 - 全局最近 Thread 是一等入口；`workspaceId` 表示归属 / 运行上下文，不要求先经过 Workspace 页面。Drawer「项目」仍保留项目层级浏览。
 - 0.2.1 不为“入口能点”制造假成功；优先把当前手机已有、现有 Host 已授权的能力接成真实功能。
+- 自 2026-08-29 起，Remote Host V1 的旧固定 route allowlist 不再是规范权限真相；客户端能力判断以 Remote Gateway 显式 scope 映射 + 当前设备 scope + Host runtime manifest 为准。协议版本仍为 1，未授权 route 仍默认拒绝。
 
 ## 拾言（Shiyan）MVP 规则
 
@@ -99,3 +101,4 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工，因此无需
 - `MOB-021-shiyan-mobile-results-history.md`
 - `MOB-022-shiyan-github-destination.md`
 - `MOB-023-shiyan-e2e-hardening.md`
+- `MOB-024-mobile-thread-creation.md`

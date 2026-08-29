@@ -83,6 +83,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -144,7 +145,26 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     navigation.navigate('Plugins');
   };
 
-  const handleUiOnlyChat = useCallback(() => undefined, []);
+  const handleCreateChat = useCallback(async () => {
+    if (creatingChat) return;
+    setCreatingChat(true);
+    try {
+      const session = await miraHostClient.createSession();
+      setCreatingChat(false);
+      onClose();
+      navigation.navigate('Chat', {
+        sessionId: session.id,
+        title: session.title,
+      });
+    } catch (error) {
+      setCreatingChat(false);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : '无法新建会话，请稍后重试。';
+      Alert.alert('无法新建会话', message);
+    }
+  }, [creatingChat, navigation, onClose]);
 
   return (
     <View
@@ -326,20 +346,23 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="聊天"
-          onPress={handleUiOnlyChat}
+          accessibilityLabel={creatingChat ? '正在新建聊天' : '聊天'}
+          accessibilityState={{ disabled: creatingChat }}
+          disabled={creatingChat}
+          onPress={() => void handleCreateChat()}
           style={({ pressed }) => [
             styles.chatButton,
             {
               backgroundColor: pressed ? colors.primaryActive : colors.primary,
             },
+            creatingChat && { opacity: 0.7 },
           ]}
         >
           <SquarePen size={20} color={colors.onPrimary} strokeWidth={2.2} />
           <Text
             style={[styles.chatButtonLabel, { color: colors.onPrimary }]}
           >
-            聊天
+            {creatingChat ? '新建中…' : '聊天'}
           </Text>
         </Pressable>
         <View
