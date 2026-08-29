@@ -10,6 +10,8 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
+const SEARCH_FOCUS_RETRY_DELAYS_MS = [120, 320] as const;
+
 interface ConversationSearchBarProps {
   messages: ChatMessage[];
   onFocusMatch: (match: ConversationMatch) => void;
@@ -39,9 +41,22 @@ export function ConversationSearchBar({
   useEffect(() => {
     if (activeMatchIndex < 0 || activeMatchIndex >= matches.length) {
       onClearFocus();
-      return;
+      return undefined;
     }
-    onFocusMatch(matches[activeMatchIndex]);
+
+    const match = matches[activeMatchIndex];
+    onFocusMatch(match);
+
+    // Variable-height chat rows can make FlatList's first scrollToIndex attempt
+    // fall back to an estimated offset. Retry after additional cells have had a
+    // chance to render so the same target can be resolved to its real position.
+    const retryTimers = SEARCH_FOCUS_RETRY_DELAYS_MS.map((delay) =>
+      setTimeout(() => onFocusMatch(match), delay),
+    );
+
+    return () => {
+      retryTimers.forEach(clearTimeout);
+    };
   }, [activeMatchIndex, matches, onClearFocus, onFocusMatch]);
 
   const moveMatch = useCallback(
