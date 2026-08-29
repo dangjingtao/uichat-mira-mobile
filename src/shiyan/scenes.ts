@@ -1,4 +1,4 @@
-export type ShiyanSceneId = 'meeting' | 'dictation' | 'reflection' | 'custom-local';
+export type ShiyanSceneId = string;
 
 export interface ShiyanSceneDefinition {
   id: ShiyanSceneId;
@@ -6,6 +6,14 @@ export interface ShiyanSceneDefinition {
   description: string;
   organizationRequirement: string;
   outputStructure: string[];
+  builtIn: boolean;
+}
+
+export interface ShiyanSceneSnapshot {
+  id: string;
+  name: string;
+  instruction: string;
+  sections: Array<{ id: string; title: string; description: string }>;
   builtIn: boolean;
 }
 
@@ -19,11 +27,11 @@ export const SHIYAN_BUILT_IN_SCENES: readonly ShiyanSceneDefinition[] = [
     builtIn: true,
   },
   {
-    id: 'dictation',
+    id: 'quick-note',
     name: '临时口述需求',
     description: '快速记录临时需求、补充条件与交付边界。',
     organizationRequirement: '区分背景、目标、约束与未决问题。',
-    outputStructure: ['背景', '目标', '需求要点', '约束', '待确认问题'],
+    outputStructure: ['需求要点', '待办事项', '待确认问题'],
     builtIn: true,
   },
   {
@@ -31,14 +39,41 @@ export const SHIYAN_BUILT_IN_SCENES: readonly ShiyanSceneDefinition[] = [
     name: '个人复盘 / 想法记录',
     description: '把零散想法整理为清晰结论和下一步。',
     organizationRequirement: '保留原意，不把推测改写成事实。',
-    outputStructure: ['主题', '核心想法', '观察', '判断', '下一步'],
+    outputStructure: ['关键想法', '后续行动', '待确认问题'],
     builtIn: true,
   },
 ] as const;
 
+const LEGACY_SCENE_IDS: Record<string, string> = {
+  dictation: 'quick-note',
+};
+
+export const canonicalShiyanSceneId = (sceneId: string): string =>
+  LEGACY_SCENE_IDS[sceneId] ?? sceneId;
+
+export const shiyanSceneNameForId = (sceneId: string): string | null => {
+  const canonicalId = canonicalShiyanSceneId(sceneId);
+  return SHIYAN_BUILT_IN_SCENES.find((scene) => scene.id === canonicalId)?.name ?? null;
+};
+
+export const toShiyanSceneSnapshot = (scene: ShiyanSceneDefinition): ShiyanSceneSnapshot => ({
+  id: canonicalShiyanSceneId(scene.id),
+  name: scene.name,
+  instruction: scene.organizationRequirement,
+  sections: scene.outputStructure.map((title, index) => ({
+    id: `section-${index + 1}`,
+    title,
+    description: title,
+  })),
+  builtIn: scene.builtIn,
+});
+
 let customSceneDraft: ShiyanSceneDefinition | null = null;
 
 export const getCustomSceneDraft = () => customSceneDraft;
+
+const customSceneId = () =>
+  `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
 export const saveCustomSceneDraft = (input: {
   name: string;
@@ -57,9 +92,9 @@ export const saveCustomSceneDraft = (input: {
   }
 
   customSceneDraft = {
-    id: 'custom-local',
+    id: customSceneId(),
     name,
-    description: '本机当前会话中的自定义拾言场景。',
+    description: '本机自定义拾言场景。提交时会把当前规则冻结并注册到拾言 Cloud。',
     organizationRequirement,
     outputStructure,
     builtIn: false,
