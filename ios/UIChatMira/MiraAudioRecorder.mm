@@ -15,6 +15,29 @@ RCT_EXPORT_MODULE();
   return NO;
 }
 
+RCT_EXPORT_METHOD(requestPermission:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    switch (session.recordPermission) {
+      case AVAudioSessionRecordPermissionGranted:
+        resolve(@"granted");
+        return;
+      case AVAudioSessionRecordPermissionDenied:
+        resolve(@"blocked");
+        return;
+      case AVAudioSessionRecordPermissionUndetermined:
+        [session requestRecordPermission:^(BOOL granted) {
+          resolve(granted ? @"granted" : @"denied");
+        }];
+        return;
+      default:
+        resolve(@"unavailable");
+        return;
+    }
+  });
+}
+
 RCT_EXPORT_METHOD(start:(NSString *)recordingId
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
@@ -202,8 +225,8 @@ RCT_EXPORT_METHOD(deleteFile:(NSString *)path
 - (NSURL *)checkedRecordingURL:(NSString *)path error:(NSError **)error {
   NSURL *root = [self recordingsDirectory:error];
   if (root == nil) return nil;
-  NSString *rootPath = root.URLByStandardizingPath.path;
-  NSString *candidate = [NSURL fileURLWithPath:path].URLByStandardizingPath.path;
+  NSString *rootPath = [[root URLByStandardizingPath] path];
+  NSString *candidate = [[[NSURL fileURLWithPath:path] URLByStandardizingPath] path];
   NSString *prefix = [rootPath stringByAppendingString:@"/"];
   if (![candidate hasPrefix:prefix]) {
     if (error != NULL) {
