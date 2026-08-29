@@ -47,18 +47,26 @@ import {
 } from './taskPresentation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+type TranscriptState =
+  | { status: 'not_ready'; value: null; message: null }
+  | { status: 'ready'; value: ShiyanTranscriptView; message: null }
+  | { status: 'error'; value: ShiyanTranscriptView | null; message: string };
 
-type LoadState = 'loading' | 'ready' | 'error';
+const EMPTY_TRANSCRIPT: TranscriptState = {
+  status: 'not_ready',
+  value: null,
+  message: null,
+};
 
 export function ShiyanTaskDetailScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'ShiyanTaskDetail'>>();
   const { colors } = useTheme();
   const taskId = route.params.taskId;
-  const [loadState, setLoadState] = useState<LoadState>('loading');
-  const [errorText, setErrorText] = useState('');
   const [task, setTask] = useState<ShiyanCaptureTaskView | null>(null);
-  const [transcript, setTranscript] = useState<ShiyanTranscriptView | null>(null);
+  const [taskError, setTaskError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [transcript, setTranscript] = useState<TranscriptState>(EMPTY_TRANSCRIPT);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [content, setContent] = useState<ShiyanTaskContentView | null>(null);
   const [contentUnavailable, setContentUnavailable] = useState(false);
@@ -66,56 +74,64 @@ export function ShiyanTaskDetailScreen() {
   const [candidateMarkdown, setCandidateMarkdown] = useState<string | null>(null);
   const [finalEditorOpen, setFinalEditorOpen] = useState(false);
   const [finalMarkdown, setFinalMarkdown] = useState('');
-  const [finalDirty, setFinalDirty] = useState(false);
   const [savedFinalMarkdown, setSavedFinalMarkdown] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoadState('loading');
-    try {
-      const { task: nextTask } = await shiyanClient.getCaptureTask(taskId);
-      setTask(nextTask);
-      setErrorText('');
-      setLoadState('ready');
-
+  const loadTask = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
-        const { transcript: nextTranscript } = await shiyanClient.getTranscript(taskId);
-        setTranscript(nextTranscript);
+        const result = await shiyanClient.getCaptureTask(taskId);
+        setTask(result.task);
+        setTaskError('');
       } catch (error) {
-        if (!(error instanceof ShiyanClientError) || error.code !== 'transcript_not_ready') {
-          // Task state remains usable even when the Transcript artifact read fails.
+        if (!silent) {
+          setTaskError(error instanceof Error ? error.message : '无法读取拾言任务。');
         }
+      } finally {
+        if (!silent) setLoading(false);
       }
+    },
+    [taskId],
+  );
 
-      try {
-        const nextContent = await getShiyanContentDataSource().getTaskContent(taskId);
-        setContent(nextContent);
-        setContentUnavailable(false);
-        setSavedFinalMarkdown(nextContent.finalDraftMarkdown);
-        if (!finalDirty && !finalEditorOpen) {
-          setFinalMarkdown(
-            nextContent.finalDraftMarkdown ??
-              candidateMarkdown ??
-              nextContent.aiDraftMarkdown ??
-              '',
-          );
-        }
-      } catch {
-        setContentUnavailable(true);
-      }
+  const loadTranscript = useCallback(async () => {
+    try {
+      const result = await shiyanClient.getTranscript(taskId);
+      setTranscript({ status: 'ready', value: result.transcript, message: null });
     } catch (error) {
-      if (!silent) {
-        setLoadState('error');
-        setErrorText(error instanceof Error ? error.message : '无法读取拾言任务。');
+      if (error instanceof ShiyanClientError && error.code === 'transcript_not_ready') {
+        setTranscript(EMPTY_TRANSCRIPT);
+        return;
       }
+      setTranscript((previous) => ({
+        status: 'error',
+        value: previous.value,
+        message: error instanceof Error ? error.message : 'Transcript 读取失败。',
+      }));
     }
-  }, [candidateMarkdown, finalDirty, finalEditorOpen, taskId]);
+  }, [taskId]);
+
+  const loadContent = useCallback(async () => {
+    try {
+      const next = await getShiyanContentDataSource().getTaskContent(taskId);
+      setContent(next);
+      setSavedFinalMarkdown(next.finalDraftMarkdown);
+      setContentUnavailable(false);
+    } catch {
+      setContentUnavailable(true);
+    }
+  }, [taskId]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadTask(), loadTranscript(), loadContent()]);
+  }, [loadContent, loadTask, loadTranscript]);
 
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load]),
+      void refreshAll();
+    }, [refreshAll]),
   );
 
   const currentStage = useMemo(() => (task ? currentShiyanStage(task) : null), [task]);
@@ -124,16 +140,26 @@ export function ShiyanTaskDetailScreen() {
 
   useEffect(() => {
     if (!shouldPoll) return undefined;
-    const timer = setInterval(() => void load(true), 5000);
+    const timer = setInterval(() => {
+      void loadTask(true);
+      void loadTranscript();
+    }, 5000);
     return () => clearInterval(timer);
-  }, [load, shouldPoll]);
+  }, [loadTask, loadTranscript, shouldPoll]);
+
+  useEffect(() => {
+    if (task?.lifecycle === 'ready' || task?.lifecycle === 'completed') {
+      void loadContent();
+    }
+  }, [loadContent, task?.lifecycle]);
 
   const retryCurrentStage = async () => {
     if (!currentStage || retryActionForStage(currentStage) !== 'transcribe') return;
     setBusyAction('retry');
     try {
       await shiyanClient.retryStt(taskId);
-      await load();
+      await loadTask();
+      await loadTranscript();
     } catch (error) {
       Alert.alert('无法重试转写', error instanceof Error ? error.message : '请稍后重试。');
     } finally {
@@ -169,10 +195,6 @@ export function ShiyanTaskDetailScreen() {
       const candidate = await getShiyanContentDataSource().adjustAiDraft(taskId, instruction);
       setCandidateMarkdown(candidate.markdown);
       setAdjustInstruction('');
-      // Candidate never replaces an opened/dirty Final Draft automatically.
-      if (!finalEditorOpen && !finalDirty && !savedFinalMarkdown) {
-        setFinalMarkdown(candidate.markdown);
-      }
     } catch (error) {
       Alert.alert('AI 调整暂不可用', error instanceof Error ? error.message : '请稍后重试。');
     } finally {
@@ -181,11 +203,9 @@ export function ShiyanTaskDetailScreen() {
   };
 
   const openFinalEditor = () => {
-    if (!finalEditorOpen && !finalDirty) {
-      setFinalMarkdown(
-        savedFinalMarkdown ?? candidateMarkdown ?? content?.aiDraftMarkdown ?? '',
-      );
-    }
+    setFinalMarkdown(
+      savedFinalMarkdown ?? candidateMarkdown ?? content?.aiDraftMarkdown ?? '',
+    );
     setFinalEditorOpen(true);
   };
 
@@ -202,7 +222,6 @@ export function ShiyanTaskDetailScreen() {
       setContent(next);
       setSavedFinalMarkdown(saved);
       setFinalMarkdown(saved);
-      setFinalDirty(false);
       Alert.alert('最终稿已保存', '后续后台 AI 刷新不会自动覆盖这份人工最终稿。');
     } catch (error) {
       Alert.alert('无法保存最终稿', error instanceof Error ? error.message : '请稍后重试。');
@@ -226,42 +245,28 @@ export function ShiyanTaskDetailScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}>
       <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={() => navigation.goBack()}
-          style={styles.headerButton}
-        >
+        <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => navigation.goBack()} style={styles.headerButton}>
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>
           {task?.title ?? '拾言任务'}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="刷新拾言任务"
-          onPress={() => void load()}
-          style={styles.headerButton}
-        >
+        <Pressable accessibilityRole="button" accessibilityLabel="刷新拾言任务" onPress={() => void refreshAll()} style={styles.headerButton}>
           <RefreshCw size={19} color={colors.text.ink} />
         </Pressable>
       </View>
 
-      {loadState === 'loading' && !task ? (
+      {loading && !task ? (
         <View style={styles.centerState}>
           <ActivityIndicator color={colors.primary} />
           <Text style={[styles.muted, { color: colors.text.soft }]}>正在读取 Cloud 状态…</Text>
         </View>
-      ) : loadState === 'error' && !task ? (
+      ) : taskError && !task ? (
         <View style={styles.centerState}>
           <FileText size={34} color={colors.text.soft} />
           <Text style={[styles.stateTitle, { color: colors.text.ink }]}>任务读取失败</Text>
-          <Text style={[styles.muted, { color: colors.text.soft }]}>{errorText}</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void load()}
-            style={[styles.outlineButton, { borderColor: colors.border.default }]}
-          >
+          <Text style={[styles.muted, { color: colors.text.soft }]}>{taskError}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void refreshAll()} style={[styles.outlineButton, { borderColor: colors.border.default }]}>
             <Text style={{ color: colors.primary, fontWeight: '600' }}>重新加载</Text>
           </Pressable>
         </View>
@@ -279,10 +284,7 @@ export function ShiyanTaskDetailScreen() {
               const failed = stage.status === 'failed';
               const failure = stageFailureText(stage);
               return (
-                <View
-                  key={stage.stage}
-                  style={[styles.stageRow, { borderColor: failed ? colors.status.error : colors.border.default, backgroundColor: colors.bg.card }]}
-                >
+                <View key={stage.stage} style={[styles.stageRow, { borderColor: failed ? colors.status.error : colors.border.default, backgroundColor: colors.bg.card }]}>
                   <View style={styles.stageMain}>
                     <Text style={[styles.stageTitle, { color: colors.text.ink }]}>{shiyanStageLabel(stage.stage)}</Text>
                     <Text style={[styles.muted, { color: failed ? colors.status.error : colors.text.soft }]}>
@@ -291,12 +293,7 @@ export function ShiyanTaskDetailScreen() {
                     {failure ? <Text style={[styles.failureText, { color: colors.status.error }]}>{failure}</Text> : null}
                   </View>
                   {retryActionForStage(stage) === 'transcribe' ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={busyAction === 'retry'}
-                      onPress={() => void retryCurrentStage()}
-                      style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}
-                    >
+                    <Pressable accessibilityRole="button" disabled={busyAction === 'retry'} onPress={() => void retryCurrentStage()} style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}>
                       <Text style={{ color: colors.primary, fontWeight: '600' }}>重试转写</Text>
                     </Pressable>
                   ) : null}
@@ -313,11 +310,22 @@ export function ShiyanTaskDetailScreen() {
             </Pressable>
           </View>
           {transcriptOpen ? (
-            <View style={[styles.readonlyBox, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
-              <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>
-                {transcript?.text ?? 'Transcript 尚未生成。'}
-              </Text>
-            </View>
+            transcript.status === 'error' ? (
+              <View style={[styles.errorBox, { borderColor: colors.status.error, backgroundColor: colors.bg.card }]}>
+                <Text style={[styles.stageTitle, { color: colors.status.error }]}>Transcript 读取失败</Text>
+                <Text style={[styles.muted, { color: colors.text.base }]}>{transcript.message}</Text>
+                {transcript.value ? <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>{transcript.value.text}</Text> : null}
+                <Pressable accessibilityRole="button" onPress={() => void loadTranscript()} style={[styles.smallButton, { backgroundColor: colors.bg.soft, alignSelf: 'flex-start' }]}>
+                  <Text style={{ color: colors.primary, fontWeight: '600' }}>重试读取</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={[styles.readonlyBox, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
+                <Text selectable style={[styles.readonlyText, { color: colors.text.base }]}>
+                  {transcript.status === 'ready' ? transcript.value.text : 'Transcript 尚未生成。'}
+                </Text>
+              </View>
+            )
           ) : null}
 
           <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>AI Draft</Text>
@@ -342,20 +350,8 @@ export function ShiyanTaskDetailScreen() {
             </View>
           ) : null}
 
-          <TextInput
-            value={adjustInstruction}
-            onChangeText={setAdjustInstruction}
-            multiline
-            placeholder="轻量调整，例如：更短一些；把风险放前面"
-            placeholderTextColor={colors.text.soft}
-            style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]}
-          />
-          <Pressable
-            accessibilityRole="button"
-            disabled={!adjustInstruction.trim() || busyAction === 'adjust'}
-            onPress={() => void adjustDraft()}
-            style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}
-          >
+          <TextInput value={adjustInstruction} onChangeText={setAdjustInstruction} multiline placeholder="轻量调整，例如：更短一些；把风险放前面" placeholderTextColor={colors.text.soft} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
+          <Pressable accessibilityRole="button" disabled={!adjustInstruction.trim() || busyAction === 'adjust'} onPress={() => void adjustDraft()} style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}>
             <Sparkles size={17} color={colors.primary} />
             <Text style={{ color: colors.primary, fontWeight: '600' }}>{busyAction === 'adjust' ? '正在调整' : '生成调整候选'}</Text>
           </Pressable>
@@ -370,24 +366,8 @@ export function ShiyanTaskDetailScreen() {
           </View>
           {finalEditorOpen ? (
             <>
-              <TextInput
-                value={finalMarkdown}
-                onChangeText={(value) => {
-                  setFinalMarkdown(value);
-                  setFinalDirty(true);
-                }}
-                multiline
-                textAlignVertical="top"
-                placeholder="在这里完成最终人工编辑"
-                placeholderTextColor={colors.text.soft}
-                style={[styles.finalInput, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]}
-              />
-              <Pressable
-                accessibilityRole="button"
-                disabled={busyAction === 'save-final'}
-                onPress={() => void saveFinalDraft()}
-                style={({ pressed }) => [styles.primaryButton, { backgroundColor: pressed ? colors.primaryActive : colors.primary }]}
-              >
+              <TextInput value={finalMarkdown} onChangeText={setFinalMarkdown} multiline textAlignVertical="top" placeholder="在这里完成最终人工编辑" placeholderTextColor={colors.text.soft} style={[styles.finalInput, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
+              <Pressable accessibilityRole="button" disabled={busyAction === 'save-final'} onPress={() => void saveFinalDraft()} style={({ pressed }) => [styles.primaryButton, { backgroundColor: pressed ? colors.primaryActive : colors.primary }]}>
                 <Text style={{ color: colors.onPrimary, fontWeight: '600' }}>{busyAction === 'save-final' ? '正在保存' : '保存 Final Draft'}</Text>
               </Pressable>
             </>
@@ -400,11 +380,7 @@ export function ShiyanTaskDetailScreen() {
           )}
 
           {savedFinalMarkdown ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void shareFinalDraft()}
-              style={[styles.outlineButton, { borderColor: colors.border.default, backgroundColor: colors.bg.card }]}
-            >
+            <Pressable accessibilityRole="button" onPress={() => void shareFinalDraft()} style={[styles.outlineButton, { borderColor: colors.border.default, backgroundColor: colors.bg.card }]}>
               <Share2 size={17} color={colors.primary} />
               <Text style={{ color: colors.primary, fontWeight: '600' }}>系统分享 Markdown</Text>
             </Pressable>
@@ -413,20 +389,10 @@ export function ShiyanTaskDetailScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>原始录音</Text>
           <Text style={[styles.muted, { color: colors.text.soft }]}>Cloud 默认按临时录音策略清理。这里的操作会直接更新 Cloud retained 状态。</Text>
           <View style={styles.retentionRow}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={busyAction === 'retention'}
-              onPress={() => void setRetention(true)}
-              style={[styles.outlineButton, { flex: 1, borderColor: retentionChoice === true ? colors.primary : colors.border.default }]}
-            >
+            <Pressable accessibilityRole="button" disabled={busyAction === 'retention'} onPress={() => void setRetention(true)} style={[styles.outlineButton, { flex: 1, borderColor: retentionChoice === true ? colors.primary : colors.border.default }]}>
               <Text style={{ color: colors.primary, fontWeight: '600' }}>保留原始录音</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={busyAction === 'retention'}
-              onPress={() => void setRetention(false)}
-              style={[styles.outlineButton, { flex: 1, borderColor: retentionChoice === false ? colors.primary : colors.border.default }]}
-            >
+            <Pressable accessibilityRole="button" disabled={busyAction === 'retention'} onPress={() => void setRetention(false)} style={[styles.outlineButton, { flex: 1, borderColor: retentionChoice === false ? colors.primary : colors.border.default }]}>
               <Text style={{ color: colors.primary, fontWeight: '600' }}>默认清理</Text>
             </Pressable>
           </View>
@@ -458,6 +424,7 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   compactButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm },
   readonlyBox: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: spacing.md },
+  errorBox: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   readonlyText: { fontSize: 14, lineHeight: 22 },
   candidateBox: { borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   candidateTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
