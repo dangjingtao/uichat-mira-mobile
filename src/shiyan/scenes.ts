@@ -51,10 +51,20 @@ const LEGACY_SCENE_IDS: Record<string, string> = {
 export const canonicalShiyanSceneId = (sceneId: string): string =>
   LEGACY_SCENE_IDS[sceneId] ?? sceneId;
 
-export const shiyanSceneNameForId = (sceneId: string): string | null => {
+let customSceneDraft: ShiyanSceneDefinition | null = null;
+
+export const getCustomSceneDraft = () => customSceneDraft;
+
+export const findShiyanSceneDefinition = (sceneId: string): ShiyanSceneDefinition | null => {
   const canonicalId = canonicalShiyanSceneId(sceneId);
-  return SHIYAN_BUILT_IN_SCENES.find((scene) => scene.id === canonicalId)?.name ?? null;
+  return (
+    SHIYAN_BUILT_IN_SCENES.find((scene) => scene.id === canonicalId) ??
+    (customSceneDraft?.id === canonicalId ? customSceneDraft : null)
+  );
 };
+
+export const shiyanSceneNameForId = (sceneId: string): string | null =>
+  findShiyanSceneDefinition(sceneId)?.name ?? null;
 
 export const toShiyanSceneSnapshot = (scene: ShiyanSceneDefinition): ShiyanSceneSnapshot => ({
   id: canonicalShiyanSceneId(scene.id),
@@ -68,9 +78,10 @@ export const toShiyanSceneSnapshot = (scene: ShiyanSceneDefinition): ShiyanScene
   builtIn: scene.builtIn,
 });
 
-let customSceneDraft: ShiyanSceneDefinition | null = null;
-
-export const getCustomSceneDraft = () => customSceneDraft;
+export const snapshotShiyanSceneById = (sceneId: string): ShiyanSceneSnapshot | undefined => {
+  const scene = findShiyanSceneDefinition(sceneId);
+  return scene ? toShiyanSceneSnapshot(scene) : undefined;
+};
 
 const customSceneId = () =>
   `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -89,6 +100,12 @@ export const saveCustomSceneDraft = (input: {
 
   if (!name || !organizationRequirement || outputStructure.length === 0) {
     throw new Error('请填写场景名称、整理要求和至少一项输出结构。');
+  }
+  if (name.length > 60) throw new Error('场景名称不能超过 60 个字符。');
+  if (organizationRequirement.length > 2000) throw new Error('整理要求不能超过 2000 个字符。');
+  if (outputStructure.length > 8) throw new Error('输出结构最多 8 项。');
+  if (outputStructure.some((item) => item.length > 60)) {
+    throw new Error('每个输出结构标题不能超过 60 个字符。');
   }
 
   customSceneDraft = {
