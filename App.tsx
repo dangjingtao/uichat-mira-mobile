@@ -29,6 +29,7 @@ import {
   ShiyanSceneSelectScreen,
 } from './src/shiyan/ShiyanRecordingScreens';
 import { ShiyanCaptureSubmitScreen } from './src/shiyan/ShiyanCaptureSubmitScreen';
+import { ShiyanCloudConfigScreen } from './src/shiyan/ShiyanCloudConfigScreen';
 import { ShiyanHistoryScreen } from './src/shiyan/ShiyanHistoryScreen';
 import { ShiyanTaskDetailScreen } from './src/shiyan/ShiyanTaskDetailScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
@@ -138,6 +139,7 @@ function AppInner() {
         <Stack.Screen name="ShiyanLocalDrafts" component={ShiyanLocalDraftsScreen} />
         <Stack.Screen name="ShiyanHistory" component={ShiyanHistoryScreen} />
         <Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailScreen} />
+        <Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />
         <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
