@@ -22,6 +22,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  /** Canonical Host metadata. Mobile must not invent or rewrite these fields. */
+  metadata?: Record<string, unknown>;
 }
 
 export type ConnectionStatus =

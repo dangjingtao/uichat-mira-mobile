@@ -38,6 +38,7 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
       : message.role,
   content: message.content,
   timestamp: new Date(message.createdAt),
+  metadata: message.metadata,
 });
 
 const supportsThreadDeletion = (manifest: RemoteManifest): boolean =>
@@ -75,6 +76,13 @@ const toContextMessage = (message: RemoteMessage) => {
   };
 };
 
+export interface CanonicalMessageSnapshot {
+  sessionId: string;
+  messages: ChatMessage[];
+}
+
+type MessageSnapshotListener = (snapshot: CanonicalMessageSnapshot) => void;
+
 /**
  * Mobile runtime compatibility adapter.
  *
@@ -90,6 +98,7 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
   private lastRuntimeEvents: Array<
     Extract<RemoteChatStreamEvent, { type: 'data-tool-event' | 'data-execution-node' }>
   > = [];
+  private readonly messageSnapshotListeners = new Set<MessageSnapshotListener>();
 
   constructor(private readonly remote: RemoteMiraHostClient) {}
 
@@ -159,8 +168,33 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     return unsupportedMutation('Renaming a thread');
   }
 
+  subscribeMessageSnapshots(listener: MessageSnapshotListener): () => void {
+    this.messageSnapshotListeners.add(listener);
+    return () => {
+      this.messageSnapshotListeners.delete(listener);
+    };
+  }
+
+  private publishMessageSnapshot(sessionId: string, messages: ChatMessage[]) {
+    const snapshot: CanonicalMessageSnapshot = {
+      sessionId,
+      messages: [...messages],
+    };
+    for (const listener of this.messageSnapshotListeners) {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.warn('[miraHostClient] message snapshot listener failed', error);
+      }
+    }
+  }
+
   async getMessages(sessionId: string): Promise<ChatMessage[]> {
-    return (await this.remote.getMessages(sessionId)).map(messageToChatMessage);
+    const messages = (await this.remote.getMessages(sessionId)).map(
+      messageToChatMessage,
+    );
+    this.publishMessageSnapshot(sessionId, messages);
+    return messages;
   }
 
   async sendMessage(
