@@ -73,5 +73,6 @@ export async function submitLocalCapture(
     `mobile-confirm:${confirmedCapture.id}`,
   );
   await submissions.setUploadState(confirmedCapture.id, 'confirmed');
+  await localCaptureRepository.markSubmitted(confirmedCapture.id);
   return created.task.id;
 }
