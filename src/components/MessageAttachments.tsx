@@ -21,8 +21,6 @@ type MediaRequest = { url: string; headers: Record<string, string> };
 type ViewerSource = { uri: string; headers: Record<string, string> };
 type AttachmentPart = Extract<RemoteMessagePart, { type: 'image' | 'file' }>;
 
-const MAX_TEXT_PREVIEW_BYTES = 1_000_000;
-
 const mediaErrorMessage = (error: unknown) => {
   if (error instanceof RemoteHostError) {
     if (error.code === 'THREAD_MEDIA_READ_UNAVAILABLE' || error.status === 403) {
@@ -33,6 +31,10 @@ const mediaErrorMessage = (error: unknown) => {
     }
     if (error.status === 404) return '附件已失效或不存在';
     if (error.code === 'NETWORK_ERROR') return '无法连接 Mira Desktop 读取附件';
+    if (error.code === 'MEDIA_READ_TIMEOUT') return '读取附件超时，请稍后重试';
+    if (error.code === 'MEDIA_PREVIEW_TOO_LARGE') {
+      return '文本附件过大，暂不支持应用内预览';
+    }
     return error.message;
   }
   return error instanceof Error ? error.message : '附件读取失败';
@@ -88,59 +90,34 @@ function useMediaRequest(
 }
 
 function TextAttachmentViewer({
-  uri,
-  authorization,
+  threadId,
+  mediaId,
 }: {
-  uri: string;
-  authorization?: string;
+  threadId: string;
+  mediaId: string;
 }) {
   const { colors } = useTheme();
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
     let active = true;
     setText(null);
     setError(null);
 
-    const load = async () => {
-      try {
-        const response = await fetch(uri, {
-          method: 'GET',
-          ...(authorization ? { headers: { Authorization: authorization } } : {}),
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const declaredLength = Number(response.headers.get('content-length') ?? '0');
-        if (Number.isFinite(declaredLength) && declaredLength > MAX_TEXT_PREVIEW_BYTES) {
-          throw new Error('TOO_LARGE');
-        }
-
-        const body = await response.text();
-        if (body.length > MAX_TEXT_PREVIEW_BYTES) {
-          throw new Error('TOO_LARGE');
-        }
+    void miraHostClient
+      .getThreadMediaText(threadId, mediaId)
+      .then(body => {
         if (active) setText(body);
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) return;
-        setError(
-          loadError instanceof Error && loadError.message === 'TOO_LARGE'
-            ? '文本附件过大，暂不支持应用内预览'
-            : '附件加载失败，请检查连接后重试',
-        );
-      }
-    };
+      })
+      .catch(readError => {
+        if (active) setError(mediaErrorMessage(readError));
+      });
 
-    void load();
     return () => {
       active = false;
-      controller.abort();
     };
-  }, [authorization, uri]);
+  }, [mediaId, threadId]);
 
   if (error) {
     return (
@@ -237,25 +214,29 @@ function FileAttachment({
 }) {
   const { colors } = useTheme();
   const previewKind = useMemo(() => getFilePreviewKind(part.mimeType), [part.mimeType]);
-  const { request, error, loading } = useMediaRequest(threadId, part, previewKind !== null);
+  const { request, error, loading } = useMediaRequest(
+    threadId,
+    part,
+    previewKind === 'image',
+  );
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerError, setViewerError] = useState<string | null>(null);
-  const standaloneUri = useMemo(() => safeStandaloneUri(part.data), [part.data]);
-  const viewerSource: ViewerSource | null = previewKind
-    ? request
+  const imageViewerSource: ViewerSource | null =
+    previewKind === 'image' && request
       ? { uri: request.url, headers: request.headers }
-      : !part.fileId && standaloneUri
-        ? { uri: standaloneUri, headers: {} }
-        : null
-    : null;
+      : null;
+  const canOpenText = previewKind === 'text' && Boolean(part.fileId);
+  const canOpenImage = previewKind === 'image' && Boolean(imageViewerSource);
   const unavailableMessage =
     viewerError ??
     error ??
     (previewKind === null
       ? '当前格式不可直接预览'
-      : !loading && !viewerSource
-        ? '附件没有可读取的媒体地址'
-        : null);
+      : previewKind === 'text' && !part.fileId
+        ? '附件缺少可读取的媒体标识'
+        : previewKind === 'image' && !loading && !imageViewerSource
+          ? '附件没有可读取的媒体地址'
+          : null);
 
   return (
     <>
@@ -286,7 +267,7 @@ function FileAttachment({
         </View>
         {loading ? (
           <ActivityIndicator color={colors.primary} />
-        ) : viewerSource ? (
+        ) : canOpenText || canOpenImage ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`打开附件 ${part.filename}`}
@@ -323,20 +304,17 @@ function FileAttachment({
               <X size={22} color={colors.text.ink} />
             </Pressable>
           </View>
-          {viewerSource && previewKind === 'image' ? (
+          {imageViewerSource && previewKind === 'image' ? (
             <View style={styles.viewerImageContainer}>
               <Image
-                source={viewerSource}
+                source={imageViewerSource}
                 resizeMode="contain"
                 style={styles.viewerImage}
                 onError={() => setViewerError('附件加载失败，请检查连接后重试')}
               />
             </View>
-          ) : viewerSource && previewKind === 'text' ? (
-            <TextAttachmentViewer
-              uri={viewerSource.uri}
-              authorization={viewerSource.headers.Authorization}
-            />
+          ) : previewKind === 'text' && part.fileId ? (
+            <TextAttachmentViewer threadId={threadId} mediaId={part.fileId} />
           ) : null}
         </View>
       </Modal>
