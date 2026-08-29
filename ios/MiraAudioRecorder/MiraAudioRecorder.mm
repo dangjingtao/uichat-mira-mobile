@@ -18,23 +18,26 @@ RCT_EXPORT_MODULE();
 RCT_EXPORT_METHOD(requestPermission:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
   dispatch_async(dispatch_get_main_queue(), ^{
+    // Objective-C++ rejects a switch whose case contains a block capturing a
+    // variable, because jumping to another label would skip the block's
+    // lifetime. Keep the permission branch as an if-chain instead.
     AVAudioSession *session = [AVAudioSession sharedInstance];
-    switch (session.recordPermission) {
-      case AVAudioSessionRecordPermissionGranted:
-        resolve(@"granted");
-        return;
-      case AVAudioSessionRecordPermissionDenied:
-        resolve(@"blocked");
-        return;
-      case AVAudioSessionRecordPermissionUndetermined:
-        [session requestRecordPermission:^(BOOL granted) {
-          resolve(granted ? @"granted" : @"denied");
-        }];
-        return;
-      default:
-        resolve(@"unavailable");
-        return;
+    AVAudioSessionRecordPermission permission = session.recordPermission;
+    if (permission == AVAudioSessionRecordPermissionGranted) {
+      resolve(@"granted");
+      return;
     }
+    if (permission == AVAudioSessionRecordPermissionDenied) {
+      resolve(@"blocked");
+      return;
+    }
+    if (permission != AVAudioSessionRecordPermissionUndetermined) {
+      resolve(@"unavailable");
+      return;
+    }
+    [session requestRecordPermission:^(BOOL granted) {
+      resolve(granted ? @"granted" : @"denied");
+    }];
   });
 }
 
