@@ -1,6 +1,6 @@
 # MOB-022：拾言 GitHub Destination
 
-状态：实施完成至依赖边界（阻塞：MOB-020 Final Draft 合同）
+状态：已合入 Cloud `dev`（MOB-020 Final Draft 接线与真实 GitHub smoke 待补）
 
 负责人：`mob_022_shiyan_github_destination`
 
@@ -53,24 +53,26 @@ GitHub 是拾言 MVP 第一优先 Destination。它只保存用户确认后的�
 
 ## 施工进展（2026-08-29）
 
-已完成且可独立于 MOB-020 验证的部分：
+已完成并进入开发主线的部分：
 
 - Mobile canonical truth 新增 `docs/shiyan/GITHUB_DESTINATION_CONTRACT.md`，冻结默认仓库、`entries/YYYY/MM/<captureTaskId>.md` 路径、Frontmatter、幂等、冲突与 Secret 边界；
 - `mira-shiyan` 已通过 PR #1 合入对应 README 内容约定，不建立第二套产品真相；
-- Cloud `feature/mob-022-github-destination` 已实现 `DestinationAdapter`、GitHub adapter、Delivery Record persistence、Delivery Stage 错误 / 重试语义与读取 handler；
+- Cloud 已实现 `DestinationAdapter`、GitHub adapter、Delivery Record persistence、Delivery Stage 错误 / 重试语义与读取 handler；
 - 同一幂等键成功后直接返回已保存 canonical evidence，不再次调用 Destination；
 - 不确定网络结果下，若目标路径已有完全一致内容则恢复已有文件 / commit，不重复创建；若同一路径内容不同则明确 `path_conflict`，不随机改名、不自动覆盖正式文档；
 - 并发写入时，D1 唯一键冲突会读取已创建的 Delivery Record；GitHub PUT 遇到 409 / 422 会二次读取目标路径，内容一致则恢复为同一次成功投递；
 - 网络 / 408 / 5xx / rate limit 为可重试，401 / 普通 403 / 路径冲突为明确失败；
-- Cloud PR #4 当前保持 Draft，最新 CI run `33239152910` 全绿：typecheck、Destination / Delivery recovery tests、并发恢复测试、两个 Worker dry-run、D1 migrations 均通过；
-- 第一轮 CI 曾暴露缺失 `Retry-After` 被 `Number(null)` 错判为 rate limit 的真实问题，已修正后复验通过。
+- 自动门禁 run `33239152910` 全绿：typecheck、Destination / Delivery recovery tests、并发恢复测试、两个 Worker dry-run、D1 migrations 均通过；
+- 第一轮 CI 曾暴露缺失 `Retry-After` 被 `Number(null)` 错判为 rate limit 的真实问题，已修正后复验通过；
+- 原 Draft PR #4 因 GitHub ready-for-review GraphQL schema 兼容问题关闭，仅作为 UI 状态替代；同一 validated head 通过非 Draft PR #5 squash 合入 Cloud `dev`；
+- Cloud `dev` 当前 HEAD `d6c46d7e88853c80735f472ddb44665dd7d942da`，其 parent 为已包含 MOB-019 的 `3917d00c825ca9783e0cabfcd4dc11b79b5bd166`。
 
-尚未越权补造的依赖接线：
+仍需在 MOB-020 后完成的集成项：
 
-- 截至本记录，MOB-020 在 `mira-shiyan-cloud` 尚无已合入实现或施工分支，服务端 Final Draft persistence / confirmation 合同不存在；
-- 因此 MOB-022 未开放“客户端直接提交任意 Markdown 到 GitHub”的替代 POST 接口；
-- MOB-020 合入后需从其已确认 Final Draft 事实读取快照，接入 `deliverConfirmedFinalDraftToGithub(...)`，并将 Delivery Records handler 挂入最终公网路由；
-- 接线后需重新 rebase / typecheck / tests / Worker dry-run / migrations，并使用已配置 Cloud Secret 完成一次真实 GitHub 写入 smoke，取得真实 URL + commit SHA 后才能把本卡改为完成。
+- MOB-020 提供服务端 Final Draft persistence / confirmation 合同后，从已确认 Final Draft 事实读取快照，接入 `deliverConfirmedFinalDraftToGithub(...)`；
+- 将 Delivery Records handler 与最终投递 POST 挂入公网 API，不允许以“客户端直接提交任意 Markdown”替代服务端 Final Draft 事实；
+- 接线后重新 typecheck / tests / Worker dry-run / migrations；
+- 使用已配置 Cloud Secret 完成一次真实 GitHub 写入 smoke，取得真实 URL + commit SHA 后再判定发布级完成。
 
 ## Validation
 
