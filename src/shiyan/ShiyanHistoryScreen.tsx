@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, ChevronRight, FileText } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  ChevronRight,
+  ExternalLink,
+  FileText,
+} from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
@@ -84,39 +90,60 @@ export function ShiyanHistoryScreen() {
           <Text style={[styles.stateText, { color: colors.text.soft }]}>提交第一条本地录音后，这里会从 Cloud 读取真实 Stage 状态。</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} refreshControl={undefined}>
+        <ScrollView contentContainerStyle={styles.content}>
           {tasks.map((task) => (
-            <Pressable
+            <View
               key={task.id}
-              accessibilityRole="button"
-              onPress={() =>
-                navigation.navigate('ShiyanTaskDetail', {
-                  taskId: task.id,
-                  localCaptureId: task.localCaptureId,
-                })
-              }
-              style={({ pressed }) => [
+              style={[
                 styles.card,
                 {
-                  backgroundColor: pressed ? colors.bg.soft : colors.bg.card,
+                  backgroundColor: colors.bg.card,
                   borderColor: task.stageStatus === 'failed' ? colors.status.error : colors.border.default,
                 },
               ]}
             >
-              <View style={styles.cardMain}>
-                <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{task.title}</Text>
-                <Text style={[styles.meta, { color: colors.text.soft }]}> {task.sceneName} · {new Date(task.createdAt).toLocaleString()}</Text>
-                <Text style={[styles.status, { color: task.stageStatus === 'failed' ? colors.status.error : colors.text.base }]}>
-                  {shiyanStageLabel(task.currentStage)} · {shiyanStageStatusLabel(task.stageStatus)}
-                </Text>
-                {task.canonicalDestinationUrl ? (
-                  <Text style={[styles.destination, { color: colors.primary }]}>已有真实投递去向</Text>
-                ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  navigation.navigate('ShiyanTaskDetail', {
+                    taskId: task.id,
+                    localCaptureId: task.localCaptureId,
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.taskButton,
+                  pressed && { backgroundColor: colors.bg.soft },
+                ]}
+              >
+                <View style={styles.cardMain}>
+                  <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{task.title}</Text>
+                  <Text style={[styles.meta, { color: colors.text.soft }]}>{task.sceneName} · {new Date(task.createdAt).toLocaleString()}</Text>
+                  <Text style={[styles.status, { color: task.stageStatus === 'failed' ? colors.status.error : colors.text.base }]}>
+                    {shiyanStageLabel(task.currentStage)} · {shiyanStageStatusLabel(task.stageStatus)}
+                  </Text>
+                </View>
+                <ChevronRight size={19} color={colors.text.soft} />
+              </Pressable>
+              {task.canonicalDestinationUrl ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="打开真实投递去向"
+                  onPress={() => void Linking.openURL(task.canonicalDestinationUrl as string)}
+                  style={({ pressed }) => [
+                    styles.destinationButton,
+                    { borderTopColor: colors.border.default },
+                    pressed && { backgroundColor: colors.bg.soft },
+                  ]}
+                >
+                  <ExternalLink size={15} color={colors.primary} />
+                  <Text style={[styles.destination, { color: colors.primary }]}>打开真实投递去向</Text>
+                </Pressable>
+              ) : (
+                <View style={[styles.destinationButton, { borderTopColor: colors.border.default }]}>
                   <Text style={[styles.meta, { color: colors.text.soft }]}>暂无真实投递链接</Text>
-                )}
-              </View>
-              <ChevronRight size={19} color={colors.text.soft} />
-            </Pressable>
+                </View>
+              )}
+            </View>
           ))}
         </ScrollView>
       )}
@@ -134,10 +161,12 @@ const styles = StyleSheet.create({
   stateText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   retryButton: { minHeight: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.full, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
-  card: { minHeight: 112, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
+  taskButton: { minHeight: 94, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardMain: { flex: 1, gap: 5 },
   cardTitle: { fontSize: 16, fontWeight: '700' },
   meta: { fontSize: 12, lineHeight: 18 },
   status: { fontSize: 13, fontWeight: '600' },
+  destinationButton: { minHeight: 42, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   destination: { fontSize: 12, fontWeight: '600' },
 });
