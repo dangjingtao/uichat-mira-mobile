@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import {
 } from './ShiyanTaskDetailScreen';
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
 import {
+  hasCanonicalGithubDeliveryEvidence,
   parseShiyanDeliveriesResult,
   type ShiyanDeliveryView,
   type ShiyanFinalDraftView,
@@ -47,6 +48,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   const [deliveryError, setDeliveryError] = useState('');
   const [busy, setBusy] = useState(false);
   const [editorState, setEditorState] = useState<ShiyanFinalEditorState>(EMPTY_EDITOR_STATE);
+  const previousSaving = useRef(false);
 
   const refreshDeliveryState = useCallback(async () => {
     let nextFinalDraft: ShiyanFinalDraftView | null = null;
@@ -78,9 +80,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       const matching = result.deliveries.filter((item) =>
         nextFinalDraft ? deliveryBelongsToFinalDraft(item, nextFinalDraft) : false,
       );
-      const succeeded = matching.find(
-        (item) => item.status === 'succeeded' && Boolean(item.fileUrl),
-      );
+      const succeeded = matching.find(hasCanonicalGithubDeliveryEvidence);
       if (succeeded) {
         setDelivery(succeeded);
         setDeliveryError('');
@@ -104,6 +104,16 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       }, 5000);
       return () => clearInterval(timer);
     }, [refreshDeliveryState]),
+  );
+
+  const handleEditorStateChange = useCallback(
+    (next: ShiyanFinalEditorState) => {
+      const justFinishedSaving = previousSaving.current && !next.saving && !next.dirty;
+      previousSaving.current = next.saving;
+      setEditorState(next);
+      if (justFinishedSaving) void refreshDeliveryState();
+    },
+    [refreshDeliveryState],
   );
 
   const deliveryBlocked = editorState.dirty || editorState.saving;
@@ -130,11 +140,24 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   };
 
   const openDelivery = async () => {
-    if (!delivery?.fileUrl || deliveryBlocked) return;
+    if (!delivery || deliveryBlocked || !hasCanonicalGithubDeliveryEvidence(delivery)) return;
     try {
-      await Linking.openURL(delivery.fileUrl);
-    } catch {
-      Alert.alert('无法打开 GitHub', delivery.fileUrl);
+      // A save can complete between renders. Re-check the authoritative Final Draft
+      // before opening a canonical URL so an older successful Delivery never wins.
+      const latest = await shiyanClient.getFinalDraft(taskId);
+      if (!deliveryBelongsToFinalDraft(delivery, latest.draft)) {
+        setFinalDraft(latest.draft);
+        setDelivery(null);
+        await refreshDeliveryState();
+        return;
+      }
+      await Linking.openURL(delivery.fileUrl!);
+    } catch (error) {
+      if (error instanceof ShiyanClientError) {
+        setDeliveryError(error.message);
+        return;
+      }
+      Alert.alert('无法打开 GitHub', delivery.fileUrl ?? 'GitHub URL 不可用');
     }
   };
 
@@ -142,8 +165,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     finalDraft &&
       delivery &&
       deliveryBelongsToFinalDraft(delivery, finalDraft) &&
-      delivery.status === 'succeeded' &&
-      delivery.fileUrl,
+      hasCanonicalGithubDeliveryEvidence(delivery),
   );
 
   const statusCopy = deliveryBlocked
@@ -156,7 +178,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
   return (
     <View style={styles.root}>
-      <ShiyanTaskDetailScreen onFinalEditorStateChange={setEditorState} />
+      <ShiyanTaskDetailScreen onFinalEditorStateChange={handleEditorStateChange} />
       {finalDraft ? (
         <View
           style={[
