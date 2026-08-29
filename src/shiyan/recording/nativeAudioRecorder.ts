@@ -13,7 +13,10 @@ export interface NativeRecordingFileInfo {
   size: number;
 }
 
+export type NativeRecordingPermissionResult = 'granted' | 'denied' | 'blocked' | 'unavailable';
+
 interface NativeAudioRecorderModule {
+  requestPermission(): Promise<NativeRecordingPermissionResult>;
   start(recordingId: string): Promise<{ path: string; startedAtMs: number }>;
   pause(): Promise<void>;
   resume(): Promise<void>;
@@ -32,6 +35,9 @@ const getModule = (): NativeAudioRecorderModule => {
 };
 
 export const nativeAudioRecorder: NativeAudioRecorderModule = {
+  requestPermission() {
+    return getModule().requestPermission();
+  },
   start(recordingId) {
     return getModule().start(recordingId);
   },
