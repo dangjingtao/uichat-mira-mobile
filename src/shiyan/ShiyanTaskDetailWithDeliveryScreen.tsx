@@ -49,25 +49,33 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   const [busy, setBusy] = useState(false);
   const [editorState, setEditorState] = useState<ShiyanFinalEditorState>(EMPTY_EDITOR_STATE);
   const previousSaving = useRef(false);
+  const refreshGeneration = useRef(0);
+  const focused = useRef(false);
 
   const refreshDeliveryState = useCallback(async () => {
+    if (!focused.current) return;
+    const generation = ++refreshGeneration.current;
+    const isCurrent = () => focused.current && refreshGeneration.current === generation;
+
     let nextFinalDraft: ShiyanFinalDraftView | null = null;
     try {
       const result = await shiyanClient.getFinalDraft(taskId);
+      if (!isCurrent()) return;
       nextFinalDraft = result.draft;
       setFinalDraft(result.draft);
     } catch (error) {
+      if (!isCurrent()) return;
       if (error instanceof ShiyanClientError && error.code === 'final_draft_not_ready') {
         setFinalDraft(null);
         setDelivery(null);
         setDeliveryError('');
-        return;
       }
       return;
     }
 
     try {
       const raw = await shiyanClient.getDeliveries(taskId);
+      if (!isCurrent()) return;
       const result = parseShiyanDeliveriesResult(raw, taskId);
       if (!result) {
         throw new ShiyanClientError(
@@ -90,6 +98,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       setDelivery(failed);
       setDeliveryError(failed?.errorMessage ?? '');
     } catch (error) {
+      if (!isCurrent()) return;
       setDeliveryError(
         error instanceof Error ? error.message : '暂时无法读取 GitHub 投递状态。',
       );
@@ -98,11 +107,16 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       void refreshDeliveryState();
       const timer = setInterval(() => {
         void refreshDeliveryState();
       }, 5000);
-      return () => clearInterval(timer);
+      return () => {
+        focused.current = false;
+        refreshGeneration.current += 1;
+        clearInterval(timer);
+      };
     }, [refreshDeliveryState]),
   );
 
@@ -120,6 +134,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
   const deliver = async () => {
     if (!finalDraft || busy || deliveryBlocked) return;
+    refreshGeneration.current += 1;
     setBusy(true);
     setDeliveryError('');
     try {
@@ -141,6 +156,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
   const openDelivery = async () => {
     if (!delivery || deliveryBlocked || !hasCanonicalGithubDeliveryEvidence(delivery)) return;
+    refreshGeneration.current += 1;
     try {
       // A save can complete between renders. Re-check the authoritative Final Draft
       // before opening a canonical URL so an older successful Delivery never wins.
