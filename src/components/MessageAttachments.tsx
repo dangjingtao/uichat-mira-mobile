@@ -88,11 +88,11 @@ function useMediaRequest(
 }
 
 function TextAttachmentViewer({
-  source,
-  onFailure,
+  uri,
+  authorization,
 }: {
-  source: ViewerSource;
-  onFailure: (message: string) => void;
+  uri: string;
+  authorization?: string;
 }) {
   const { colors } = useTheme();
   const [text, setText] = useState<string | null>(null);
@@ -106,9 +106,9 @@ function TextAttachmentViewer({
 
     const load = async () => {
       try {
-        const response = await fetch(source.uri, {
+        const response = await fetch(uri, {
           method: 'GET',
-          headers: source.headers,
+          ...(authorization ? { headers: { Authorization: authorization } } : {}),
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -127,12 +127,11 @@ function TextAttachmentViewer({
         if (active) setText(body);
       } catch (loadError) {
         if (!active || controller.signal.aborted) return;
-        const message =
+        setError(
           loadError instanceof Error && loadError.message === 'TOO_LARGE'
             ? '文本附件过大，暂不支持应用内预览'
-            : '附件加载失败，请检查连接后重试';
-        setError(message);
-        onFailure(message);
+            : '附件加载失败，请检查连接后重试',
+        );
       }
     };
 
@@ -141,7 +140,7 @@ function TextAttachmentViewer({
       active = false;
       controller.abort();
     };
-  }, [onFailure, source]);
+  }, [authorization, uri]);
 
   if (error) {
     return (
@@ -258,10 +257,6 @@ function FileAttachment({
         ? '附件没有可读取的媒体地址'
         : null);
 
-  const handleViewerFailure = (message: string = '附件加载失败，请检查连接后重试') => {
-    setViewerError(message);
-  };
-
   return (
     <>
       <View
@@ -334,11 +329,14 @@ function FileAttachment({
                 source={viewerSource}
                 resizeMode="contain"
                 style={styles.viewerImage}
-                onError={() => handleViewerFailure()}
+                onError={() => setViewerError('附件加载失败，请检查连接后重试')}
               />
             </View>
           ) : viewerSource && previewKind === 'text' ? (
-            <TextAttachmentViewer source={viewerSource} onFailure={handleViewerFailure} />
+            <TextAttachmentViewer
+              uri={viewerSource.uri}
+              authorization={viewerSource.headers.Authorization}
+            />
           ) : null}
         </View>
       </Modal>
