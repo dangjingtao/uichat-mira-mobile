@@ -41,6 +41,38 @@ describe('conversationTools', () => {
     expect(text).not.toContain('Bearer secret');
   });
 
+  test('adds readable media and attachment descriptions to share text', () => {
+    const mediaMessages: ChatMessage[] = [
+      {
+        id: 'media-1',
+        role: 'user',
+        content: '看一下这些',
+        timestamp: new Date('2026-08-29T00:00:03.000Z'),
+        parts: [
+          {
+            type: 'image',
+            image: 'https://example.com/image.png',
+            filename: 'screen.png',
+          },
+          {
+            type: 'file',
+            data: '',
+            filename: 'notes.pdf',
+            mimeType: 'application/pdf',
+          },
+          { type: 'data', name: 'secret', value: { token: 'do-not-share' } },
+        ],
+      },
+    ];
+
+    const text = buildConversationShareText(mediaMessages, '附件会话');
+
+    expect(text).toContain('You: 看一下这些');
+    expect(text).toContain('[图片：screen.png]');
+    expect(text).toContain('[附件：notes.pdf]');
+    expect(text).not.toContain('do-not-share');
+  });
+
   test('finds current-thread visible text case-insensitively', () => {
     expect(findConversationMatches(messages, 'hello')).toEqual([
       { messageId: 'user-1', messageIndex: 0 },
@@ -50,7 +82,35 @@ describe('conversationTools', () => {
       { messageId: 'assistant-1', messageIndex: 1 },
     ]);
     expect(findConversationMatches(messages, 'hidden')).toEqual([]);
+  });
+
+  test('returns no matches for empty or missing queries', () => {
+    expect(findConversationMatches(messages, '')).toEqual([]);
+    expect(findConversationMatches(messages, '   ')).toEqual([]);
     expect(findConversationMatches(messages, 'missing')).toEqual([]);
+  });
+
+  test('can match a visible attachment filename', () => {
+    const withAttachment: ChatMessage[] = [
+      {
+        id: 'file-1',
+        role: 'assistant',
+        content: '',
+        timestamp: new Date('2026-08-29T00:00:04.000Z'),
+        parts: [
+          {
+            type: 'file',
+            data: '',
+            filename: 'roadmap.md',
+            mimeType: 'text/markdown',
+          },
+        ],
+      },
+    ];
+
+    expect(findConversationMatches(withAttachment, 'ROADMAP')).toEqual([
+      { messageId: 'file-1', messageIndex: 0 },
+    ]);
   });
 
   test('cycles next and previous match positions deterministically', () => {
