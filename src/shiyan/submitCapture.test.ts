@@ -54,15 +54,25 @@ const client = (upload: ShiyanCloudClient['uploadLocalAudio']): ShiyanCloudClien
   confirmAudio: jest.fn(async () => ({ task })),
 });
 
+const captures = () => ({
+  confirm: jest.fn(async () => capture),
+  markSubmitted: jest.fn(async () => undefined),
+});
+
 describe('submitLocalCapture', () => {
   it('keeps a recovery pointer when upload fails so the local recording can retry', async () => {
     const submissions = new ShiyanSubmissionRepository(new MemoryLocalKeyValueStore());
+    const localCaptures = captures();
     const failingClient = client(async () => {
       throw new ShiyanClientError('upload timeout', 'upload_timeout', true);
     });
 
     await expect(
-      submitLocalCapture(capture, { client: failingClient, submissions }),
+      submitLocalCapture(capture, {
+        client: failingClient,
+        submissions,
+        captures: localCaptures,
+      }),
     ).rejects.toMatchObject({ code: 'upload_timeout', retryable: true });
 
     expect(await submissions.get(capture.id)).toMatchObject({
@@ -71,17 +81,21 @@ describe('submitLocalCapture', () => {
       assetId: 'asset-1',
       uploadState: 'uploading',
     });
+    expect(localCaptures.markSubmitted).not.toHaveBeenCalled();
   });
 
-  it('marks the pointer confirmed only after upload and Cloud confirm succeed', async () => {
+  it('marks confirmed state and local capture only after upload and Cloud confirm succeed', async () => {
     const submissions = new ShiyanSubmissionRepository(new MemoryLocalKeyValueStore());
+    const localCaptures = captures();
     await submitLocalCapture(capture, {
       client: client(async (_grant, _path, onProgress) => onProgress?.(1)),
       submissions,
+      captures: localCaptures,
     });
 
     expect(await submissions.get(capture.id)).toMatchObject({
       uploadState: 'confirmed',
     });
+    expect(localCaptures.markSubmitted).toHaveBeenCalledWith(capture.id);
   });
 });
