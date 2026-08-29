@@ -179,6 +179,7 @@ export interface ShiyanDeliveryView {
   id: string;
   taskId: string;
   finalDraftId: string;
+  idempotencyKey: string;
   destination: 'github';
   status: 'pending' | 'succeeded' | 'failed';
   retryable: boolean;
@@ -198,6 +199,54 @@ export interface ShiyanDeliveriesResult {
   taskId: string;
   deliveries: ShiyanDeliveryView[];
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isNullableString = (value: unknown): value is string | null =>
+  value === null || typeof value === 'string';
+
+export const isShiyanDeliveryView = (value: unknown): value is ShiyanDeliveryView => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.taskId === 'string' &&
+    typeof value.finalDraftId === 'string' &&
+    typeof value.idempotencyKey === 'string' &&
+    value.idempotencyKey.length > 0 &&
+    value.destination === 'github' &&
+    (value.status === 'pending' || value.status === 'succeeded' || value.status === 'failed') &&
+    typeof value.retryable === 'boolean' &&
+    typeof value.retryCount === 'number' &&
+    Number.isFinite(value.retryCount) &&
+    value.retryCount >= 0 &&
+    isNullableString(value.repository) &&
+    isNullableString(value.path) &&
+    isNullableString(value.commitSha) &&
+    isNullableString(value.fileUrl) &&
+    isNullableString(value.errorCode) &&
+    isNullableString(value.errorMessage) &&
+    isNullableString(value.deliveredAt) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string'
+  );
+};
+
+export const parseShiyanDeliveriesResult = (
+  value: unknown,
+  expectedTaskId?: string,
+): ShiyanDeliveriesResult | null => {
+  if (!isRecord(value) || typeof value.taskId !== 'string' || !Array.isArray(value.deliveries)) {
+    return null;
+  }
+  if (expectedTaskId && value.taskId !== expectedTaskId) return null;
+  if (!value.deliveries.every(isShiyanDeliveryView)) return null;
+  if (value.deliveries.some((delivery) => delivery.taskId !== value.taskId)) return null;
+  return {
+    taskId: value.taskId,
+    deliveries: value.deliveries,
+  };
+};
 
 export interface ShiyanTaskContentView {
   aiDraftMarkdown: string | null;
