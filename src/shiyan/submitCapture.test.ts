@@ -35,7 +35,7 @@ const client = (upload: ShiyanCloudClient['uploadLocalAudio']): ShiyanCloudClien
   async createCaptureTask(input) {
     expect(input.idempotencyKey).toBe('mobile-capture:capture-1');
     return {
-      task,
+      task: { ...task, sceneId: input.sceneId },
       upload: {
         assetId: 'asset-1',
         objectKey: 'audio/task-1/asset-1',
@@ -49,6 +49,14 @@ const client = (upload: ShiyanCloudClient['uploadLocalAudio']): ShiyanCloudClien
   getCaptureTask: jest.fn(),
   getTranscript: jest.fn(),
   retryStt: jest.fn(),
+  retryOrganize: jest.fn(),
+  getAiDraft: jest.fn(),
+  adjustAiDraft: jest.fn(),
+  getFinalDraft: jest.fn(),
+  saveFinalDraft: jest.fn(),
+  listScenes: jest.fn(),
+  createScene: jest.fn(async (scene) => ({ scene: { ...scene, builtIn: false } })),
+  getDeliveries: jest.fn(),
   setAudioRetention: jest.fn(),
   uploadLocalAudio: upload,
   confirmAudio: jest.fn(async () => ({ task })),
@@ -93,9 +101,32 @@ describe('submitLocalCapture', () => {
       captures: localCaptures,
     });
 
-    expect(await submissions.get(capture.id)).toMatchObject({
-      uploadState: 'confirmed',
-    });
+    expect(await submissions.get(capture.id)).toMatchObject({ uploadState: 'confirmed' });
     expect(localCaptures.markSubmitted).toHaveBeenCalledWith(capture.id);
+  });
+
+  it('registers a frozen custom scene before creating the CaptureTask', async () => {
+    const submissions = new ShiyanSubmissionRepository(new MemoryLocalKeyValueStore());
+    const cloud = client(async () => undefined);
+    const customCapture: LocalCaptureMetadata = {
+      ...capture,
+      sceneId: 'custom-abc12',
+      sceneName: '客户访谈',
+      sceneSnapshot: {
+        id: 'custom-abc12',
+        name: '客户访谈',
+        instruction: '区分事实与推测',
+        sections: [{ id: 'section-1', title: '摘要', description: '摘要' }],
+        builtIn: false,
+      },
+    };
+
+    await submitLocalCapture(customCapture, {
+      client: cloud,
+      submissions,
+      captures: captures(),
+    });
+
+    expect(cloud.createScene).toHaveBeenCalledWith(customCapture.sceneSnapshot);
   });
 });
