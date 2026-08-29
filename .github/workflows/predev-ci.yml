@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# MOB-028: predev is a dev-channel rolling buffer.
+env:
+  MIRA_RELEASE_CHANNEL: dev
+
 concurrency:
   group: predev-ci-${{ github.ref }}
   cancel-in-progress: true

@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# MOB-028: build-time release channel truth consumed by metro.config.js.
+# prod builds must never fall back to the dev channel.
+env:
+  MIRA_RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'dev' }}
+
 concurrency:
   group: mobile-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
