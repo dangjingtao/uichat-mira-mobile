@@ -26,6 +26,10 @@
 - MOB-014：有条件完成，Mobile PR #62 已 squash 合入 `dev`，merge commit `cfff6b3f61d2469a279e1579f8c080c48c829a7a`；Share Sheet / 当前聊天查找代码与双平台自动构建已通过，真实 Share Sheet、长会话查找与关闭搜索后的交互 smoke 挂账。
 - MOB-015：有条件完成，Mobile PR #54 已合入 `dev`；真机设置持久化、system 主题切换、断开 / 重配对挂账。
 - MOB-024：有条件完成。Desktop PR #88 已合入 `dev`，merge commit `e1752500cafd300bb6c9c82e9b5a610beb985d2c`；Mobile PR #65 已 squash 合入 `dev`，merge commit `a668bf503b3d540a1bd521e3792684af258de0d4`。`POST /threads` 通过现有 `messages:write` 兼容 scope 正式发布，Mobile 以 runtime manifest + device scope 做 capability guard，Drawer“聊天”已接真实 canonical Thread 创建；创建 POST 响应不确定时不会跨 Direct / Relay 重放。Desktop `pnpm check` 已通过；Mobile typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding。真实已配对设备无需重配对的新建 Thread 跨端 smoke 挂账。
+- MOB-025：待实施。修复 Android dogfood 中主线程列表右滑无法稳定呼出置顶 / 删除，并把 Drawer 的 pinned Thread 独立为「置顶」分组；不改变 MOB-007 device-local pin 合同。
+- MOB-026：待实施。全局搜索需命中消息正文；当前基线 `SearchScreen` 只匹配 Thread 标题。不得为此私自发明 Host search route。
+- MOB-027：待实施。Settings「插件」行当前无 action 接线，但应用已有 `Plugins` route；按最小回归修复处理。
+- MOB-028：待实施。关于页增加 release-channel-aware 更新检查、红点、确认后下载；Android 只触发 signed Release APK 的系统 / 浏览器下载，不做静默安装。
 
 ### 拾言 MVP
 
@@ -34,9 +38,10 @@
 - MOB-018：有条件完成。Cloud PR #1 已建立 CaptureTask / D1 / R2 / Workflow / device auth / direct upload 基础；该实现已经进入当前 Cloud `dev` 祖先基线。真实 Cloudflare 资源、Secret 与正式部署联调挂账。
 - MOB-019：有条件完成并已进入 Cloud `dev`。Cloud PR #3 合入提交 `3917d00c825ca9783e0cabfcd4dc11b79b5bd166`；Workers AI STT、Transcript persistence、STT 独立 retry、72 小时默认音频保留与 retained / cleanup 已落地，自动门禁通过；真实约 40 分钟 Provider smoke 挂账。
 - MOB-020：Review 后有条件可依赖，尚未合入。上游 PR #6（head `513b91e971627a3561f386002b6479061f9f7dc8`，来自 `t-zt/mira-shiyan-cloud` fork）已实现 LLM Gateway、内置 / 自定义 Scene、structured JSON -> Markdown AI Draft、AI adjustment、organize retry 与 Final Draft persistence。代码合同审查未发现新的高置信 P1/P2；因 fork PR 的 Actions 仍需上游批准，Cloud typecheck / tests / Worker dry-run / migration 证据尚不能记为已执行。下一步：批准并跑 Cloud CI，Review 后合入 Cloud `dev`。
-- MOB-021：施工完成待合入。Mobile PR #63（head `b6afc294be07fe549779d60c2363d966d944549e`）已经对齐 MOB-020 PR #6：独立 ShiyanClient、提交 / 上传恢复、Stage UI、Transcript、AI Draft / adjustment、Final Draft、Scene 注册与冻结、retention、历史 / 分享均已接线；legacy `dictation -> quick-note` 已兼容。Mobile CI run #721：typecheck、lint、159 Jest、Android debug、iOS simulator 与 unsigned device build 全绿。OpenCode Review 当前因 `spawnSync opencode E2BIG` 在模型启动前失败，属于 Review 基建问题而非代码 finding。下一步：解决/绕过 Review 基建门禁后合入 `dev`；真实 Cloud/device smoke 挂 MOB-023。
+- MOB-021：已合入 Mobile `dev`。PR #63 merge commit `72f854d9f378fb7a5e8ed9ec248c7b16565665a5`；其施工内容已对齐 MOB-020 PR #6，Mobile CI run #721 的 typecheck、lint、159 Jest、Android debug、iOS simulator 与 unsigned device build 全绿。真实 Cloud/device smoke 仍挂 MOB-023。
 - MOB-022：核心能力已进入 Cloud `dev`，最终接线未完成。DestinationAdapter、GitHub adapter、Delivery Record、幂等 / 并发恢复与 canonical evidence 已随 Cloud PR #5 合入；`mira-shiyan` 内容约定已落地。当前 Cloud `dev/src/api/index.ts` 只挂了 MOB-019 handler，尚未把 MOB-020 / MOB-022 public route 接入；因此 Final Draft -> GitHub Delivery POST、`GET /deliveries` 公网读取及真实 GitHub smoke 仍待 MOB-020 合入后收口。
 - MOB-023：待启动的最终集成验收卡。已完成任务卡阅读与边界确认；只有 MOB-020 合入 Cloud `dev`、MOB-021 合入 Mobile `dev`、MOB-022 完成 Final Draft / public API 接线后才进入正式验收施工。40 分钟真机会议、真实 Provider / Secret、真实 GitHub URL 是 MOB-023 的验收内容，不作为修改上游代码合同的理由。
+- MOB-029：待实施。拾言主页右上角成为 Cloud 配置 canonical 入口；确认页录音摘要改为可播放 / seek 的小播放器，场景改为当前值回显 + cross-platform Action Sheet；不改变 CaptureTask / Scene snapshot / Draft / Delivery 合同。
 
 ## 任务卡总览
 
@@ -62,10 +67,24 @@
 | MOB-018 | 拾言 Cloud 基础与上传闭环 | 有条件完成 | 正式 Cloud 资源 / Secret smoke |
 | MOB-019 | 拾言 STT / Transcript | 有条件完成；已在 Cloud `dev` | 40 分钟真实 Provider smoke |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | PR #6 待 Cloud CI / Review / 合入 | 批准 fork Actions，跑 CI 后合并 |
-| MOB-021 | 拾言 Mobile 结果 / Final Draft / 历史 | PR #63 待 Review / 合入；Mobile CI 全绿 | 解决 Review E2BIG，合入 `dev` |
+| MOB-021 | 拾言 Mobile 结果 / Final Draft / 历史 | 已合入 `dev`；PR #63 merge `72f854d` | 真实 Cloud/device smoke 挂 MOB-023 |
 | MOB-022 | 拾言 GitHub Destination | 核心已合入；Final Draft / public route 待接 | MOB-020 合入后补 route + real GitHub smoke |
-| MOB-023 | 拾言 E2E 验收与加固 | 待启动 | 等 020/021/022 达到可联调基线 |
+| MOB-023 | 拾言 E2E 验收与加固 | 待启动 | 等 020/022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | 有条件完成；Desktop #88 / Mobile #65 已合入 | 真实已配对设备新建 Thread 跨端 smoke |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-026 | 全局搜索命中消息正文 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-027 | 设置页插件入口恢复可用 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-028 | 关于页版本更新检查与确认下载 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | 待实施 | 从最新 `dev` 独立开卡施工 |
+
+## 2026-08-29 Dogfood Follow-up 并行规则
+
+MOB-025～MOB-029 首次派卡共同基线为 Mobile `dev @ a90dfb6c2d80079fd85084fff0214968e137e653`。正式施工时每张卡仍必须先 fetch 当前 `dev` 并确认 HEAD；若任务卡合入后 `dev` 已前进，以新 HEAD 为准。
+
+- MOB-025 / 026 / 027 可并行，入口分别主要位于 Thread list+Drawer、Global Search、Settings。
+- MOB-028 在保持“确认后交系统 / 浏览器下载、不实现 native installer”的范围内可并行。
+- MOB-029 是本批唯一明确可能同时触碰 Android / iOS native audio 的卡，建议独立 worktree / branch。
+- 如果 MOB-028 或 MOB-029 施工过程中需要同时修改共享 native package registration、Podfile、MainApplication、全局 navigation / store 等共享合同，必须先报告并重新判断集成顺序；不能仅因文件暂时没冲突就认为可安全并行。
 
 ## 拾言 canonical 产品规则
 
@@ -87,13 +106,13 @@ MOB-018 ✓
 MOB-019 ✓
    ↓
 MOB-020  PR #6：待 CI / Review / merge
-   ├── MOB-021  PR #63：CI 全绿，待 Review / merge
+   ├── MOB-021 ✓ Mobile dev
    └── MOB-022  core 已合入，待 Final Draft + public route 接线
              \ /
            MOB-023
 ```
 
-MOB-021 已基于 MOB-020 PR #6 的冻结合同施工，因此它不需要重新等待设计；但正式集成基线仍要求 MOB-020 进入 Cloud `dev`。MOB-023 不与上游实现卡并行施工。
+MOB-021 已基于 MOB-020 PR #6 的冻结合同施工并合入 Mobile `dev`，因此它不需要重新等待设计；但正式集成基线仍要求 MOB-020 进入 Cloud `dev`。MOB-023 不与上游实现卡并行施工。
 
 ## MOB-023 验收矩阵
 
@@ -114,7 +133,7 @@ MOB-021 已基于 MOB-020 PR #6 的冻结合同施工，因此它不需要重新
 
 ## 详细任务卡
 
-`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-024 的详细范围均在 `docs/task-cards/`。
+`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-029 的详细范围均在 `docs/task-cards/`。
 
 ## 历史追溯
 
