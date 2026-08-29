@@ -342,6 +342,27 @@ export function SearchScreen() {
               </Text>
             ) : null}
           </>
+        ) : hasQuery && searchState.status === 'degraded' ? (
+          // Every message lookup failed and no title matched. This must not
+          // render as a definitive "no results" — Host availability is the
+          // unknown here, not the absence of matches.
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索未能完成</Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+              部分会话消息暂时无法读取，无法确认是否存在匹配。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试搜索"
+              onPress={() => searchControllerRef.current?.search(query)}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
