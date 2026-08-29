@@ -197,10 +197,15 @@ PULL REQUEST DIFF\n\`\`\`diff\n${diff.text}\n\`\`\``;
 
 const model = process.env.OPENCODE_REVIEW_MODEL?.trim() || DEFAULT_MODEL;
 const reviewDir = process.env.OPENCODE_REVIEW_DIR?.trim() || process.cwd();
+// The prompt regularly exceeds the Linux per-argument limit (MAX_ARG_STRLEN,
+// ~128KB) once the bounded diff and trusted base contexts are assembled, which
+// made spawnSync fail with E2BIG on larger PRs. `opencode run` reads the full
+// message from stdin when stdin is not a TTY, so pipe it instead.
 const result = spawnSync(
   'opencode',
-  ['run', '--model', model, '--format', 'default', '--dir', reviewDir, prompt],
+  ['run', '--model', model, '--format', 'default', '--dir', reviewDir],
   {
+    input: prompt,
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
     env: {
