@@ -57,7 +57,8 @@ describe('Shiyan Delivery contract', () => {
   });
 
   it('rejects delivery records that omit the declared idempotency key', () => {
-    const { idempotencyKey: _ignored, ...withoutIdentity } = delivery();
+    const withoutIdentity: Record<string, unknown> = { ...delivery() };
+    delete withoutIdentity.idempotencyKey;
     expect(
       parseShiyanDeliveriesResult(
         { taskId: finalDraft.taskId, deliveries: [withoutIdentity] },
