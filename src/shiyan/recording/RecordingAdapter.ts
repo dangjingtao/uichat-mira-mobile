@@ -1,12 +1,4 @@
-import { Platform } from 'react-native';
-import {
-  check,
-  openSettings,
-  PERMISSIONS,
-  request,
-  RESULTS,
-  type PermissionStatus,
-} from 'react-native-permissions';
+import { Linking, PermissionsAndroid, Platform } from 'react-native';
 import { nativeAudioRecorder, type NativeRecordingStopResult } from './nativeAudioRecorder';
 
 export type RecordingLifecycleState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
@@ -38,26 +30,6 @@ export interface RecordingAdapter {
   cancel(): Promise<void>;
 }
 
-const microphonePermission = () =>
-  Platform.select({
-    ios: PERMISSIONS.IOS.MICROPHONE,
-    android: PERMISSIONS.ANDROID.RECORD_AUDIO,
-  });
-
-const normalizePermission = (status: PermissionStatus): RecordingPermissionResult => {
-  switch (status) {
-    case RESULTS.GRANTED:
-    case RESULTS.LIMITED:
-      return 'granted';
-    case RESULTS.BLOCKED:
-      return 'blocked';
-    case RESULTS.UNAVAILABLE:
-      return 'unavailable';
-    default:
-      return 'denied';
-  }
-};
-
 const toCompletedRecording = (result: NativeRecordingStopResult): CompletedRecording => ({
   filePath: result.path,
   startedAt: new Date(result.startedAtMs).toISOString(),
@@ -84,18 +56,21 @@ class NativeRecordingAdapter implements RecordingAdapter {
   }
 
   async requestPermission(): Promise<RecordingPermissionResult> {
-    const permission = microphonePermission();
-    if (!permission) return 'unavailable';
-    const current = await check(permission);
-    if (current === RESULTS.GRANTED || current === RESULTS.LIMITED) return 'granted';
-    if (current === RESULTS.BLOCKED || current === RESULTS.UNAVAILABLE) {
-      return normalizePermission(current);
+    if (Platform.OS === 'ios') {
+      return nativeAudioRecorder.requestPermission();
     }
-    return normalizePermission(await request(permission));
+    if (Platform.OS !== 'android') return 'unavailable';
+
+    const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
+    if (await PermissionsAndroid.check(permission)) return 'granted';
+    const result = await PermissionsAndroid.request(permission);
+    if (result === PermissionsAndroid.RESULTS.GRANTED) return 'granted';
+    if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) return 'blocked';
+    return 'denied';
   }
 
-  openPermissionSettings() {
-    return openSettings('application');
+  async openPermissionSettings() {
+    await Linking.openSettings();
   }
 
   async start(recordingId: string) {
