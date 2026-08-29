@@ -422,9 +422,9 @@ export const parseRemoteThread = (value: unknown): RemoteThread => {
   };
 };
 
-const parseRemoteMessagePart = (value: unknown): RemoteMessagePart => {
+const parseRemoteMessagePart = (value: unknown): RemoteMessagePart | null => {
   if (!isRecord(value) || typeof value.type !== 'string') {
-    throw new Error('Message part must have a type');
+    return null;
   }
 
   if (value.type === 'text') {
@@ -456,7 +456,7 @@ const parseRemoteMessagePart = (value: unknown): RemoteMessagePart => {
     };
   }
 
-  throw new Error(`Unsupported message part type: ${value.type}`);
+  return null;
 };
 
 export const parseRemoteMessage = (value: unknown): RemoteMessage => {
@@ -468,12 +468,18 @@ export const parseRemoteMessage = (value: unknown): RemoteMessage => {
     throw new Error(`Unsupported message role: ${role}`);
   }
 
+  const parts = Array.isArray(value.parts)
+    ? value.parts
+        .map(parseRemoteMessagePart)
+        .filter((part): part is RemoteMessagePart => part !== null)
+    : [];
+
   return {
     id: requiredString(value, 'id', 'message'),
     threadId: requiredString(value, 'threadId', 'message'),
     role,
     content: typeof value.content === 'string' ? value.content : '',
-    parts: Array.isArray(value.parts) ? value.parts.map(parseRemoteMessagePart) : [],
+    parts,
     ...(isRecord(value.metadata) ? { metadata: value.metadata } : {}),
     createdAt: requiredString(value, 'createdAt', 'message'),
   };
