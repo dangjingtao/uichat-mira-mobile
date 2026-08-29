@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   FlatList,
@@ -36,7 +37,14 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
 import { AssistantMarkdown } from '../components/AssistantMarkdown';
 import { ConversationMenu } from '../components/ConversationMenu';
+import { FindInChatBar } from '../components/FindInChatBar';
 import { MessageAttachments } from '../components/MessageAttachments';
+import { shareConversation } from '../chat/shareConversation';
+import {
+  clampMatchIndex,
+  findMatchesInChat,
+  stepMatchIndex,
+} from '../chat/findInChat';
 import {
   getChatHistoryErrorMessage,
   readCanonicalSessionTitle,
@@ -217,6 +225,69 @@ export function ChatScreen() {
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const menuButtonRef = useRef<View>(null);
   const abortRef = useRef(false);
+  const [isFindVisible, setIsFindVisible] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [debouncedFindQuery, setDebouncedFindQuery] = useState('');
+  const [findMatchIndex, setFindMatchIndex] = useState(0);
+
+  useEffect(() => {
+    // Debounce so each keystroke does not re-scan a long loaded history on the
+    // main thread.
+    const timer = setTimeout(() => {
+      setDebouncedFindQuery(findQuery);
+      setFindMatchIndex(0);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [findQuery]);
+
+  const findMatches = useMemo(
+    () => (isFindVisible ? findMatchesInChat(messages, debouncedFindQuery) : []),
+    [isFindVisible, messages, debouncedFindQuery],
+  );
+
+  const currentFindIndex = clampMatchIndex(findMatchIndex, findMatches.length);
+  const currentFindMatch = findMatches[currentFindIndex];
+
+  useEffect(() => {
+    if (!isFindVisible || !currentFindMatch) return;
+    flatListRef.current?.scrollToIndex({
+      index: currentFindMatch.messageIndex,
+      viewPosition: 0.4,
+      animated: true,
+    });
+  }, [isFindVisible, currentFindMatch]);
+
+  const openFindInChat = useCallback(() => {
+    setFindQuery('');
+    setDebouncedFindQuery('');
+    setFindMatchIndex(0);
+    setIsFindVisible(true);
+  }, []);
+
+  const closeFindInChat = useCallback(() => {
+    // Local UI state only; Host Thread, read state and messages stay untouched.
+    setIsFindVisible(false);
+    setFindQuery('');
+    setDebouncedFindQuery('');
+    setFindMatchIndex(0);
+  }, []);
+
+  const stepFindMatch = useCallback(
+    (delta: 1 | -1) => {
+      setFindMatchIndex((prev) =>
+        stepMatchIndex(clampMatchIndex(prev, findMatches.length), delta, findMatches.length),
+      );
+    },
+    [findMatches.length],
+  );
+
+  const handleShare = useCallback(() => {
+    shareConversation(sessionTitle, messages).catch((error: unknown) => {
+      const detail =
+        error instanceof Error && error.message ? `: ${error.message}` : '';
+      Alert.alert('分享失败', `无法调起系统分享${detail}`);
+    });
+  }, [messages, sessionTitle]);
 
   const refreshSessionTitle = useCallback(async () => {
     const canonicalTitle = await readCanonicalSessionTitle(
@@ -494,12 +565,14 @@ export function ChatScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="分享会话，暂不可用"
-            accessibilityState={{ disabled: true }}
-            disabled
-            style={styles.groupButtonDisabled}
+            accessibilityLabel="分享会话"
+            onPress={handleShare}
+            style={({ pressed }) => [
+              styles.groupButton,
+              pressed && { backgroundColor: colors.bg.soft },
+            ]}
           >
-            <Share2 size={19} color={colors.text.soft} strokeWidth={2} />
+            <Share2 size={19} color={colors.text.ink} strokeWidth={2} />
           </Pressable>
           <View
             style={[
@@ -528,7 +601,21 @@ export function ChatScreen() {
         title={sessionTitle}
         anchor={menuAnchor}
         onClose={() => setIsMenuVisible(false)}
+        onShare={handleShare}
+        onFindInChat={openFindInChat}
       />
+
+      {isFindVisible ? (
+        <FindInChatBar
+          query={findQuery}
+          onQueryChange={setFindQuery}
+          currentIndex={currentFindIndex}
+          total={findMatches.length}
+          onPrevious={() => stepFindMatch(-1)}
+          onNext={() => stepFindMatch(1)}
+          onClose={closeFindInChat}
+        />
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.container}
@@ -542,6 +629,17 @@ export function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={scrollToBottom}
+          onScrollToIndexFailed={({ index }) => {
+            // Rows above the viewport may not be measured yet; retry once after
+            // the list has laid out more content.
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({
+                index,
+                viewPosition: 0.4,
+                animated: true,
+              });
+            }, 250);
+          }}
           ListEmptyComponent={
             isLoadingHistory ? (
               <MessageHistorySkeleton colors={colors} />
@@ -693,13 +791,6 @@ const styles = StyleSheet.create({
     height: sizing.buttonHeight,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  groupButtonDisabled: {
-    flex: 1,
-    height: sizing.buttonHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.55,
   },
   groupDivider: { width: StyleSheet.hairlineWidth, height: 20 },
   headerTitle: {

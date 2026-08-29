@@ -30,10 +30,10 @@ interface ConversationMenuItem {
 }
 
 const menuItems: ConversationMenuItem[] = [
-  { id: 'share', label: '分享', icon: Share2 },
+  { id: 'share', label: '分享', icon: Share2, enabled: true },
   { id: 'project', label: '添加到项目', icon: FolderPlus, hasChevron: true },
   { id: 'files', label: '已上传文件', icon: Paperclip },
-  { id: 'search', label: '在聊天中查找', icon: Search },
+  { id: 'search', label: '在聊天中查找', icon: Search, enabled: true },
   { id: 'home', label: '添加到首页', icon: House },
   { id: 'archive', label: '归档', icon: Archive },
   {
@@ -53,6 +53,8 @@ interface ConversationMenuProps {
     right: number;
   };
   onClose: () => void;
+  onShare: () => void;
+  onFindInChat: () => void;
 }
 
 export function ConversationMenu({
@@ -60,8 +62,19 @@ export function ConversationMenu({
   title,
   anchor,
   onClose,
+  onShare,
+  onFindInChat,
 }: ConversationMenuProps) {
   const { colors } = useTheme();
+
+  const handleItemPress = (itemId: string) => {
+    onClose();
+    if (itemId === 'share') {
+      onShare();
+    } else if (itemId === 'search') {
+      onFindInChat();
+    }
+  };
 
   return (
     <Modal
@@ -110,6 +123,7 @@ export function ConversationMenu({
                 }
                 accessibilityState={{ disabled }}
                 disabled={disabled}
+                onPress={() => handleItemPress(item.id)}
                 style={({ pressed }) => [
                   styles.item,
                   item.addTopSpacing && styles.itemWithTopSpacing,
