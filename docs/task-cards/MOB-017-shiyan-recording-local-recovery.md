@@ -1,6 +1,6 @@
 # MOB-017：拾言录音与本地恢复
 
-状态：待实施
+状态：施工中（Draft PR #56）
 
 负责人：`mob_017_shiyan_recording_local_recovery`
 

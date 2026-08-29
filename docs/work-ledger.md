@@ -16,7 +16,7 @@
 - MOB-014 已进入施工，Draft PR #59 基于 MOB-013 合入后的最新 `dev`：已先完成安全分享文本与当前 Thread 查找 helper / 单测；Share Sheet、菜单/顶部同源入口、find UI 与消息定位仍在施工，当前 CI 运行中。
 - MOB-015 已随 Mobile PR #54 合入 `dev`，当前为有条件完成；仅保留 Android / iOS 真机设置持久化、system 主题切换与断开 / 重配对人工验收。
 - MOB-016 已随 Mobile PR #55 合入 `dev`，当前为有条件完成；最新 Review 无阻塞 finding，自动化门禁已通过，剩余真机 / UI 人工验收不重新阻塞拾言后续施工。
-- MOB-017 已进入施工，Draft PR #56 当前已有 `RecordingAdapter` / 本地草稿存储合同且 Mobile CI 通过；原生录音实现、麦克风权限、私有文件落盘与恢复 UI / 测试仍待完成。40 分钟真实录音属于最终人工验收而非施工前置。
+- MOB-017 已进入施工，Draft PR #56 已完成代码施工：`RecordingAdapter` 可替换边界、Android `MediaRecorder` / iOS `AVAudioRecorder` 原生录音、Android `RECORD_AUDIO` 与 iOS `NSMicrophoneUsageDescription` 麦克风权限、App 私有目录落盘、重启后本地草稿恢复 UI 与单测均已落地。iOS `MiraAudioRecorder.mm` 的 Objective-C++ switch 内 block 强捕获导致 `cannot jump from switch statement to this case label` 编译失败已修复（改为 if-chain），Mobile CI 已全绿（typecheck / lint / Jest、Android debug、iOS simulator、iOS unsigned device）。40 分钟真实录音属于最终人工验收而非施工前置。
 - MOB-018 已随 `mira-shiyan-cloud` PR #1 合入 Cloud `main`，当前为有条件完成；Review 阻塞已修复并关闭，Cloud CI 已通过。真实 D1 / R2 / Workflow 资源、Secret 与部署联调继续挂账，不阻塞 MOB-019 施工。
 - MOB-019 已进入施工，Cloud Draft PR #2 当前已冻结 `SttProvider`、Transcript persistence 与 3 天 AudioAsset retention schema，Cloud CI 通过；真实 Provider 接入、Workflow STT Stage / retry、Transcript API 与 cleanup 验证仍待完成，因此 MOB-020 尚未解锁。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威 Thread、Workspace、Role、Agent Run、Message Part 与 Artifact 数据，不猜测远端字段或状态。
@@ -46,7 +46,7 @@
 | MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **施工中**：Draft PR #59；安全分享/查找 helper 与单测已完成，Share Sheet + find UI / 定位仍在施工 | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
 | MOB-015 | 设备设置与连接收口 | Theme / Accent 持久化、system 主题响应、真实断开 Host | **有条件完成**：Mobile PR #54 已合入；剩余真机持久化 / system 切换 / 断开重配对验收 | `mob_015_device_settings_connection` | 无新增 Host 依赖 |
 | MOB-016 | 拾言插件入口与任务壳 | Mobile；插件入口、场景、历史任务 UI 壳 | **有条件完成**：Mobile PR #55 已合入 `dev`；Review 无阻塞 finding，自动化门禁通过；真机 / UI 验收挂账 | `mob_016_shiyan_plugin_shell` | Shiyan PRD / Technical Design |
-| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **施工中**：Draft PR #56；Adapter / draft-store 合同与 CI 已有，native recording / permission / recovery UI 仍待完成 | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
+| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **施工中**：Draft PR #56；Adapter / 原生录音 / 两端权限 / 私有目录落盘 / 恢复 UI / 单测已完成，iOS ObjC++ 编译错误已修复且 Mobile CI 全绿；真机 40 分钟录音与短录音重启恢复挂人工验收 | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
 | MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | `mira-shiyan-cloud`；`shiyan-api` / `shiyan-llm` 壳、D1/R2/Workflow、设备身份、直传 | **有条件完成**：Cloud PR #1 已合入 `main`；Review 阻塞已修复，CI 全绿；真实资源 / Secret / 部署联调挂账 | `mob_018_shiyan_cloud_foundation` | Shiyan canonical truth |
 | MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | `mira-shiyan-cloud`；STT Provider、Transcript、3 天录音保留 | **施工中**：Cloud Draft PR #2；Provider contract / Transcript schema / retention schema 与 CI 已有，Workflow / Provider / API / cleanup 仍待完成 | `mob_019_shiyan_stt_transcript` | MOB-018 已 Gate |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | `mira-shiyan-cloud`；私有 LLM Gateway、场景整理、JSON + Markdown Draft | **待实施** | `mob_020_shiyan_llm_organization` | MOB-018, MOB-019 |
