@@ -25,14 +25,84 @@ export interface ShiyanGithubDeliveryResult {
 const requestId = () =>
   `mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isNullableString = (value: unknown): value is string | null =>
+  value === null || typeof value === 'string';
+
+const isDeliveryView = (value: unknown): value is ShiyanDeliveryView => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.taskId === 'string' &&
+    typeof value.finalDraftId === 'string' &&
+    value.destination === 'github' &&
+    (value.status === 'pending' || value.status === 'succeeded' || value.status === 'failed') &&
+    typeof value.retryable === 'boolean' &&
+    typeof value.retryCount === 'number' &&
+    isNullableString(value.repository) &&
+    isNullableString(value.path) &&
+    isNullableString(value.commitSha) &&
+    isNullableString(value.fileUrl) &&
+    isNullableString(value.errorCode) &&
+    isNullableString(value.errorMessage) &&
+    isNullableString(value.deliveredAt) &&
+    typeof value.createdAt === 'string' &&
+    typeof value.updatedAt === 'string'
+  );
+};
+
+const parseGithubDeliveryResult = (
+  value: unknown,
+  taskId: string,
+  finalDraftId: string,
+): ShiyanGithubDeliveryResult | null => {
+  if (!isRecord(value) || value.taskId !== taskId || !isDeliveryView(value.record)) {
+    return null;
+  }
+  const delivery = value.delivery;
+  if (!isRecord(delivery)) return null;
+  if (
+    value.record.taskId !== taskId ||
+    value.record.finalDraftId !== finalDraftId ||
+    value.record.status !== 'succeeded' ||
+    delivery.destination !== 'github' ||
+    typeof delivery.repository !== 'string' ||
+    typeof delivery.path !== 'string' ||
+    typeof delivery.commitSha !== 'string' ||
+    typeof delivery.fileUrl !== 'string' ||
+    typeof delivery.deliveredAt !== 'string' ||
+    !delivery.repository ||
+    !delivery.path ||
+    !delivery.commitSha ||
+    !delivery.fileUrl ||
+    !delivery.deliveredAt
+  ) {
+    return null;
+  }
+  return {
+    taskId,
+    record: value.record,
+    delivery: {
+      destination: 'github',
+      repository: delivery.repository,
+      path: delivery.path,
+      commitSha: delivery.commitSha,
+      fileUrl: delivery.fileUrl,
+      deliveredAt: delivery.deliveredAt,
+    },
+  };
+};
+
 export const githubDeliveryIdempotencyKey = (
   taskId: string,
-  finalDraft: Pick<ShiyanFinalDraftView, 'confirmedAt'>,
-): string => `mobile-github:${taskId}:${finalDraft.confirmedAt}`;
+  finalDraft: Pick<ShiyanFinalDraftView, 'id' | 'confirmedAt'>,
+): string => `mobile-github:${taskId}:${finalDraft.id}:${finalDraft.confirmedAt}`;
 
 export async function deliverFinalDraftToGithub(
   taskId: string,
-  finalDraft: Pick<ShiyanFinalDraftView, 'confirmedAt'>,
+  finalDraft: Pick<ShiyanFinalDraftView, 'id' | 'confirmedAt'>,
 ): Promise<ShiyanGithubDeliveryResult> {
   const config = await loadShiyanRuntimeConfig();
   if (!config) {
@@ -83,8 +153,8 @@ export async function deliverFinalDraftToGithub(
     );
   }
 
-  const envelope = parseShiyanApiEnvelope<ShiyanGithubDeliveryResult>(raw) as
-    | ShiyanApiEnvelope<ShiyanGithubDeliveryResult>
+  const envelope = parseShiyanApiEnvelope<unknown>(raw) as
+    | ShiyanApiEnvelope<unknown>
     | null;
   if (!envelope) {
     throw new ShiyanClientError(
@@ -102,5 +172,15 @@ export async function deliverFinalDraftToGithub(
       envelope.taskId,
     );
   }
-  return envelope.data;
+
+  const result = parseGithubDeliveryResult(envelope.data, taskId, finalDraft.id);
+  if (!result) {
+    throw new ShiyanClientError(
+      '拾言 Cloud 返回的 GitHub 投递证据不完整或不属于当前 Final Draft。',
+      'invalid_response',
+      true,
+      taskId,
+    );
+  }
+  return result;
 }
