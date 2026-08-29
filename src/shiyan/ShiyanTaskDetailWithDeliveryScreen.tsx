@@ -21,27 +21,15 @@ import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
 import type { ShiyanDeliveryView, ShiyanFinalDraftView } from './client/contracts';
 import {
   deliverFinalDraftToGithub,
-  githubDeliveryIdempotencyKey,
+  deliveryBelongsToFinalDraft,
 } from './client/delivery';
 
 type DetailRoute = RouteProp<RootStackParamList, 'ShiyanTaskDetail'>;
-type DeliveryWithIdentity = ShiyanDeliveryView & { idempotencyKey?: unknown };
 
 const EMPTY_EDITOR_STATE: ShiyanFinalEditorState = {
   open: false,
   dirty: false,
   saving: false,
-};
-
-const belongsToFinalDraft = (
-  delivery: ShiyanDeliveryView,
-  finalDraft: ShiyanFinalDraftView,
-): boolean => {
-  const idempotencyKey = (delivery as DeliveryWithIdentity).idempotencyKey;
-  return (
-    delivery.finalDraftId === finalDraft.id &&
-    idempotencyKey === githubDeliveryIdempotencyKey(finalDraft.taskId, finalDraft)
-  );
 };
 
 export function ShiyanTaskDetailWithDeliveryScreen() {
@@ -73,7 +61,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     try {
       const result = await shiyanClient.getDeliveries(taskId);
       const matching = result.deliveries.filter((item) =>
-        nextFinalDraft ? belongsToFinalDraft(item, nextFinalDraft) : false,
+        nextFinalDraft ? deliveryBelongsToFinalDraft(item, nextFinalDraft) : false,
       );
       const succeeded = matching.find(
         (item) => item.status === 'succeeded' && Boolean(item.fileUrl),
@@ -138,7 +126,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   const currentSucceeded = Boolean(
     finalDraft &&
       delivery &&
-      belongsToFinalDraft(delivery, finalDraft) &&
+      deliveryBelongsToFinalDraft(delivery, finalDraft) &&
       delivery.status === 'succeeded' &&
       delivery.fileUrl,
   );
