@@ -25,7 +25,13 @@ import {
 } from '../update/appUpdate';
 import { parseSemver } from '../update/semver';
 
-type UpdateCheckStatus = 'idle' | 'checking' | 'available' | 'current' | 'failed';
+type UpdateCheckStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'current'
+  | 'unavailable'
+  | 'failed';
 
 const channelLabel = releaseChannel === 'prod' ? '正式' : '开发';
 
@@ -52,9 +58,15 @@ export function AboutScreen() {
     try {
       const latest = await fetchLatestRelease(releaseChannel, fetch);
       setLatestRelease(latest);
-      setUpdateStatus(
-        isUpdateAvailable(parseSemver(version)!, latest) ? 'available' : 'current',
-      );
+      // "No published release on this channel" is not proof of being current;
+      // keep it distinct so the UI never claims an unverified "已是最新".
+      if (!latest) {
+        setUpdateStatus('unavailable');
+      } else {
+        setUpdateStatus(
+          isUpdateAvailable(parseSemver(version)!, latest) ? 'available' : 'current',
+        );
+      }
     } catch (error) {
       // A failed check must stay a retryable error; never "已是最新".
       setLatestRelease(null);
@@ -73,11 +85,19 @@ export function AboutScreen() {
 
   const openDownload = (latest: AppRelease) => {
     // Android hands the signed Release APK to the system/browser downloader.
-    // iOS has no installable signed artifact, so it opens the release page.
+    // Falling back to the GitHub release page on Android would break the
+    // signed-APK download contract, so a missing APK asset is an explicit
+    // dead end there. iOS has no installable signed artifact and always
+    // opens the release page.
+    if (Platform.OS === 'android' && !latest.apkUrl) {
+      Alert.alert(
+        '该版本未提供安装包',
+        `最新版本 ${latest.tag} 没有附带签名 APK，请等待发布流程补齐后再试。`,
+      );
+      return;
+    }
     const targetUrl =
-      Platform.OS === 'android' && latest.apkUrl
-        ? latest.apkUrl
-        : latest.releaseUrl;
+      Platform.OS === 'android' && latest.apkUrl ? latest.apkUrl : latest.releaseUrl;
     if (!targetUrl) {
       Alert.alert('无法下载', '该版本没有提供可用的下载地址。');
       return;
@@ -117,6 +137,16 @@ export function AboutScreen() {
           { text: '重试', onPress: () => void checkForUpdate() },
         ]);
         return;
+      case 'unavailable':
+        Alert.alert(
+          '暂无发布信息',
+          `当前渠道（${channelLabel}）还没有可查询的发布版本，无法确认是否最新。`,
+          [
+            { text: '取消', style: 'cancel' },
+            { text: '重试', onPress: () => void checkForUpdate() },
+          ],
+        );
+        return;
       default:
         Alert.alert(
           '版本信息',
@@ -145,6 +175,8 @@ export function AboutScreen() {
         return `${version} · 有新版本 ${latestRelease?.tag ?? ''}`;
       case 'current':
         return `${version} · 已是最新`;
+      case 'unavailable':
+        return `${version} · 暂无发布信息`;
       case 'failed':
         return `${version} · 检查更新失败，点击重试`;
       default:

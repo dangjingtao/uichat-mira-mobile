@@ -20,6 +20,7 @@ interface GithubReleaseAsset {
 interface GithubReleasePayload {
   tag_name?: unknown;
   draft?: unknown;
+  prerelease?: unknown;
   body?: unknown;
   html_url?: unknown;
   assets?: unknown;
@@ -68,6 +69,11 @@ export const selectLatestRelease = (
   let latest: AppRelease | null = null;
   for (const release of releases) {
     if (release.draft === true) continue;
+    // Tag format alone is not trustworthy channel isolation: a mislabeled
+    // release could otherwise leak across channels. Dev releases must be
+    // flagged as prereleases, prod releases must not be.
+    if (channel === 'dev' && release.prerelease !== true) continue;
+    if (channel === 'prod' && release.prerelease === true) continue;
     if (typeof release.tag_name !== 'string' || release.tag_name.length === 0) {
       continue;
     }

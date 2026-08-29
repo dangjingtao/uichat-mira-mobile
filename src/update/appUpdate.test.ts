@@ -17,8 +17,8 @@ const release = (overrides: Partial<AppRelease> & { tag: string }): AppRelease =
 describe('selectLatestRelease', () => {
   it('keeps dev channel away from prod releases', () => {
     const latest = selectLatestRelease('dev', [
-      { tag_name: 'v0.3.0', draft: false },
-      { tag_name: 'v0.2.9-dev', draft: false },
+      { tag_name: 'v0.3.0', draft: false, prerelease: false },
+      { tag_name: 'v0.2.9-dev', draft: false, prerelease: true },
     ]);
 
     expect(latest?.tag).toBe('v0.2.9-dev');
@@ -26,18 +26,34 @@ describe('selectLatestRelease', () => {
 
   it('keeps prod channel away from dev prereleases', () => {
     const latest = selectLatestRelease('prod', [
-      { tag_name: 'v0.3.0-dev', draft: false },
-      { tag_name: 'v0.2.8', draft: false },
+      { tag_name: 'v0.3.0-dev', draft: false, prerelease: true },
+      { tag_name: 'v0.2.8', draft: false, prerelease: false },
     ]);
 
     expect(latest?.tag).toBe('v0.2.8');
   });
 
+  it('rejects a dev-tagged release that is not flagged as a prerelease', () => {
+    const latest = selectLatestRelease('dev', [
+      { tag_name: 'v0.2.9-dev', draft: false, prerelease: false },
+    ]);
+
+    expect(latest).toBeNull();
+  });
+
+  it('rejects a stable-tagged release that is flagged as a prerelease', () => {
+    const latest = selectLatestRelease('prod', [
+      { tag_name: 'v0.2.8', draft: false, prerelease: true },
+    ]);
+
+    expect(latest).toBeNull();
+  });
+
   it('picks the highest version within the channel', () => {
     const latest = selectLatestRelease('dev', [
-      { tag_name: 'v0.2.9-dev', draft: false },
-      { tag_name: 'v0.2.10-dev', draft: false },
-      { tag_name: 'v0.2.2-dev', draft: false },
+      { tag_name: 'v0.2.9-dev', draft: false, prerelease: true },
+      { tag_name: 'v0.2.10-dev', draft: false, prerelease: true },
+      { tag_name: 'v0.2.2-dev', draft: false, prerelease: true },
     ]);
 
     expect(latest?.tag).toBe('v0.2.10-dev');
@@ -45,10 +61,10 @@ describe('selectLatestRelease', () => {
 
   it('ignores drafts and invalid tags', () => {
     const latest = selectLatestRelease('dev', [
-      { tag_name: 'v0.9.9-dev', draft: true },
-      { tag_name: 'not-a-version', draft: false },
-      { tag_name: 'v0.2.9-dev2', draft: false },
-      { tag_name: 'v0.2.9', draft: false },
+      { tag_name: 'v0.9.9-dev', draft: true, prerelease: true },
+      { tag_name: 'not-a-version', draft: false, prerelease: true },
+      { tag_name: 'v0.2.9-dev2', draft: false, prerelease: true },
+      { tag_name: 'v0.2.9', draft: false, prerelease: false },
     ]);
 
     expect(latest).toBeNull();
@@ -59,6 +75,7 @@ describe('selectLatestRelease', () => {
       {
         tag_name: 'v0.2.8',
         draft: false,
+        prerelease: false,
         assets: [
           { name: 'SHA256SUMS.txt', browser_download_url: 'https://example.com/sums' },
           {
@@ -77,6 +94,7 @@ describe('selectLatestRelease', () => {
       {
         tag_name: 'v0.2.8',
         draft: false,
+        prerelease: false,
         assets: [{ name: 'SHA256SUMS.txt', browser_download_url: 'https://example.com/sums' }],
       },
     ]);
@@ -106,6 +124,10 @@ describe('isUpdateAvailable', () => {
       isUpdateAvailable(parseSemver('0.3.0')!, release({ tag: 'v0.2.9-dev' })),
     ).toBe(false);
   });
+
+  it('treats an absent release as not-current-but-unknown', () => {
+    expect(isUpdateAvailable(parseSemver('0.2.9')!, null)).toBe(false);
+  });
 });
 
 describe('fetchLatestRelease', () => {
@@ -115,8 +137,8 @@ describe('fetchLatestRelease', () => {
   it('returns the latest release for the channel', async () => {
     const result = await fetchLatestRelease('dev', async () =>
       jsonResponse([
-        { tag_name: 'v0.2.8-dev', draft: false },
-        { tag_name: 'v0.2.9-dev', draft: false },
+        { tag_name: 'v0.2.8-dev', draft: false, prerelease: true },
+        { tag_name: 'v0.2.9-dev', draft: false, prerelease: true },
       ]),
     );
 
@@ -141,7 +163,7 @@ describe('fetchLatestRelease', () => {
 
   it('returns null when the channel has no published releases', async () => {
     const result = await fetchLatestRelease('dev', async () =>
-      jsonResponse([{ tag_name: 'v0.2.8', draft: false }]),
+      jsonResponse([{ tag_name: 'v0.2.8', draft: false, prerelease: false }]),
     );
 
     expect(result).toBeNull();
