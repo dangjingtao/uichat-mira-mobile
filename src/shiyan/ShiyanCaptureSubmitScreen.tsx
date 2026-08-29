@@ -32,7 +32,9 @@ import {
 } from './recording/localCaptureRepository';
 import {
   SHIYAN_BUILT_IN_SCENES,
+  canonicalShiyanSceneId,
   getCustomSceneDraft,
+  toShiyanSceneSnapshot,
   type ShiyanSceneDefinition,
 } from './scenes';
 import { submitLocalCapture, type SubmitCaptureProgress } from './submitCapture';
@@ -52,6 +54,7 @@ const formatSize = (bytes: number) =>
 const progressLabel = (progress: SubmitCaptureProgress | null) => {
   if (!progress) return '提交并开始处理';
   if (progress.phase === 'creating_task') return '正在创建任务…';
+  if (progress.phase === 'registering_scene') return '正在同步场景…';
   if (progress.phase === 'confirming') return '正在确认录音…';
   return `正在上传 ${Math.round((progress.uploadFraction ?? 0) * 100)}%`;
 };
@@ -74,7 +77,7 @@ export function ShiyanCaptureSubmitScreen() {
         if (!active || !next) return;
         setCapture(next);
         setTitle(next.title);
-        setSceneId(next.sceneId);
+        setSceneId(canonicalShiyanSceneId(next.sceneSnapshot?.id ?? next.sceneId));
       });
       return () => {
         active = false;
@@ -86,11 +89,25 @@ export function ShiyanCaptureSubmitScreen() {
     const custom = getCustomSceneDraft();
     const base: ShiyanSceneDefinition[] = [...SHIYAN_BUILT_IN_SCENES];
     if (custom) base.push(custom);
-    if (capture && !base.some((scene) => scene.id === capture.sceneId)) {
+
+    if (capture?.sceneSnapshot && !base.some((scene) => scene.id === capture.sceneSnapshot?.id)) {
       base.push({
-        id: capture.sceneId as ShiyanSceneDefinition['id'],
+        id: capture.sceneSnapshot.id,
+        name: capture.sceneSnapshot.name,
+        description: '录音时冻结的自定义场景规则。',
+        organizationRequirement: capture.sceneSnapshot.instruction,
+        outputStructure: capture.sceneSnapshot.sections.map((section) => section.title),
+        builtIn: capture.sceneSnapshot.builtIn,
+      });
+    } else if (
+      capture &&
+      !base.some((scene) => scene.id === canonicalShiyanSceneId(capture.sceneId)) &&
+      !capture.sceneSnapshot
+    ) {
+      base.push({
+        id: capture.sceneId,
         name: capture.sceneName,
-        description: '录音时使用的场景。',
+        description: '旧版录音中的场景；提交前需要重新选择或重新配置场景。',
         organizationRequirement: '',
         outputStructure: [],
         builtIn: false,
@@ -101,13 +118,18 @@ export function ShiyanCaptureSubmitScreen() {
 
   const confirmLocally = async () => {
     if (!capture) return null;
-    const scene = scenes.find((item) => item.id === sceneId);
+    const scene = scenes.find((item) => canonicalShiyanSceneId(item.id) === canonicalShiyanSceneId(sceneId));
     if (!scene) throw new Error('请选择场景。');
+    if (!scene.builtIn && (!scene.organizationRequirement.trim() || scene.outputStructure.length === 0)) {
+      throw new Error('这条旧录音缺少自定义场景规则，请重新配置并选择一个自定义场景后再提交。');
+    }
+    const snapshot = toShiyanSceneSnapshot(scene);
     return localCaptureRepository.confirm({
       id: capture.id,
       title,
-      sceneId: scene.id,
-      sceneName: scene.name,
+      sceneId: snapshot.id,
+      sceneName: snapshot.name,
+      sceneSnapshot: snapshot,
     });
   };
 
@@ -120,10 +142,7 @@ export function ShiyanCaptureSubmitScreen() {
       if (!confirmed) return;
       setCapture(confirmed);
       const taskId = await submitLocalCapture(confirmed, { onProgress: setProgress });
-      navigation.replace('ShiyanTaskDetail', {
-        taskId,
-        localCaptureId: confirmed.id,
-      });
+      navigation.replace('ShiyanTaskDetail', { taskId, localCaptureId: confirmed.id });
     } catch (error) {
       setProgress(null);
       setErrorText(
@@ -170,13 +189,7 @@ export function ShiyanCaptureSubmitScreen() {
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text.ink }]}>确认并提交</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="配置拾言 Cloud"
-          disabled={busy}
-          onPress={() => navigation.navigate('ShiyanCloudConfig')}
-          style={styles.headerButton}
-        >
+        <Pressable accessibilityRole="button" accessibilityLabel="配置拾言 Cloud" disabled={busy} onPress={() => navigation.navigate('ShiyanCloudConfig')} style={styles.headerButton}>
           <Settings2 size={19} color={colors.text.ink} />
         </Pressable>
       </View>
@@ -192,41 +205,19 @@ export function ShiyanCaptureSubmitScreen() {
             <FileAudio size={20} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.summaryTitle, { color: colors.text.ink }]}>录音已安全保存在手机</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>
-                {formatDuration(capture.durationMs)} · {formatSize(capture.fileSizeBytes)}
-              </Text>
+              <Text style={[styles.muted, { color: colors.text.soft }]}>{formatDuration(capture.durationMs)} · {formatSize(capture.fileSizeBytes)}</Text>
             </View>
           </View>
 
           <Text style={[styles.label, { color: colors.text.base }]}>标题</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            editable={!busy}
-            placeholder="例如：8 月 29 日产品评审"
-            placeholderTextColor={colors.text.soft}
-            style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]}
-          />
+          <TextInput value={title} onChangeText={setTitle} editable={!busy} placeholder="例如：8 月 29 日产品评审" placeholderTextColor={colors.text.soft} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
 
           <Text style={[styles.label, { color: colors.text.base }]}>场景</Text>
           <View style={styles.sceneList}>
             {scenes.map((scene) => {
-              const selected = scene.id === sceneId;
+              const selected = canonicalShiyanSceneId(scene.id) === canonicalShiyanSceneId(sceneId);
               return (
-                <Pressable
-                  key={scene.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected, disabled: busy }}
-                  disabled={busy}
-                  onPress={() => setSceneId(scene.id)}
-                  style={({ pressed }) => [
-                    styles.sceneButton,
-                    {
-                      borderColor: selected ? colors.primary : colors.border.default,
-                      backgroundColor: pressed || selected ? colors.bg.soft : colors.bg.card,
-                    },
-                  ]}
-                >
+                <Pressable key={scene.id} accessibilityRole="button" accessibilityState={{ selected, disabled: busy }} disabled={busy} onPress={() => setSceneId(scene.id)} style={({ pressed }) => [styles.sceneButton, { borderColor: selected ? colors.primary : colors.border.default, backgroundColor: pressed || selected ? colors.bg.soft : colors.bg.card }]}>
                   <Text style={{ color: colors.text.ink, fontWeight: '600' }}>{scene.name}</Text>
                 </Pressable>
               );
@@ -241,22 +232,12 @@ export function ShiyanCaptureSubmitScreen() {
             </View>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => void submit()}
-            style={({ pressed }) => [styles.primaryButton, { backgroundColor: busy ? colors.primaryDisabled : pressed ? colors.primaryActive : colors.primary }]}
-          >
+          <Pressable accessibilityRole="button" disabled={busy} onPress={() => void submit()} style={({ pressed }) => [styles.primaryButton, { backgroundColor: busy ? colors.primaryDisabled : pressed ? colors.primaryActive : colors.primary }]}>
             <CloudUpload size={19} color={colors.onPrimary} />
             <Text style={[styles.primaryText, { color: colors.onPrimary }]}>{progressLabel(progress)}</Text>
           </Pressable>
 
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => void saveForLater()}
-            style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}
-          >
+          <Pressable accessibilityRole="button" disabled={busy} onPress={() => void saveForLater()} style={({ pressed }) => [styles.outlineButton, { borderColor: colors.border.default, backgroundColor: pressed ? colors.bg.soft : colors.bg.card }]}>
             <Text style={{ color: colors.primary, fontWeight: '600' }}>先保存在本机，稍后提交</Text>
           </Pressable>
 
