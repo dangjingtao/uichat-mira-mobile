@@ -16,7 +16,13 @@ import {
   type RouteProp,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowLeft, CloudUpload, FileAudio, Trash2 } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  CloudUpload,
+  FileAudio,
+  Settings2,
+  Trash2,
+} from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
@@ -164,7 +170,15 @@ export function ShiyanCaptureSubmitScreen() {
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text.ink }]}>确认并提交</Text>
-        <View style={styles.headerButton} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="配置拾言 Cloud"
+          disabled={busy}
+          onPress={() => navigation.navigate('ShiyanCloudConfig')}
+          style={styles.headerButton}
+        >
+          <Settings2 size={19} color={colors.text.ink} />
+        </Pressable>
       </View>
 
       {!capture ? (
@@ -223,7 +237,7 @@ export function ShiyanCaptureSubmitScreen() {
             <View style={[styles.errorBox, { borderColor: colors.status.error, backgroundColor: colors.bg.card }]}>
               <Text style={[styles.errorTitle, { color: colors.status.error }]}>这次提交没有完成</Text>
               <Text style={[styles.muted, { color: colors.text.base }]}>{errorText}</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试。</Text>
+              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试；若提示 Cloud 未配置，可点右上角设置。</Text>
             </View>
           ) : null}
 
