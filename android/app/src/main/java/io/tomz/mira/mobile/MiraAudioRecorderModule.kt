@@ -2,6 +2,7 @@ package io.tomz.mira.mobile
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.SystemClock
@@ -10,6 +11,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.UiThreadUtil
 import java.io.File
 
 class MiraAudioRecorderModule(
@@ -22,6 +24,12 @@ class MiraAudioRecorderModule(
   private var startedAtElapsedMs = 0L
   private var pausedAtElapsedMs: Long? = null
   private var totalPausedMs = 0L
+
+  // Player state is only touched on the UI thread, including the completion
+  // listener, so the MediaPlayer never gets concurrent calls.
+  private var player: MediaPlayer? = null
+  private var playerEnded = false
+  private var playerDurationMs = 0L
 
   override fun getName(): String = MODULE_NAME
 
@@ -204,7 +212,149 @@ class MiraAudioRecorderModule(
     }
   }
 
+  @ReactMethod
+  fun playerLoad(path: String, promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      try {
+        val file = checkedRecordingFile(path)
+        if (!file.exists() || !file.isFile || file.length() <= 0L) {
+          throw IllegalArgumentException("Recording file is not readable")
+        }
+
+        releasePlayer()
+        val nextPlayer = MediaPlayer()
+        nextPlayer.setDataSource(file.absolutePath)
+        nextPlayer.prepare()
+        nextPlayer.setOnCompletionListener { _ ->
+          // Runs on the same UI thread; MediaPlayer is already stopped here.
+          playerEnded = true
+        }
+        player = nextPlayer
+        playerEnded = false
+        playerDurationMs = nextPlayer.duration.toLong().coerceAtLeast(0L)
+        promise.resolve(Arguments.createMap().apply {
+          putDouble("durationMs", playerDurationMs.toDouble())
+        })
+      } catch (error: Exception) {
+        releasePlayer()
+        promise.reject("PLAYER_LOAD_FAILED", "Unable to open the local recording", error)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun playerPlay(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val active = player
+      if (active == null) {
+        promise.reject("NO_LOADED_RECORDING", "There is no loaded recording to play")
+        return@runOnUiThread
+      }
+      try {
+        if (playerEnded) {
+          active.seekTo(0)
+          playerEnded = false
+        }
+        active.start()
+        promise.resolve(null)
+      } catch (error: Exception) {
+        playerEnded = false
+        promise.reject("PLAYER_PLAY_FAILED", "Unable to play the local recording", error)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun playerPause(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val active = player
+      if (active == null) {
+        promise.reject("NO_LOADED_RECORDING", "There is no loaded recording to pause")
+        return@runOnUiThread
+      }
+      try {
+        if (active.isPlaying) {
+          active.pause()
+        }
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.reject("PLAYER_PAUSE_FAILED", "Unable to pause the local recording", error)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun playerSeekTo(positionMs: Double, promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val active = player
+      if (active == null) {
+        promise.reject("NO_LOADED_RECORDING", "There is no loaded recording to seek")
+        return@runOnUiThread
+      }
+      try {
+        val target = positionMs.toLong().coerceIn(0L, playerDurationMs)
+        active.seekTo(target.toInt())
+        if (playerEnded && target < playerDurationMs) {
+          playerEnded = false
+        }
+        promise.resolve(null)
+      } catch (error: Exception) {
+        promise.reject("PLAYER_SEEK_FAILED", "Unable to seek the local recording", error)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun playerGetState(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      val active = player
+      if (active == null) {
+        promise.reject("NO_LOADED_RECORDING", "There is no loaded recording")
+        return@runOnUiThread
+      }
+      val playing = try {
+        active.isPlaying
+      } catch (_: Exception) {
+        false
+      }
+      val positionMs = try {
+        active.currentPosition.toLong()
+      } catch (_: Exception) {
+        0L
+      }
+      promise.resolve(Arguments.createMap().apply {
+        putDouble("positionMs", positionMs.toDouble())
+        putDouble("durationMs", playerDurationMs.toDouble())
+        putBoolean("playing", playing)
+        putBoolean("ended", playerEnded)
+      })
+    }
+  }
+
+  @ReactMethod
+  fun playerRelease(promise: Promise) {
+    UiThreadUtil.runOnUiThread {
+      releasePlayer()
+      promise.resolve(null)
+    }
+  }
+
   private fun recordingsDirectory() = File(reactContext.filesDir, RECORDINGS_DIR)
+
+  private fun releasePlayer() {
+    try {
+      player?.stop()
+    } catch (_: Exception) {
+      // Stopping an uninitialized or finished player is not an error here.
+    }
+    try {
+      player?.release()
+    } catch (_: Exception) {
+    }
+    player = null
+    playerEnded = false
+    playerDurationMs = 0L
+  }
 
   private fun checkedRecordingFile(path: String): File {
     val root = recordingsDirectory().canonicalFile

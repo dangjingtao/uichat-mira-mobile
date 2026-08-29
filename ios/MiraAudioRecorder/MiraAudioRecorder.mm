@@ -1,10 +1,12 @@
 #import <AVFoundation/AVFoundation.h>
 #import <React/RCTBridgeModule.h>
 
-@interface MiraAudioRecorder : NSObject <RCTBridgeModule>
+@interface MiraAudioRecorder : NSObject <RCTBridgeModule, AVAudioPlayerDelegate>
 @property(nonatomic, strong) AVAudioRecorder *recorder;
 @property(nonatomic, strong) NSURL *currentURL;
 @property(nonatomic, assign) NSTimeInterval startedAtMs;
+@property(nonatomic, strong) AVAudioPlayer *player;
+@property(nonatomic, assign) BOOL playerEnded;
 @end
 
 @implementation MiraAudioRecorder
@@ -207,6 +209,131 @@ RCT_EXPORT_METHOD(deleteFile:(NSString *)path
     return;
   }
   resolve(nil);
+}
+
+RCT_EXPORT_METHOD(playerLoad:(NSString *)path
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    NSError *error = nil;
+    NSURL *url = [self checkedRecordingURL:path error:&error];
+    if (url == nil) {
+      reject(@"INVALID_RECORDING_PATH", @"Unable to open the local recording", error);
+      return;
+    }
+    NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:url.path error:nil];
+    NSNumber *size = attributes[NSFileSize];
+    if (attributes == nil || size.longLongValue <= 0) {
+      reject(@"PLAYER_LOAD_FAILED", @"Recording file is not readable", nil);
+      return;
+    }
+
+    [self releasePlayer];
+
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    [session setCategory:AVAudioSessionCategoryPlayback
+                    mode:AVAudioSessionModeDefault
+                 options:0
+                   error:nil];
+    [session setActive:YES error:nil];
+
+    AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
+    if (player == nil) {
+      reject(@"PLAYER_LOAD_FAILED", @"Unable to open the local recording", error);
+      return;
+    }
+    player.delegate = self;
+    self.player = player;
+    self.playerEnded = NO;
+    resolve(@{ @"durationMs": @(MAX(0, player.duration * 1000.0)) });
+  });
+}
+
+RCT_EXPORT_METHOD(playerPlay:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.player == nil) {
+      reject(@"NO_LOADED_RECORDING", @"There is no loaded recording to play", nil);
+      return;
+    }
+    if (self.playerEnded) {
+      self.player.currentTime = 0;
+      self.playerEnded = NO;
+    }
+    if (![self.player play]) {
+      reject(@"PLAYER_PLAY_FAILED", @"Unable to play the local recording", nil);
+      return;
+    }
+    resolve(nil);
+  });
+}
+
+RCT_EXPORT_METHOD(playerPause:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.player == nil) {
+      reject(@"NO_LOADED_RECORDING", @"There is no loaded recording to pause", nil);
+      return;
+    }
+    [self.player pause];
+    resolve(nil);
+  });
+}
+
+RCT_EXPORT_METHOD(playerSeekTo:(double)positionMs
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.player == nil) {
+      reject(@"NO_LOADED_RECORDING", @"There is no loaded recording to seek", nil);
+      return;
+    }
+    NSTimeInterval duration = self.player.duration;
+    NSTimeInterval target = MIN(MAX(positionMs / 1000.0, 0), duration);
+    self.player.currentTime = target;
+    if (self.playerEnded && target < duration) {
+      self.playerEnded = NO;
+    }
+    resolve(nil);
+  });
+}
+
+RCT_EXPORT_METHOD(playerGetState:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (self.player == nil) {
+      reject(@"NO_LOADED_RECORDING", @"There is no loaded recording", nil);
+      return;
+    }
+    resolve(@{
+      @"positionMs": @(MAX(0, self.player.currentTime * 1000.0)),
+      @"durationMs": @(MAX(0, self.player.duration * 1000.0)),
+      @"playing": @(self.player.isPlaying),
+      @"ended": @(self.playerEnded),
+    });
+  });
+}
+
+RCT_EXPORT_METHOD(playerRelease:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self releasePlayer];
+    resolve(nil);
+  });
+}
+
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag {
+  self.playerEnded = YES;
+}
+
+- (void)releasePlayer {
+  [self.player stop];
+  self.player.delegate = nil;
+  self.player = nil;
+  self.playerEnded = NO;
+  [[AVAudioSession sharedInstance] setActive:NO
+                                 withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
+                                       error:nil];
 }
 
 - (NSURL *)recordingsDirectory:(NSError **)error {
