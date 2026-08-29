@@ -13,12 +13,14 @@ import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 interface ConversationSearchBarProps {
   messages: ChatMessage[];
   onFocusMatch: (match: ConversationMatch) => void;
+  onClearFocus: () => void;
   onClose: () => void;
 }
 
 export function ConversationSearchBar({
   messages,
   onFocusMatch,
+  onClearFocus,
   onClose,
 }: ConversationSearchBarProps) {
   const { colors } = useTheme();
@@ -35,9 +37,12 @@ export function ConversationSearchBar({
   }, [matches]);
 
   useEffect(() => {
-    if (activeMatchIndex < 0 || activeMatchIndex >= matches.length) return;
+    if (activeMatchIndex < 0 || activeMatchIndex >= matches.length) {
+      onClearFocus();
+      return;
+    }
     onFocusMatch(matches[activeMatchIndex]);
-  }, [activeMatchIndex, matches, onFocusMatch]);
+  }, [activeMatchIndex, matches, onClearFocus, onFocusMatch]);
 
   const moveMatch = useCallback(
     (direction: 'next' | 'previous') => {
