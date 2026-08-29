@@ -17,8 +17,8 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
 type MediaRequest = { url: string; headers: Record<string, string> };
-
 type AttachmentPart = Extract<RemoteMessagePart, { type: 'image' | 'file' }>;
+type PreviewKind = 'image' | 'text' | null;
 
 const mediaErrorMessage = (error: unknown) => {
   if (error instanceof RemoteHostError) {
@@ -42,17 +42,42 @@ const safeStandaloneUri = (value: string) => {
   return null;
 };
 
-function useMediaRequest(threadId: string, part: AttachmentPart) {
+export const getFilePreviewKind = (mimeType: string): PreviewKind => {
+  const normalized = mimeType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  if (
+    normalized === 'image/png' ||
+    normalized === 'image/jpeg' ||
+    normalized === 'image/gif' ||
+    normalized === 'image/webp'
+  ) {
+    return 'image';
+  }
+  if (
+    normalized === 'text/plain' ||
+    normalized === 'text/markdown' ||
+    normalized === 'text/csv' ||
+    normalized === 'application/json'
+  ) {
+    return 'text';
+  }
+  return null;
+};
+
+function useMediaRequest(
+  threadId: string,
+  part: AttachmentPart,
+  enabled: boolean = true,
+) {
   const [request, setRequest] = useState<MediaRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(part.fileId));
+  const [loading, setLoading] = useState(Boolean(part.fileId) && enabled);
 
   useEffect(() => {
     let active = true;
     setRequest(null);
     setError(null);
 
-    if (!part.fileId) {
+    if (!enabled || !part.fileId) {
       setLoading(false);
       return () => {
         active = false;
@@ -75,7 +100,7 @@ function useMediaRequest(threadId: string, part: AttachmentPart) {
     return () => {
       active = false;
     };
-  }, [part.fileId, threadId]);
+  }, [enabled, part.fileId, threadId]);
 
   return { request, error, loading };
 }
@@ -149,14 +174,31 @@ function FileAttachment({
   part: Extract<AttachmentPart, { type: 'file' }>;
 }) {
   const { colors } = useTheme();
-  const { request, error, loading } = useMediaRequest(threadId, part);
+  const previewKind = useMemo(() => getFilePreviewKind(part.mimeType), [part.mimeType]);
+  const { request, error, loading } = useMediaRequest(threadId, part, previewKind !== null);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerError, setViewerError] = useState<string | null>(null);
   const standaloneUri = useMemo(() => safeStandaloneUri(part.data), [part.data]);
-  const viewerSource = request
-    ? { uri: request.url, headers: request.headers }
-    : !part.fileId && standaloneUri
-      ? { uri: standaloneUri }
-      : null;
+  const viewerSource = previewKind
+    ? request
+      ? { uri: request.url, headers: request.headers }
+      : !part.fileId && standaloneUri
+        ? { uri: standaloneUri }
+        : null
+    : null;
+  const unavailableMessage =
+    viewerError ??
+    error ??
+    (previewKind === null
+      ? '当前格式不可直接预览'
+      : !loading && !viewerSource
+        ? '附件没有可读取的媒体地址'
+        : null);
+
+  const handleViewerFailure = () => {
+    setViewerVisible(false);
+    setViewerError('附件加载失败，请检查连接后重试');
+  };
 
   return (
     <>
@@ -174,8 +216,15 @@ function FileAttachment({
           <Text style={[styles.fileMeta, { color: colors.text.muted }]} numberOfLines={1}>
             {part.mimeType}
           </Text>
-          {error ? (
-            <Text style={[styles.errorText, { color: colors.status.error }]}>{error}</Text>
+          {unavailableMessage ? (
+            <Text
+              style={[
+                styles.errorText,
+                { color: error || viewerError ? colors.status.error : colors.text.muted },
+              ]}
+            >
+              {unavailableMessage}
+            </Text>
           ) : null}
         </View>
         {loading ? (
@@ -184,7 +233,10 @@ function FileAttachment({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`打开附件 ${part.filename}`}
-            onPress={() => setViewerVisible(true)}
+            onPress={() => {
+              setViewerError(null);
+              setViewerVisible(true);
+            }}
             style={({ pressed }) => [
               styles.openButton,
               { backgroundColor: pressed ? colors.primaryActive : colors.primary },
@@ -195,7 +247,11 @@ function FileAttachment({
         ) : null}
       </View>
 
-      <Modal visible={viewerVisible} animationType="slide" onRequestClose={() => setViewerVisible(false)}>
+      <Modal
+        visible={viewerVisible}
+        animationType="slide"
+        onRequestClose={() => setViewerVisible(false)}
+      >
         <View style={[styles.viewer, { backgroundColor: colors.bg.canvas }]}>
           <View style={[styles.viewerHeader, { borderBottomColor: colors.border.soft }]}>
             <Text style={[styles.viewerTitle, { color: colors.text.ink }]} numberOfLines={1}>
@@ -210,12 +266,22 @@ function FileAttachment({
               <X size={22} color={colors.text.ink} />
             </Pressable>
           </View>
-          {viewerSource ? (
+          {viewerSource && previewKind === 'image' ? (
+            <View style={styles.viewerImageContainer}>
+              <Image
+                source={viewerSource}
+                resizeMode="contain"
+                style={styles.viewerImage}
+                onError={handleViewerFailure}
+              />
+            </View>
+          ) : viewerSource && previewKind === 'text' ? (
             <WebView
               source={viewerSource}
               style={styles.webView}
               originWhitelist={['https://*', 'http://*', 'data:*']}
-              onHttpError={() => setViewerVisible(false)}
+              onError={handleViewerFailure}
+              onHttpError={handleViewerFailure}
             />
           ) : null}
         </View>
@@ -232,7 +298,10 @@ export function MessageAttachments({
   parts?: readonly RemoteMessagePart[];
 }) {
   const attachments = useMemo(
-    () => (parts ?? []).filter((part): part is AttachmentPart => part.type === 'image' || part.type === 'file'),
+    () =>
+      (parts ?? []).filter(
+        (part): part is AttachmentPart => part.type === 'image' || part.type === 'file',
+      ),
     [parts],
   );
 
@@ -242,9 +311,17 @@ export function MessageAttachments({
     <View style={styles.container}>
       {attachments.map((part, index) =>
         part.type === 'image' ? (
-          <ImageAttachment key={`image-${part.fileId ?? part.image}-${index}`} threadId={threadId} part={part} />
+          <ImageAttachment
+            key={`image-${part.fileId ?? part.image}-${index}`}
+            threadId={threadId}
+            part={part}
+          />
         ) : (
-          <FileAttachment key={`file-${part.fileId ?? part.filename}-${index}`} threadId={threadId} part={part} />
+          <FileAttachment
+            key={`file-${part.fileId ?? part.filename}-${index}`}
+            threadId={threadId}
+            part={part}
+          />
         ),
       )}
     </View>
@@ -312,5 +389,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  viewerImageContainer: { flex: 1, padding: spacing.md },
+  viewerImage: { flex: 1, width: '100%' },
   webView: { flex: 1 },
 });
