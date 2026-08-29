@@ -1,10 +1,10 @@
 # MOB-012：Agent 手机审批闭环
 
-状态：待实施
+状态：有条件完成（代码与自动化门禁通过；真实 Desktop + Android / iOS 联调验收挂账）
 
 负责人：`mob_012_agent_mobile_approval`
 
-工作分支：`dev`
+工作分支：`feature/mob-012-agent-mobile-approval`（Mobile PR #57 已合入 `dev`）
 
 目标版本：`0.2.1`
 
@@ -28,6 +28,8 @@ Mobile Remote Client 已具备 Agent Run 读取、批准、拒绝和取消能力
 - 如果只能靠猜测、解析文案或客户端生成 `runId`：立即停止，记录 Host 依赖；
 - 不允许自行发明 Agent Run 列表接口、轮询接口或第二套状态模型。
 
+该前置已于 2026-08-29 核实：Desktop `dev` 会把 Agent `run.id` 持久化到 Assistant Message `metadata.agent.runId`，Remote manifest 与配对 scope 已正式开放 Agent Run read / approve / reject / cancel，因此不存在新增 Host 合同前置。
+
 ## 实现要求
 
 - 复用 `RemoteMiraHostClient.getAgentRun()` / `approveAgentRun()` / `rejectAgentRun()` / `cancelAgentRun()`；
@@ -39,9 +41,21 @@ Mobile Remote Client 已具备 Agent Run 读取、批准、拒绝和取消能力
 - Agent Run 与当前 Thread 必须能验证关联，禁止把其它 Thread 的 Run 注入当前聊天；
 - 不改变普通 Thread / Role Thread 的聊天行为。
 
+## 实施结果（2026-08-29）
+
+- Mobile PR #57 已合入 `dev`，merge commit：`c8e4cbcc518d7a572afe755ccffec2245c11cde0`。
+- Mobile adapter 保留 canonical Assistant Message `metadata.agent.runId`，并在 Chat canonical history refresh 后发布消息快照。
+- Agent 层仅从最新 Assistant Message metadata 读取稳定 `runId`，随后通过 Host `GET /agent/runs/:runId` 读取权威状态，并校验 `run.threadId === 当前 Thread`。
+- `waiting_approval` 显示真实 tool / reason 与批准、拒绝；queued / running 支持取消；终态不暴露错误操作。
+- approve / reject / cancel 操作先读取当前 canonical Run 校验状态，使用同步 action lock 防重复提交，并以 Host 返回结果覆盖本地状态。
+- 401 / 403 / 404 / network / Thread mismatch 均保持真实失败语义，不制造本地假成功。
+- 为减少与 MOB-013 / MOB-014 的共享 Chat 竞态，Agent 状态由 `AgentChatScreen` 包装层承接，原 `ChatScreen` 主状态机未被重写。
+- OpenCode PR Review verdict：`NO_BLOCKING_FINDINGS`，无高置信 P0-P2 finding。
+- `typecheck` / `lint` / Jest 已通过。Android / iOS 自动构建与真实 Desktop + 真机交互属于平台 / 最终验收证据，不重新阻塞后续任务。
+
 ## 并行边界
 
-MOB-012 对 Chat Agent 运行态拥有优先修改权。MOB-013 / MOB-014 若需修改 `ChatScreen.tsx`，应在 MOB-012 合入后 rebase，或将改动下沉到独立组件，避免并发改同一块状态机。
+MOB-012 已合入 `dev`，Chat Agent 运行态边界已冻结。MOB-013 / MOB-014 可从最新 `dev` 开工；若需修改 Chat，应优先下沉到独立组件并避免重写 MOB-012 的 Agent wrapper / 状态边界。
 
 MOB-015 可独立并行。
 
@@ -57,6 +71,8 @@ MOB-015 可独立并行。
 - Thread / Run 不匹配时拒绝渲染或操作；
 - 普通聊天回归不受影响。
 
+上述代码级要求已由 PR #57 自动化覆盖；真实 Desktop + Android / iOS 设备链路保留为最终人工验收项。
+
 ## 验收
 
 1. Desktop Agent 进入等待审批；
@@ -65,6 +81,8 @@ MOB-015 可独立并行。
 4. 手机拒绝后 Desktop 反映真实拒绝状态；
 5. 手机可取消可取消状态的运行；
 6. 弱网 / 断网不产生假成功。
+
+以上 1～6 的真实跨端 / 真机证据尚待最终验收；不影响本卡代码施工 Gate 与后续 MOB-013 / MOB-014 放行。
 
 ## 非目标
 
