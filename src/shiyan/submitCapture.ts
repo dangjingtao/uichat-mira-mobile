@@ -8,6 +8,11 @@ import {
 
 const CONTENT_TYPE = 'audio/mp4';
 
+type CaptureSubmissionRepository = Pick<
+  typeof localCaptureRepository,
+  'confirm' | 'markSubmitted'
+>;
+
 export interface SubmitCaptureProgress {
   phase: 'creating_task' | 'uploading' | 'confirming';
   uploadFraction?: number;
@@ -18,15 +23,17 @@ export async function submitLocalCapture(
   options: {
     client?: ShiyanCloudClient;
     submissions?: ShiyanSubmissionRepository;
+    captures?: CaptureSubmissionRepository;
     onProgress?: (progress: SubmitCaptureProgress) => void;
   } = {},
 ): Promise<string> {
   const client = options.client ?? shiyanClient;
   const submissions = options.submissions ?? shiyanSubmissionRepository;
+  const captures = options.captures ?? localCaptureRepository;
   const confirmedCapture =
     capture.status === 'ready_for_submission'
       ? capture
-      : await localCaptureRepository.confirm({
+      : await captures.confirm({
           id: capture.id,
           title: capture.title,
           sceneId: capture.sceneId,
@@ -73,6 +80,6 @@ export async function submitLocalCapture(
     `mobile-confirm:${confirmedCapture.id}`,
   );
   await submissions.setUploadState(confirmedCapture.id, 'confirmed');
-  await localCaptureRepository.markSubmitted(confirmedCapture.id);
+  await captures.markSubmitted(confirmedCapture.id);
   return created.task.id;
 }
