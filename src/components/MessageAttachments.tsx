@@ -12,13 +12,13 @@ import { FileText, ImageIcon, X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import { miraHostClient } from '../api/miraHostClient';
 import { RemoteHostError } from '../api/remoteHttp';
+import { getFilePreviewKind } from '../media/messageAttachmentPolicy';
 import type { RemoteMessagePart } from '../protocol/remoteHostV1';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
 type MediaRequest = { url: string; headers: Record<string, string> };
 type AttachmentPart = Extract<RemoteMessagePart, { type: 'image' | 'file' }>;
-type PreviewKind = 'image' | 'text' | null;
 
 const mediaErrorMessage = (error: unknown) => {
   if (error instanceof RemoteHostError) {
@@ -39,27 +39,6 @@ const safeStandaloneUri = (value: string) => {
   const trimmed = value.trim();
   if (/^data:/iu.test(trimmed) || /^https:\/\//iu.test(trimmed)) return trimmed;
   if (__DEV__ && /^http:\/\//iu.test(trimmed)) return trimmed;
-  return null;
-};
-
-export const getFilePreviewKind = (mimeType: string): PreviewKind => {
-  const normalized = mimeType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
-  if (
-    normalized === 'image/png' ||
-    normalized === 'image/jpeg' ||
-    normalized === 'image/gif' ||
-    normalized === 'image/webp'
-  ) {
-    return 'image';
-  }
-  if (
-    normalized === 'text/plain' ||
-    normalized === 'text/markdown' ||
-    normalized === 'text/csv' ||
-    normalized === 'application/json'
-  ) {
-    return 'text';
-  }
   return null;
 };
 
