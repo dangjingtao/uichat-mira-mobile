@@ -180,7 +180,7 @@ export function SearchScreen() {
       >
         {!isImplementedTab ? (
           <Text style={[styles.placeholderText, { color: colors.text.soft }]}>该类型搜索即将支持</Text>
-        ) : collectionState === 'loading' ? (
+        ) : collectionState === 'loading' && !hasQuery ? (
           <View
             style={styles.centerState}
             accessibilityLabel="正在加载会话"
@@ -188,7 +188,10 @@ export function SearchScreen() {
           >
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        ) : collectionState === 'error' ? (
+        ) : collectionState === 'error' && !hasQuery ? (
+          // The collection list and the search controller fetch sessions
+          // independently, so a failed initial load must not mask search
+          // results that arrived through the controller's own request.
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>加载会话失败</Text>
             <Text style={[styles.stateText, { color: colors.text.soft }]}>{loadError}</Text>
