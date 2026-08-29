@@ -8,6 +8,47 @@ export interface ThreadMediaRequest {
 const DEFAULT_MAX_TEXT_BYTES = 1_000_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+const utf8ByteLength = (value: string): number => {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        index += 1;
+      } else {
+        bytes += 3;
+      }
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
+};
+
+const mapMediaReadError = (error: unknown, aborted: boolean): RemoteHostError => {
+  if (error instanceof RemoteHostError) return error;
+  if (aborted) {
+    return new RemoteHostError(
+      'MEDIA_READ_TIMEOUT',
+      'Timed out while reading Mira Host attachment',
+      undefined,
+      error,
+    );
+  }
+  return new RemoteHostError(
+    'NETWORK_ERROR',
+    error instanceof Error ? error.message : 'Unable to read Mira Host attachment',
+    undefined,
+    error,
+  );
+};
+
 export async function readThreadMediaText(
   request: ThreadMediaRequest,
   options: { maxBytes?: number; timeoutMs?: number } = {},
@@ -26,20 +67,7 @@ export async function readThreadMediaText(
         signal: controller.signal,
       });
     } catch (error) {
-      if (controller.signal.aborted) {
-        throw new RemoteHostError(
-          'MEDIA_READ_TIMEOUT',
-          'Timed out while reading Mira Host attachment',
-          undefined,
-          error,
-        );
-      }
-      throw new RemoteHostError(
-        'NETWORK_ERROR',
-        error instanceof Error ? error.message : 'Unable to read Mira Host attachment',
-        undefined,
-        error,
-      );
+      throw mapMediaReadError(error, controller.signal.aborted);
     }
 
     if (!response.ok) {
@@ -58,8 +86,14 @@ export async function readThreadMediaText(
       );
     }
 
-    const body = await response.text();
-    if (body.length > maxBytes) {
+    let body: string;
+    try {
+      body = await response.text();
+    } catch (error) {
+      throw mapMediaReadError(error, controller.signal.aborted);
+    }
+
+    if (utf8ByteLength(body) > maxBytes) {
       throw new RemoteHostError(
         'MEDIA_PREVIEW_TOO_LARGE',
         'Text attachment is too large for in-app preview',
