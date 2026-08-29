@@ -2,7 +2,10 @@ import {
   localKeyValueStore,
   type LocalKeyValueStore,
 } from '../../storage/localKeyValueStore';
-import type { ShiyanSceneSnapshot } from '../scenes';
+import {
+  snapshotShiyanSceneById,
+  type ShiyanSceneSnapshot,
+} from '../scenes';
 import type { CompletedRecording } from './RecordingAdapter';
 import { nativeAudioRecorder } from './nativeAudioRecorder';
 
@@ -117,12 +120,13 @@ export class LocalCaptureRepository {
     sceneSnapshot?: ShiyanSceneSnapshot;
     recording: CompletedRecording;
   }): Promise<LocalCaptureMetadata> {
+    const sceneSnapshot = input.sceneSnapshot ?? snapshotShiyanSceneById(input.sceneId);
     const capture: LocalCaptureMetadata = {
       id: input.id,
       filePath: input.recording.filePath,
-      sceneId: input.sceneId,
-      sceneName: input.sceneName,
-      ...(input.sceneSnapshot ? { sceneSnapshot: input.sceneSnapshot } : {}),
+      sceneId: sceneSnapshot?.id ?? input.sceneId,
+      sceneName: sceneSnapshot?.name ?? input.sceneName,
+      ...(sceneSnapshot ? { sceneSnapshot } : {}),
       title: '',
       startedAt: input.recording.startedAt,
       endedAt: input.recording.endedAt,
