@@ -11,13 +11,14 @@
 - 当前阶段已进入受控实施；维护者已明确授权 MOB-001 至 MOB-023，其中 MOB-012～MOB-015 为 0.2.1 当前新增授权卡，MOB-016～MOB-023 为拾言（Shiyan）MVP 新增授权卡。
 - MOB-007 / MOB-008 已完成并合入 `dev`。
 - MOB-009 / MOB-010 / MOB-011 已完成代码施工并合入 `dev`，仍保留各自真机 / 跨端人工验收项，因此当前为有条件完成。
-- MOB-012 已随 Mobile PR #57 合入 `dev`，当前为有条件完成：Desktop `dev` 的 Assistant Message `metadata.agent.runId`、Agent Run read / approve / reject / cancel 与 device scope 已核实；Mobile 已完成 `waiting_approval` 展示、approve / reject / cancel、Thread / Run 校验、重复提交保护与真实错误态。OpenCode Review 为 `NO_BLOCKING_FINDINGS`，typecheck / lint / Jest 全绿；真实 Desktop + Android / iOS 联调继续挂账，不阻塞 MOB-013 / MOB-014。
-- MOB-013 / MOB-014 已由 MOB-012 Gate 解锁，可从最新 `dev` 开工；两卡若并行，MOB-013 优先拥有 Message / Media renderer，MOB-014 不重写该 renderer 或 MOB-012 Agent wrapper。
+- MOB-012 已随 Mobile PR #57 合入 `dev`，当前为有条件完成：Desktop `dev` 的 Assistant Message `metadata.agent.runId`、Agent Run read / approve / reject / cancel 与 device scope 已核实；Mobile 已完成 `waiting_approval` 展示、approve / reject / cancel、Thread / Run 校验、重复提交保护与真实错误态。OpenCode Review 为 `NO_BLOCKING_FINDINGS`，typecheck / lint / Jest 全绿；真实 Desktop + Android / iOS 联调继续挂账，不阻塞后续 Chat 施工。
+- MOB-013 已随 Mobile PR #58 合入 `dev`，当前为有条件完成：Remote Message image/file parts、thread media read、权限/Relay/失效错误态与 system/tool 隔离已落地；最新 Mobile CI 全绿，OpenCode Review 无高置信阻塞 finding。真实 Desktop + Android / iOS 媒体显示、附件打开、Relay-only、弱网与过期媒体继续挂人工验收。
+- MOB-014 已进入施工，Draft PR #59 基于 MOB-013 合入后的最新 `dev`：已先完成安全分享文本与当前 Thread 查找 helper / 单测；Share Sheet、菜单/顶部同源入口、find UI 与消息定位仍在施工，当前 CI 运行中。
 - MOB-015 已随 Mobile PR #54 合入 `dev`，当前为有条件完成；仅保留 Android / iOS 真机设置持久化、system 主题切换与断开 / 重配对人工验收。
 - MOB-016 已随 Mobile PR #55 合入 `dev`，当前为有条件完成；最新 Review 无阻塞 finding，自动化门禁已通过，剩余真机 / UI 人工验收不重新阻塞拾言后续施工。
-- MOB-017 仍待实施，当前没有现成施工分支 / PR；其 Mobile Native 录音链可独立于 Cloud 推进，40 分钟真实录音属于最终人工验收而非施工前置。
+- MOB-017 已进入施工，Draft PR #56 当前已有 `RecordingAdapter` / 本地草稿存储合同且 Mobile CI 通过；原生录音实现、麦克风权限、私有文件落盘与恢复 UI / 测试仍待完成。40 分钟真实录音属于最终人工验收而非施工前置。
 - MOB-018 已随 `mira-shiyan-cloud` PR #1 合入 Cloud `main`，当前为有条件完成；Review 阻塞已修复并关闭，Cloud CI 已通过。真实 D1 / R2 / Workflow 资源、Secret 与部署联调继续挂账，不阻塞 MOB-019 施工。
-- MOB-019 已由 MOB-018 Gate 解锁；MOB-020 继续等待 MOB-019，MOB-021 / MOB-022 / MOB-023 按既定依赖继续等待。
+- MOB-019 已进入施工，Cloud Draft PR #2 当前已冻结 `SttProvider`、Transcript persistence 与 3 天 AudioAsset retention schema，Cloud CI 通过；真实 Provider 接入、Workflow STT Stage / retry、Transcript API 与 cleanup 验证仍待完成，因此 MOB-020 尚未解锁。
 - 移动端继续消费 Mira Desktop / Mira Host 的权威 Thread、Workspace、Role、Agent Run、Message Part 与 Artifact 数据，不猜测远端字段或状态。
 - 拾言是 Mira Mobile 官方内置生产力插件，但其云端链路独立于 Desktop / Host 在线状态；`mira-shiyan-cloud` 与 `mira-shiyan` 不建立第二套产品或施工台账。
 - 设备级本地能力可以复用 Mobile 现有系统 API 与本地存储，但必须明确其设备级语义，不伪装成账户级或跨端统一状态。
@@ -41,13 +42,13 @@
 | MOB-010 | Desktop Remote 合同接入收口 | Workspace / Role / Workspace Thread 正式 Remote 合同 | **有条件完成**：代码与自动化通过；真实 Desktop 配对联调待验收 | `mob_010_remote_contract_alignment` | Desktop #77 / #78 / #80 |
 | MOB-011 | 0.2.0 会话交互回归修复 | 全局 Thread 直达 Chat、旧版置顶右划、真实删除、失败态视觉 | **有条件完成**：Mobile PR #46 / Host PR #87 已合入；0.2.1 真机回归待验收 | `mob_011_conversation_ux_regression` | 单线程删除 Remote 放行已随本卡完成 |
 | MOB-012 | Agent 手机审批闭环 | `waiting_approval` 展示与 approve / reject / cancel | **有条件完成**：Mobile PR #57 已合入 `dev`；Reviewer `NO_BLOCKING_FINDINGS`，typecheck / lint / Jest 全绿；真实 Desktop + Android / iOS 联调挂账 | `mob_012_agent_mobile_approval` | 现有 Agent Remote 已满足；代码 Gate 已通过 |
-| MOB-013 | 会话媒体与附件读取 | Message image/file parts、只读媒体 / 附件展示与打开 | **已解锁，待实施**：MOB-012 Chat Agent 边界已冻结，可从最新 `dev` 开工 | `mob_013_media_attachment_reading` | 现有 `artifacts:read` 与线程媒体读取 |
-| MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **已解锁，待实施**：MOB-012 已 Gate；可与 MOB-013 在明确文件所有权后并行 | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
+| MOB-013 | 会话媒体与附件读取 | Message image/file parts、只读媒体 / 附件展示与打开 | **有条件完成**：Mobile PR #58 已合入 `dev`；Mobile CI 全绿，OpenCode Review 无高置信阻塞 finding；真机 / Host 媒体联调挂账 | `mob_013_media_attachment_reading` | 现有 `artifacts:read` 与线程媒体读取 |
+| MOB-014 | 会话手机工具 | 系统分享、当前聊天内查找 | **施工中**：Draft PR #59；安全分享/查找 helper 与单测已完成，Share Sheet + find UI / 定位仍在施工 | `mob_014_mobile_conversation_tools` | 无新增 Host 依赖 |
 | MOB-015 | 设备设置与连接收口 | Theme / Accent 持久化、system 主题响应、真实断开 Host | **有条件完成**：Mobile PR #54 已合入；剩余真机持久化 / system 切换 / 断开重配对验收 | `mob_015_device_settings_connection` | 无新增 Host 依赖 |
 | MOB-016 | 拾言插件入口与任务壳 | Mobile；插件入口、场景、历史任务 UI 壳 | **有条件完成**：Mobile PR #55 已合入 `dev`；Review 无阻塞 finding，自动化门禁通过；真机 / UI 验收挂账 | `mob_016_shiyan_plugin_shell` | Shiyan PRD / Technical Design |
-| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **待实施**：无现成分支 / PR；可独立于 Cloud 开工 | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
+| MOB-017 | 拾言录音与本地恢复 | Mobile；RecordingAdapter、麦克风权限、本地草稿恢复、40 分钟录音 smoke | **施工中**：Draft PR #56；Adapter / draft-store 合同与 CI 已有，native recording / permission / recovery UI 仍待完成 | `mob_017_shiyan_recording_local_recovery` | 无 Cloud 依赖 |
 | MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | `mira-shiyan-cloud`；`shiyan-api` / `shiyan-llm` 壳、D1/R2/Workflow、设备身份、直传 | **有条件完成**：Cloud PR #1 已合入 `main`；Review 阻塞已修复，CI 全绿；真实资源 / Secret / 部署联调挂账 | `mob_018_shiyan_cloud_foundation` | Shiyan canonical truth |
-| MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | `mira-shiyan-cloud`；STT Provider、Transcript、3 天录音保留 | **已解锁，待实施** | `mob_019_shiyan_stt_transcript` | MOB-018 已 Gate |
+| MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | `mira-shiyan-cloud`；STT Provider、Transcript、3 天录音保留 | **施工中**：Cloud Draft PR #2；Provider contract / Transcript schema / retention schema 与 CI 已有，Workflow / Provider / API / cleanup 仍待完成 | `mob_019_shiyan_stt_transcript` | MOB-018 已 Gate |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | `mira-shiyan-cloud`；私有 LLM Gateway、场景整理、JSON + Markdown Draft | **待实施** | `mob_020_shiyan_llm_organization` | MOB-018, MOB-019 |
 | MOB-021 | 拾言处理状态、结果编辑与历史任务 | Mobile；提交上传、Stage UI、Transcript、AI Draft、Final Draft、分享 | **待实施** | `mob_021_shiyan_mobile_results_history` | MOB-016～MOB-020 |
 | MOB-022 | 拾言 GitHub Destination | `mira-shiyan-cloud` + `mira-shiyan`；幂等投递、Delivery Record、canonical link | **待实施** | `mob_022_shiyan_github_destination` | MOB-018, MOB-020 |
@@ -94,19 +95,18 @@
 
 ### MOB-013：会话媒体与附件读取
 
-- **已解锁**，从最新 `dev` 开工。
-- 只做已有会话内容的只读消费，不做拍照 / 相册 / 文件上传。
-- 主要拥有 Remote Message Part -> Chat 展示与 media / artifact 读取层。
-- 若需修改 Chat，优先抽独立 Message / Media 组件；不得重写 MOB-012 Agent wrapper / canonical run 状态边界。
+- **已 Gate / 有条件完成**，Mobile PR #58 已合入 `dev`。
+- Remote Message 的 user / assistant image/file parts 已保留并进入独立附件组件；system/tool parts 不作为普通附件暴露。
+- media 读取同时受 `artifacts:read` 与 manifest route Gate；权限、Relay-only、404、网络/超时与预览过大均保留真实失败态，不暴露 Device Credential。
+- 当前 Mobile CI 全绿，OpenCode Review 无高置信阻塞 finding。真实 Desktop + Android / iOS 图片显示、附件打开、弱网 / Relay / 过期媒体为人工验收尾项。
 
 详细卡：`docs/task-cards/MOB-013-media-attachment-reading.md`
 
 ### MOB-014：会话手机工具
 
-- **已解锁**，可与 MOB-013 在明确文件所有权后并行。
-- 使用手机现有系统能力实现系统分享。
-- “在聊天中查找”只搜索当前已加载 Thread 的用户可见文本，不冒充跨会话全文索引。
-- 与 MOB-013 并行时不重写 Message renderer；与 MOB-012 的 Agent wrapper 保持边界分离。
+- **施工中**，Draft PR #59 基于 MOB-013 合入后的最新 `dev`。
+- 已建立共享 helper：分享只序列化 user / assistant 可见文本，不序列化 metadata；当前聊天查找只命中当前已加载的 user / assistant 文本，并支持稳定的上一条 / 下一条索引循环。
+- 下一步接同源 React Native Share Sheet 与 find-in-chat UI / scroll-to-message；不得重写 MOB-013 MessageAttachments 或 MOB-012 Agent wrapper。
 
 详细卡：`docs/task-cards/MOB-014-mobile-conversation-tools.md`
 
@@ -122,23 +122,23 @@
 
 ### 第一波：可并行
 
-- **MOB-016**：Mobile 插件入口 / 场景 / 历史任务 UI 壳。
-- **MOB-017**：Mobile 录音 Adapter / 本地恢复 / 原生麦克风能力。
-- **MOB-018**：Cloud 基础 / CaptureTask / D1-R2 / 上传闭环。
+- **MOB-016**：Mobile 插件入口 / 场景 / 历史任务 UI 壳，已 Gate。
+- **MOB-017**：Mobile 录音 Adapter / 本地恢复 / 原生麦克风能力，Draft PR #56 施工中。
+- **MOB-018**：Cloud 基础 / CaptureTask / D1-R2 / 上传闭环，已 Gate。
 
-三张卡职责分离：016 不碰原生录音和 Cloud；017 不碰导航主结构和 Cloud；018 不碰 Mobile UI。它们可以从各自当前正式基线并行施工。
+三张卡职责分离：016 不碰原生录音和 Cloud；017 不碰导航主结构和 Cloud；018 不碰 Mobile UI。
 
 ### 第二波：Cloud 主链串行
 
 ```text
 MOB-018  ✓ Gate
    ↓
-MOB-019  STT / Transcript  ← 当前已解锁
+MOB-019  STT / Transcript  ← Draft PR #2 施工中
    ↓
 MOB-020  LLM 整理 / AI Draft
 ```
 
-MOB-019 / MOB-020 都会触碰 Workflow、Stage 与结构化内容合同，不能仅因“模块名不同”就默认并行。先冻结上游合同，再继续下游。
+MOB-019 / MOB-020 都会触碰 Workflow、Stage 与结构化内容合同，不能仅因“模块名不同”就默认并行。MOB-019 未 Gate 前 MOB-020 不启动。
 
 ### 第三波：合同冻结后并行
 
@@ -160,18 +160,18 @@ MOB-021 与 MOB-022 只有在 MOB-020 已冻结 Final Draft / structured content
 现有 0.2.1：
 MOB-012  ✓ 有条件完成 / Chat Agent Gate
    ↓
-MOB-013 ─┐
-         ├─ 已解锁；明确文件所有权后可并行
-MOB-014 ─┘
+MOB-013  ✓ 有条件完成 / Media Gate
+   ↓
+MOB-014  ← Draft PR #59 施工中
 
 MOB-015  ✓ 有条件完成
 
 拾言 MVP：
 MOB-016  ✓ 有条件完成
-MOB-017  ← 可独立开工
+MOB-017  ← Draft PR #56 施工中
 MOB-018  ✓ 有条件完成 / Cloud Gate
            ↓
-        MOB-019  ← 当前 Cloud 主链施工入口
+        MOB-019  ← Draft PR #2 施工中
            ↓
         MOB-020
          ↙   ↘
@@ -180,7 +180,7 @@ MOB-018  ✓ 有条件完成 / Cloud Gate
         MOB-023
 ```
 
-如果有第二施工组进入，现有 0.2.1 可并行推进 MOB-013 / MOB-014；拾言当前优先并行 MOB-017 与 MOB-019。任何 Builder 在开始前仍必须按派卡 Skill 读取当前仓库事实和实际 HEAD，旧派卡不得覆盖新代码事实。
+当前优先并行 MOB-014、MOB-017 与 MOB-019。任何 Builder 在开始前仍必须按派卡 Skill 读取当前仓库事实和实际 HEAD，旧派卡不得覆盖新代码事实。
 
 ## 0.2.1 验收原则
 
