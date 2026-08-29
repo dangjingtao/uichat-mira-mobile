@@ -40,7 +40,9 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
       : message.role,
   content: message.content,
   timestamp: new Date(message.createdAt),
-  parts: message.parts,
+  ...(message.role === 'user' || message.role === 'assistant'
+    ? { parts: message.parts }
+    : {}),
   metadata: message.metadata,
 });
 
