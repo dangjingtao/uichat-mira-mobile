@@ -16,6 +16,7 @@ import type {
   RemoteThread,
 } from '../protocol/remoteHostV1';
 import { RemoteHostError } from './remoteHttp';
+import { readThreadMediaText } from './threadMedia';
 import type { MiraHostApi } from './miraHost';
 
 const THREAD_MEDIA_ROUTE = 'GET /threads/:id/media/:mediaId/content';
@@ -225,6 +226,11 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     }
 
     return this.remote.getThreadMediaRequest(sessionId, stableMediaId);
+  }
+
+  async getThreadMediaText(sessionId: string, mediaId: string): Promise<string> {
+    const request = await this.getThreadMediaRequest(sessionId, mediaId);
+    return readThreadMediaText(request);
   }
 
   async sendMessage(
