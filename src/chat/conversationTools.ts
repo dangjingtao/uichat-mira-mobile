@@ -1,23 +1,59 @@
 import type { ChatMessage } from '../types';
+import type { RemoteMessagePart } from '../protocol/remoteHostV1';
 
-const userVisibleMessages = (messages: ChatMessage[]) =>
-  messages.filter(
-    (message) =>
-      (message.role === 'user' || message.role === 'assistant') &&
-      message.content.trim().length > 0,
+const isUserVisibleMessage = (message: ChatMessage) =>
+  message.role === 'user' || message.role === 'assistant';
+
+const attachmentParts = (message: ChatMessage) =>
+  (message.parts ?? []).filter(
+    (
+      part,
+    ): part is Extract<RemoteMessagePart, { type: 'image' | 'file' }> =>
+      part.type === 'image' || part.type === 'file',
   );
+
+const describeAttachment = (
+  part: Extract<RemoteMessagePart, { type: 'image' | 'file' }>,
+) => {
+  if (part.type === 'image') {
+    return part.filename ? `[图片：${part.filename}]` : '[图片]';
+  }
+  return `[附件：${part.filename}]`;
+};
+
+const messageSearchText = (message: ChatMessage) =>
+  [
+    message.content,
+    ...attachmentParts(message).map((part) =>
+      part.type === 'image' ? (part.filename ?? '图片') : part.filename,
+    ),
+  ]
+    .join('\n')
+    .toLocaleLowerCase();
 
 export const buildConversationShareText = (
   messages: ChatMessage[],
   title?: string,
 ): string => {
-  const body = userVisibleMessages(messages)
-    .map((message) => `${message.role === 'user' ? 'You' : 'Mira'}: ${message.content.trim()}`)
-    .join('\n\n');
+  const blocks = messages
+    .filter(isUserVisibleMessage)
+    .map((message) => {
+      const content = message.content.trim();
+      const attachments = attachmentParts(message).map(describeAttachment);
+      if (!content && attachments.length === 0) return null;
 
+      const speaker = message.role === 'user' ? 'You' : 'Mira';
+      return [content ? `${speaker}: ${content}` : `${speaker}:`, ...attachments].join(
+        '\n',
+      );
+    })
+    .filter((block): block is string => block !== null);
+
+  if (blocks.length === 0) return '';
+
+  const body = blocks.join('\n\n');
   const safeTitle = title?.trim();
-  if (!safeTitle) return body;
-  return body ? `${safeTitle}\n\n${body}` : safeTitle;
+  return safeTitle ? `${safeTitle}\n\n${body}` : body;
 };
 
 export type ConversationMatch = {
@@ -34,8 +70,8 @@ export const findConversationMatches = (
 
   const matches: ConversationMatch[] = [];
   messages.forEach((message, messageIndex) => {
-    if (message.role !== 'user' && message.role !== 'assistant') return;
-    if (message.content.toLocaleLowerCase().includes(normalizedQuery)) {
+    if (!isUserVisibleMessage(message)) return;
+    if (messageSearchText(message).includes(normalizedQuery)) {
       matches.push({ messageId: message.id, messageIndex });
     }
   });
