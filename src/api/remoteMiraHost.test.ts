@@ -60,6 +60,20 @@ const manifestPayload = {
   serverTime: '2026-08-02T00:00:00.000Z',
 };
 
+const createdThreadPayload = {
+  id: 'thread-new',
+  title: '新对话',
+  modelName: null,
+  workspaceId: null,
+  knowledgeBaseId: null,
+  roleId: null,
+  agentEnabled: false,
+  status: 'active',
+  createdAt: '2026-08-29T00:00:00.000Z',
+  updatedAt: '2026-08-29T00:00:00.000Z',
+  messageCount: 0,
+};
+
 const pairingDescriptor = {
   version: 1 as const,
   hostUrl: 'https://mira.example.ts.net',
@@ -259,6 +273,89 @@ describe('RemoteMiraHostClient transport selection', () => {
     });
     expect(directMock).toHaveBeenCalledTimes(1);
     expect(relayJsonMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('selects a reachable transport before dispatching thread creation', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'messages:write'],
+      savedAt: '2026-08-29T00:00:00.000Z',
+    });
+
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      throw new RemoteHostError('NETWORK_ERROR', 'tailnet unavailable');
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (_relay, request) => {
+      relayJsonMock(_relay, request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(manifestPayload);
+      }
+      return request.parse(createdThreadPayload);
+    };
+    const client = new RemoteMiraHostClient(
+      store,
+      direct,
+      undefined,
+      relayJson,
+    );
+
+    await expect(client.createThread()).resolves.toMatchObject({
+      id: 'thread-new',
+      title: '新对话',
+    });
+    expect(directMock).toHaveBeenCalledTimes(1);
+    expect(relayJsonMock.mock.calls.map(call => call[1].path)).toEqual([
+      '/remote/v1/manifest',
+      '/threads',
+    ]);
+  });
+
+  it('does not replay an uncertain dispatched thread create through Relay', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'messages:write'],
+      savedAt: '2026-08-29T00:00:00.000Z',
+    });
+
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(manifestPayload);
+      }
+      throw new RemoteHostError('NETWORK_ERROR', 'response lost');
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (_relay, request) => {
+      relayJsonMock(_relay, request);
+      return request.parse(createdThreadPayload);
+    };
+    const client = new RemoteMiraHostClient(
+      store,
+      direct,
+      undefined,
+      relayJson,
+    );
+
+    await expect(client.createThread()).rejects.toMatchObject({
+      code: 'THREAD_CREATE_UNCERTAIN',
+    });
+    expect(directMock.mock.calls.map(call => call[0].path)).toEqual([
+      '/remote/v1/manifest',
+      '/threads',
+    ]);
+    expect(relayJsonMock).not.toHaveBeenCalled();
   });
 
   it('does not hide Host authorization errors behind Relay fallback', async () => {
