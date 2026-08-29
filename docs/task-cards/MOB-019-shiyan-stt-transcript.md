@@ -1,6 +1,6 @@
 # MOB-019：拾言 STT Workflow 与 Transcript 证据层
 
-状态：待实施
+状态：已合入 Cloud `dev`（自动门禁通过；真实长音频 Provider smoke 待补）
 
 负责人：`mob_019_shiyan_stt_transcript`
 
@@ -50,6 +50,14 @@
 - `STTProvider` 新增实现
 - Transcript persistence
 - R2 lifecycle / retained asset policy
+
+## 施工进展（2026-08-29）
+
+- MOB-019 已通过 Cloud PR #3 合入原 `main`，提交 `3917d00c825ca9783e0cabfcd4dc11b79b5bd166`；
+- Cloud `dev` 由该 `main` 基线创建，因此 MOB-019 已进入当前开发主线；
+- 已实现 Workers AI STT、`initial_prompt`、`verify-audio -> transcribe -> persist-transcript`、不可变 Transcript / segments、STT 独立重试、72 小时音频保留与 `retained`、定时清理；
+- 自动门禁覆盖 provider、Workflow 成功 / 5xx / timeout / 不可重试错误 / 重复重试、原始音频清理后 Transcript 可读、Worker dry-run 与 D1 migration；
+- 真实约 40 分钟会议的部署后 Provider smoke 仍需实际 Cloudflare 资源和真实音频样本，作为运行态验收项保留，不回退代码状态。
 
 ## Validation
 
