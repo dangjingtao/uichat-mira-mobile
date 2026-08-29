@@ -53,13 +53,25 @@ type TranscriptState =
   | { status: 'ready'; value: ShiyanTranscriptView; message: null }
   | { status: 'error'; value: ShiyanTranscriptView | null; message: string };
 
+export interface ShiyanFinalEditorState {
+  open: boolean;
+  dirty: boolean;
+  saving: boolean;
+}
+
+interface ShiyanTaskDetailScreenProps {
+  onFinalEditorStateChange?: (state: ShiyanFinalEditorState) => void;
+}
+
 const EMPTY_TRANSCRIPT: TranscriptState = {
   status: 'not_ready',
   value: null,
   message: null,
 };
 
-export function ShiyanTaskDetailScreen() {
+export function ShiyanTaskDetailScreen({
+  onFinalEditorStateChange,
+}: ShiyanTaskDetailScreenProps = {}) {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'ShiyanTaskDetail'>>();
   const { colors } = useTheme();
@@ -79,6 +91,21 @@ export function ShiyanTaskDetailScreen() {
   const [savedFinalMarkdown, setSavedFinalMarkdown] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
+
+  const finalDraftDirty = useMemo(
+    () =>
+      finalEditorOpen &&
+      finalMarkdown.trim() !== (savedFinalMarkdown ?? '').trim(),
+    [finalEditorOpen, finalMarkdown, savedFinalMarkdown],
+  );
+
+  useEffect(() => {
+    onFinalEditorStateChange?.({
+      open: finalEditorOpen,
+      dirty: finalDraftDirty,
+      saving: busyAction === 'save-final',
+    });
+  }, [busyAction, finalDraftDirty, finalEditorOpen, onFinalEditorStateChange]);
 
   const loadTask = useCallback(
     async (silent = false) => {

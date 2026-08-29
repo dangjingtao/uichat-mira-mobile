@@ -31,7 +31,7 @@ import {
 import { ShiyanCaptureSubmitScreen } from './src/shiyan/ShiyanCaptureSubmitScreen';
 import { ShiyanCloudConfigScreen } from './src/shiyan/ShiyanCloudConfigScreen';
 import { ShiyanHistoryScreen } from './src/shiyan/ShiyanHistoryScreen';
-import { ShiyanTaskDetailScreen } from './src/shiyan/ShiyanTaskDetailScreen';
+import { ShiyanTaskDetailWithDeliveryScreen } from './src/shiyan/ShiyanTaskDetailWithDeliveryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
@@ -138,7 +138,7 @@ function AppInner() {
         <Stack.Screen name="ShiyanCaptureConfirm" component={ShiyanCaptureSubmitScreen} />
         <Stack.Screen name="ShiyanLocalDrafts" component={ShiyanLocalDraftsScreen} />
         <Stack.Screen name="ShiyanHistory" component={ShiyanHistoryScreen} />
-        <Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailScreen} />
+        <Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailWithDeliveryScreen} />
         <Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />
         <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
