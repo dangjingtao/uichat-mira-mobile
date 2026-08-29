@@ -46,6 +46,31 @@ const requestId = () =>
 const normalizeFileUri = (path: string) =>
   path.startsWith('file://') ? path : `file://${path}`;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export function parseShiyanApiEnvelope<T>(value: unknown): ShiyanApiEnvelope<T> | null {
+  if (!isRecord(value) || typeof value.ok !== 'boolean' || typeof value.requestId !== 'string') {
+    return null;
+  }
+
+  if (value.ok === true) {
+    if (!Object.prototype.hasOwnProperty.call(value, 'data')) return null;
+    return value as unknown as ShiyanApiEnvelope<T>;
+  }
+
+  if (!isRecord(value.error)) return null;
+  if (
+    typeof value.error.code !== 'string' ||
+    typeof value.error.message !== 'string' ||
+    typeof value.error.retryable !== 'boolean' ||
+    (value.taskId !== undefined && typeof value.taskId !== 'string')
+  ) {
+    return null;
+  }
+  return value as unknown as ShiyanApiEnvelope<T>;
+}
+
 export class HttpShiyanClient implements ShiyanCloudClient {
   constructor(private readonly loadConfig: ConfigLoader = loadShiyanRuntimeConfig) {}
 
@@ -163,13 +188,17 @@ export class HttpShiyanClient implements ShiyanCloudClient {
       throw new ShiyanClientError('无法连接拾言 Cloud，请稍后重试。', 'network_error', true);
     }
 
-    let envelope: ShiyanApiEnvelope<T>;
+    let raw: unknown;
     try {
-      envelope = (await response.json()) as ShiyanApiEnvelope<T>;
+      raw = await response.json();
     } catch {
       throw new ShiyanClientError('拾言 Cloud 返回了无法识别的响应。', 'invalid_response', true);
     }
 
+    const envelope = parseShiyanApiEnvelope<T>(raw);
+    if (!envelope) {
+      throw new ShiyanClientError('拾言 Cloud 返回了不完整的响应。', 'invalid_response', true);
+    }
     if (!envelope.ok) {
       throw new ShiyanClientError(
         envelope.error.message,
