@@ -229,6 +229,9 @@ export function ChatScreen() {
   const [findQuery, setFindQuery] = useState('');
   const [debouncedFindQuery, setDebouncedFindQuery] = useState('');
   const [findMatchIndex, setFindMatchIndex] = useState(0);
+  // The row the user currently wants to jump to, kept in a ref so async retries
+  // can verify they still refer to the latest target before scrolling.
+  const pendingFindIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Debounce so each keystroke does not re-scan a long loaded history on the
@@ -248,14 +251,61 @@ export function ChatScreen() {
   const currentFindIndex = clampMatchIndex(findMatchIndex, findMatches.length);
   const currentFindMatch = findMatches[currentFindIndex];
 
+  // Estimated average height (in points) of a rendered message row, used to
+  // approximate a scroll offset when the FlatList cannot yet measure a row that
+  // has not been rendered. Sizes are memoized so the offset math stays stable.
+  const averageRowHeightRef = useRef(0);
+
+  const scrollToFindMatch = useCallback(
+    (messageIndex: number) => {
+      pendingFindIndexRef.current = messageIndex;
+      flatListRef.current?.scrollToIndex({
+        index: messageIndex,
+        viewPosition: 0.4,
+        animated: true,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
-    if (!isFindVisible || !currentFindMatch) return;
-    flatListRef.current?.scrollToIndex({
-      index: currentFindMatch.messageIndex,
-      viewPosition: 0.4,
-      animated: true,
-    });
-  }, [isFindVisible, currentFindMatch]);
+    if (!isFindVisible || !currentFindMatch) {
+      pendingFindIndexRef.current = null;
+      return;
+    }
+    scrollToFindMatch(currentFindMatch.messageIndex);
+  }, [isFindVisible, currentFindMatch, scrollToFindMatch]);
+
+  // When the list cannot measure a target row (it has not been rendered yet),
+  // jump approximately by offset first so the row starts laying out, then retry
+  // once layout has progressed. The ref guard prevents a stale retry from
+  // scrolling somewhere the user is no longer asking for.
+  const handleScrollToIndexFailed = useCallback(
+    (info: {
+      index: number;
+      averageItemLength: number;
+      highestMeasuredFrameIndex: number;
+    }) => {
+      if (info.index !== pendingFindIndexRef.current) return;
+      averageRowHeightRef.current = Math.max(info.averageItemLength, 1);
+      const approximateOffset = info.index * averageRowHeightRef.current;
+      flatListRef.current?.scrollToOffset({
+        offset: approximateOffset,
+        animated: false,
+      });
+      // Let one frame of layout happen, then retry for pixel-perfect placement.
+      requestAnimationFrame(() => {
+        if (info.index === pendingFindIndexRef.current) {
+          flatListRef.current?.scrollToIndex({
+            index: info.index,
+            viewPosition: 0.4,
+            animated: true,
+          });
+        }
+      });
+    },
+    [],
+  );
 
   const openFindInChat = useCallback(() => {
     setFindQuery('');
@@ -343,6 +393,13 @@ export function ChatScreen() {
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
   }, []);
+
+  // While the user is in find mode we intentionally suppress auto-scroll to the
+  // bottom, otherwise layout events keep yanking the list away from a found
+  // match; the caller decides what to do when not searching.
+  const onContentSizeChange = useCallback(() => {
+    if (!isFindVisible) scrollToBottom();
+  }, [isFindVisible, scrollToBottom]);
 
   const sendMessage = useCallback(
     async (text?: string, existingMessage?: ChatMessage) => {
@@ -628,18 +685,8 @@ export function ChatScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={scrollToBottom}
-          onScrollToIndexFailed={({ index }) => {
-            // Rows above the viewport may not be measured yet; retry once after
-            // the list has laid out more content.
-            setTimeout(() => {
-              flatListRef.current?.scrollToIndex({
-                index,
-                viewPosition: 0.4,
-                animated: true,
-              });
-            }, 250);
-          }}
+          onContentSizeChange={onContentSizeChange}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
           ListEmptyComponent={
             isLoadingHistory ? (
               <MessageHistorySkeleton colors={colors} />
