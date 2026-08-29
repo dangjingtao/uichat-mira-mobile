@@ -19,6 +19,7 @@ import { RemoteHostError } from './remoteHttp';
 import { readThreadMediaText } from './threadMedia';
 import type { MiraHostApi } from './miraHost';
 
+const THREAD_CREATE_ROUTE = 'POST /threads';
 const THREAD_MEDIA_ROUTE = 'GET /threads/:id/media/:mediaId/content';
 
 const threadToSession = (thread: RemoteThread): Session => ({
@@ -46,6 +47,10 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
     : {}),
   metadata: message.metadata,
 });
+
+const supportsThreadCreation = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('messages:write') &&
+  manifest.routes.threads.includes(THREAD_CREATE_ROUTE);
 
 const supportsThreadDeletion = (manifest: RemoteManifest): boolean =>
   manifest.device.scopes.includes('messages:write') &&
@@ -151,8 +156,16 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     return threadToSession(await this.remote.getThread(sessionId));
   }
 
-  async createSession(_title?: string): Promise<Session> {
-    return unsupportedMutation('Creating a thread');
+  async createSession(title?: string): Promise<Session> {
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadCreation(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_CREATE_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端新建会话',
+        403,
+      );
+    }
+    return threadToSession(await this.remote.createThread(title));
   }
 
   async canDeleteSession(): Promise<boolean> {
