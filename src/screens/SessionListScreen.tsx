@@ -133,21 +133,24 @@ function SessionRow({
 
   const settle = useCallback(
     (open: boolean) => {
-      if (isOpenRef.current === open && !open) return;
+      const wasOpen = isOpenRef.current;
       isOpenRef.current = open;
+      // Always animate, even for a redundant close: a terminated gesture can
+      // leave a closed row visually displaced mid-swipe, and skipping the
+      // animation here would strand it off its rest position.
       Animated.spring(translateX, {
         toValue: open ? actionsWidth : 0,
         useNativeDriver: true,
         friction: 9,
         tension: 80,
       }).start();
-      onSwipeStateChange(open);
+      if (wasOpen !== open) onSwipeStateChange(open);
     },
     [actionsWidth, onSwipeStateChange, translateX],
   );
 
-  // Close this row when another row opens. settle() already skips redundant
-  // close notifications, so this cannot loop.
+  // Close this row when another row opens. settle() only notifies on an
+  // actual state change, so this cannot loop.
   useEffect(() => {
     if (!isOpen && isOpenRef.current) {
       settle(false);
