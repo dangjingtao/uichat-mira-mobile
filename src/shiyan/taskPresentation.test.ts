@@ -39,9 +39,10 @@ describe('Shiyan task presentation', () => {
     expect(stageFailureText(currentShiyanStage(value)!)).toBe('STT provider timed out');
   });
 
-  it('only exposes retries that the current Cloud contract actually supports', () => {
+  it('exposes only stage retries backed by the Cloud contract', () => {
     expect(retryActionForStage(stage())).toBe('transcribe');
-    expect(retryActionForStage(stage({ stage: 'organize' }))).toBeNull();
+    expect(retryActionForStage(stage({ stage: 'organize' }))).toBe('organize');
+    expect(retryActionForStage(stage({ stage: 'delivery' }))).toBeNull();
     expect(retryActionForStage(stage({ retryable: false }))).toBeNull();
   });
 
