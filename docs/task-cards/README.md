@@ -22,10 +22,15 @@
 | MOB-018 | 拾言 Cloud 基础与 CaptureTask / 上传闭环 | **有条件完成**：基础实现已进入当前 Cloud `dev` 祖先基线 | `mira-shiyan-cloud`；真实 Cloud 资源 / Secret smoke |
 | MOB-019 | 拾言 STT Workflow 与 Transcript 证据层 | **有条件完成**：Cloud PR #3 已进入 `dev`，自动门禁通过 | `mira-shiyan-cloud`；40 分钟真实 Provider smoke |
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | **PR #6 待合入**：合同审查可接受；fork Actions 尚待批准执行 | `mira-shiyan-cloud`；批准 CI -> Review -> merge |
-| MOB-021 | 拾言处理状态、结果编辑与历史任务 | **PR #63 待合入**：Mobile CI run #721 全绿 | Mobile；OpenCode Review `E2BIG` 基建问题待处理后 merge |
+| MOB-021 | 拾言处理状态、结果编辑与历史任务 | **已合入 `dev`**：Mobile PR #63，merge `72f854d`；CI 全绿 | Mobile；真实 Cloud/device smoke 挂 MOB-023 |
 | MOB-022 | 拾言 GitHub Destination | **核心已合入，最终接线待完成** | `mira-shiyan-cloud` + `mira-shiyan`；待 MOB-020 合入后接 Final Draft / public routes + real GitHub smoke |
-| MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 021 / 022 达到可联调基线 |
+| MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | **有条件完成**：Desktop #88 / Mobile #65 已合入 | Mobile + Desktop Host；真实已配对设备新建 Thread 跨端 smoke |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **待实施** | Mobile；修复真机右滑并收口置顶分组 |
+| MOB-026 | 全局搜索命中消息正文 | **待实施** | Mobile；不新增虚构 Host search route |
+| MOB-027 | 设置页插件入口恢复可用 | **待实施** | Mobile；最小接线现有 `Plugins` route |
+| MOB-028 | 关于页版本更新检查与确认下载 | **待实施** | Mobile；release channel 隔离 + signed APK 下载 |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **待实施** | Mobile；可能触碰双平台 native audio |
 
 ## 既有产品决策
 
@@ -33,6 +38,14 @@
 - 全局最近 Thread 是一等入口；`workspaceId` 表示归属 / 运行上下文，不要求先经过 Workspace 页面。Drawer「项目」仍保留项目层级浏览。
 - 0.2.1 不为“入口能点”制造假成功；优先把当前手机已有、现有 Host 已授权的能力接成真实功能。
 - 自 2026-08-29 起，Remote Host V1 的旧固定 route allowlist 不再是规范权限真相；客户端能力判断以 Remote Gateway 显式 scope 映射 + 当前设备 scope + Host runtime manifest 为准。协议版本仍为 1，未授权 route 仍默认拒绝。
+
+## 2026-08-29 Dogfood Follow-up
+
+- MOB-025 是 MOB-007 之后的交互回归 / Drawer 展示收口，不改变 device-local pin 合同。
+- MOB-026 是新的**跨会话消息正文搜索**；MOB-014 仍只负责当前会话查找，不重开旧卡。
+- MOB-027 是明确的 Settings -> Plugins 接线回归，保持最小改动。
+- MOB-028 必须区分 dev / prod release channel；用户确认后触发系统 / 浏览器下载，不在本卡实现静默安装。
+- MOB-029 保持拾言“录音结束 -> 确认标题 / 场景 -> 提交”产品合同，仅收口确认页播放器、场景修改方式与 Cloud 配置入口。
 
 ## 拾言（Shiyan）MVP 规则
 
@@ -64,20 +77,20 @@ MOB-018 ✓
 MOB-019 ✓
    ↓
 MOB-020  PR #6
-   ├── MOB-021  PR #63
+   ├── MOB-021 ✓ Mobile dev
    └── MOB-022  core ✓ / integration pending
              \ /
            MOB-023
 ```
 
-MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工，因此无需重新设计；正式集成仍要求 MOB-020 合入 Cloud `dev`。MOB-023 是最终集成验收卡，不与上游实现卡并行施工。
+MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工并合入 Mobile `dev`；正式集成仍要求 MOB-020 合入 Cloud `dev`。MOB-023 是最终集成验收卡，不与上游实现卡并行施工。
 
 ## MOB-023 启动条件
 
 正式开始 MOB-023 前至少满足：
 
 1. MOB-020 合入 Cloud `dev`，其 Cloud CI / Review 形成可引用证据；
-2. MOB-021 合入 Mobile `dev`；
+2. MOB-021 已合入 Mobile `dev`；
 3. MOB-022 完成 Final Draft -> Delivery 的 public API 接线，并具备可调用真实 GitHub Destination 的路径。
 
 40 分钟真机会议、真实 Provider / Cloud Secret、真实 GitHub URL 属于 MOB-023 的验收矩阵，不需要提前伪造成上游“完成”。
@@ -102,3 +115,8 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工，因此无需
 - `MOB-022-shiyan-github-destination.md`
 - `MOB-023-shiyan-e2e-hardening.md`
 - `MOB-024-mobile-thread-creation.md`
+- `MOB-025-thread-swipe-drawer-pinning.md`
+- `MOB-026-global-message-search.md`
+- `MOB-027-settings-plugin-entry.md`
+- `MOB-028-app-update-check-download.md`
+- `MOB-029-shiyan-confirmation-ux.md`
