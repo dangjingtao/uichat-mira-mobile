@@ -1,6 +1,7 @@
-import { shiyanClient } from './client/ShiyanClient';
+import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
+import { localCaptureRepository } from './recording/localCaptureRepository';
+import { canonicalShiyanSceneId, shiyanSceneNameForId } from './scenes';
 import { shiyanSubmissionRepository } from './submissionRepository';
-import { SHIYAN_BUILT_IN_SCENES, getCustomSceneDraft } from './scenes';
 
 export type ShiyanHistoryStageStatus =
   | 'pending'
@@ -24,12 +25,25 @@ export interface ShiyanHistoryDataSource {
   listTasks(): Promise<readonly ShiyanHistoryTaskSummary[]>;
 }
 
-const sceneNameFor = (sceneId: string) => {
-  const custom = getCustomSceneDraft();
-  return (
-    SHIYAN_BUILT_IN_SCENES.find((scene) => scene.id === sceneId)?.name ??
-    (custom?.id === sceneId ? custom.name : sceneId)
-  );
+const destinationUrlFor = async (taskId: string): Promise<string | null> => {
+  try {
+    const result = await shiyanClient.getDeliveries(taskId);
+    return (
+      result.deliveries.find(
+        (delivery) => delivery.status === 'succeeded' && Boolean(delivery.fileUrl),
+      )?.fileUrl ?? null
+    );
+  } catch (error) {
+    // MOB-022's handler exists but public router wiring may lag the Mobile build.
+    // Missing route/evidence means “no canonical URL yet”, never a fabricated URL.
+    if (
+      error instanceof ShiyanClientError &&
+      (error.code === 'route_not_found' || error.code === 'task_not_found')
+    ) {
+      return null;
+    }
+    return null;
+  }
 };
 
 const cloudHistoryDataSource: ShiyanHistoryDataSource = {
@@ -37,20 +51,28 @@ const cloudHistoryDataSource: ShiyanHistoryDataSource = {
     const pointers = await shiyanSubmissionRepository.list();
     const rows = await Promise.all(
       pointers.map(async (pointer) => {
-        const { task } = await shiyanClient.getCaptureTask(pointer.taskId);
+        const [{ task }, localCapture, canonicalDestinationUrl] = await Promise.all([
+          shiyanClient.getCaptureTask(pointer.taskId),
+          localCaptureRepository.get(pointer.localCaptureId).catch(() => null),
+          destinationUrlFor(pointer.taskId),
+        ]);
         const current =
           task.stages.find((stage) => stage.stage === task.currentStage) ??
           task.stages[task.stages.length - 1];
+        const sceneId = canonicalShiyanSceneId(task.sceneId);
         return {
           id: task.id,
           localCaptureId: pointer.localCaptureId,
           title: task.title,
-          sceneName: sceneNameFor(task.sceneId),
+          sceneName:
+            shiyanSceneNameForId(sceneId) ??
+            localCapture?.sceneSnapshot?.name ??
+            localCapture?.sceneName ??
+            sceneId,
           createdAt: task.createdAt,
           currentStage: task.currentStage,
           stageStatus: current?.status ?? 'pending',
-          // MOB-022 owns Destination delivery. Never fabricate a URL here.
-          canonicalDestinationUrl: null,
+          canonicalDestinationUrl,
         } satisfies ShiyanHistoryTaskSummary;
       }),
     );
