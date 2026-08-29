@@ -51,9 +51,10 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   const previousSaving = useRef(false);
   const refreshGeneration = useRef(0);
   const focused = useRef(false);
+  const deliveryBusy = useRef(false);
 
-  const refreshDeliveryState = useCallback(async () => {
-    if (!focused.current) return;
+  const refreshDeliveryState = useCallback(async (force = false) => {
+    if (!focused.current || (deliveryBusy.current && !force)) return;
     const generation = ++refreshGeneration.current;
     const isCurrent = () => focused.current && refreshGeneration.current === generation;
 
@@ -134,6 +135,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
 
   const deliver = async () => {
     if (!finalDraft || busy || deliveryBlocked) return;
+    deliveryBusy.current = true;
     refreshGeneration.current += 1;
     setBusy(true);
     setDeliveryError('');
@@ -148,8 +150,9 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       Alert.alert('已投递 GitHub', 'Final Draft 已写入真实 GitHub 文档。');
     } catch (error) {
       setDeliveryError(error instanceof Error ? error.message : 'GitHub 投递失败，可以直接重试。');
-      await refreshDeliveryState();
+      await refreshDeliveryState(true);
     } finally {
+      deliveryBusy.current = false;
       setBusy(false);
     }
   };
