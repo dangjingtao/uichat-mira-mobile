@@ -82,7 +82,40 @@ describe('LocalCaptureRepository', () => {
     );
   });
 
-  it('deletes both local audio and metadata', async () => {
+  it('keeps submitted audio locally but removes it from actionable drafts', async () => {
+    const store = new MemoryLocalKeyValueStore();
+    const files = new FakeRecordingFileStore();
+    files.files.set('/private/shiyan/submitted.m4a', 8192);
+    const repository = new LocalCaptureRepository(store, files);
+
+    await repository.saveCompleted({
+      id: 'submitted',
+      sceneId: 'meeting',
+      sceneName: '会议采集',
+      recording: {
+        filePath: '/private/shiyan/submitted.m4a',
+        startedAt: '2026-08-29T03:00:00.000Z',
+        endedAt: '2026-08-29T03:10:00.000Z',
+        durationMs: 600000,
+        fileSizeBytes: 8192,
+      },
+    });
+    await repository.confirm({
+      id: 'submitted',
+      title: '已提交会议',
+      sceneId: 'meeting',
+      sceneName: '会议采集',
+    });
+    await repository.markSubmitted('submitted');
+
+    await expect(repository.listRecoverable()).resolves.toEqual([]);
+    expect(files.files.has('/private/shiyan/submitted.m4a')).toBe(true);
+    await expect(repository.get('submitted')).resolves.toEqual(
+      expect.objectContaining({ status: 'submitted' }),
+    );
+  });
+
+  it('deletes both local audio and metadata only on explicit delete', async () => {
     const store = new MemoryLocalKeyValueStore();
     const files = new FakeRecordingFileStore();
     files.files.set('/private/shiyan/c.m4a', 1024);
