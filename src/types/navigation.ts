@@ -25,6 +25,7 @@ export type RootStackParamList = {
   ShiyanCaptureConfirm: { captureId: string };
   ShiyanLocalDrafts: undefined;
   ShiyanHistory: undefined;
+  ShiyanTaskDetail: { taskId: string; localCaptureId?: string };
   ShiyanSceneConfig: undefined;
   ReportError: undefined;
   About: undefined;
