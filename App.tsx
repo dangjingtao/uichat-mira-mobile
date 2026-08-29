@@ -20,16 +20,18 @@ import { AboutScreen } from './src/screens/AboutScreen';
 import { LicenseScreen } from './src/screens/LicenseScreen';
 import {
   PluginsScreen,
-  ShiyanHistoryScreen,
   ShiyanSceneConfigScreen,
 } from './src/shiyan/ShiyanScreens';
 import {
-  ShiyanCaptureConfirmScreen,
   ShiyanHomeScreen,
   ShiyanLocalDraftsScreen,
   ShiyanRecordScreen,
   ShiyanSceneSelectScreen,
 } from './src/shiyan/ShiyanRecordingScreens';
+import { ShiyanCaptureSubmitScreen } from './src/shiyan/ShiyanCaptureSubmitScreen';
+import { ShiyanCloudConfigScreen } from './src/shiyan/ShiyanCloudConfigScreen';
+import { ShiyanHistoryScreen } from './src/shiyan/ShiyanHistoryScreen';
+import { ShiyanTaskDetailScreen } from './src/shiyan/ShiyanTaskDetailScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
@@ -133,9 +135,11 @@ function AppInner() {
         <Stack.Screen name="ShiyanHome" component={ShiyanHomeScreen} />
         <Stack.Screen name="ShiyanSceneSelect" component={ShiyanSceneSelectScreen} />
         <Stack.Screen name="ShiyanRecord" component={ShiyanRecordScreen} />
-        <Stack.Screen name="ShiyanCaptureConfirm" component={ShiyanCaptureConfirmScreen} />
+        <Stack.Screen name="ShiyanCaptureConfirm" component={ShiyanCaptureSubmitScreen} />
         <Stack.Screen name="ShiyanLocalDrafts" component={ShiyanLocalDraftsScreen} />
         <Stack.Screen name="ShiyanHistory" component={ShiyanHistoryScreen} />
+        <Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailScreen} />
+        <Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />
         <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
         <Stack.Screen name="About" component={AboutScreen} />

@@ -2,18 +2,26 @@ import {
   localKeyValueStore,
   type LocalKeyValueStore,
 } from '../../storage/localKeyValueStore';
+import {
+  snapshotShiyanSceneById,
+  type ShiyanSceneSnapshot,
+} from '../scenes';
 import type { CompletedRecording } from './RecordingAdapter';
 import { nativeAudioRecorder } from './nativeAudioRecorder';
 
 const STORAGE_KEY = 'mira.shiyan.local-captures.v1';
 
-export type LocalCaptureStatus = 'pending_confirmation' | 'ready_for_submission';
+export type LocalCaptureStatus =
+  | 'pending_confirmation'
+  | 'ready_for_submission'
+  | 'submitted';
 
 export interface LocalCaptureMetadata {
   id: string;
   filePath: string;
   sceneId: string;
   sceneName: string;
+  sceneSnapshot?: ShiyanSceneSnapshot;
   title: string;
   startedAt: string;
   endedAt: string;
@@ -32,6 +40,26 @@ const nativeRecordingFileStore: RecordingFileStore = {
   deleteFile: (path) => nativeAudioRecorder.deleteFile(path),
 };
 
+const isSceneSnapshot = (value: unknown): value is ShiyanSceneSnapshot => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Partial<ShiyanSceneSnapshot>;
+  return (
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.instruction === 'string' &&
+    typeof item.builtIn === 'boolean' &&
+    Array.isArray(item.sections) &&
+    item.sections.every(
+      (section) =>
+        !!section &&
+        typeof section === 'object' &&
+        typeof section.id === 'string' &&
+        typeof section.title === 'string' &&
+        typeof section.description === 'string',
+    )
+  );
+};
+
 const isCapture = (value: unknown): value is LocalCaptureMetadata => {
   if (!value || typeof value !== 'object') return false;
   const item = value as Partial<LocalCaptureMetadata>;
@@ -40,12 +68,15 @@ const isCapture = (value: unknown): value is LocalCaptureMetadata => {
     typeof item.filePath === 'string' &&
     typeof item.sceneId === 'string' &&
     typeof item.sceneName === 'string' &&
+    (item.sceneSnapshot === undefined || isSceneSnapshot(item.sceneSnapshot)) &&
     typeof item.title === 'string' &&
     typeof item.startedAt === 'string' &&
     typeof item.endedAt === 'string' &&
     typeof item.durationMs === 'number' &&
     typeof item.fileSizeBytes === 'number' &&
-    (item.status === 'pending_confirmation' || item.status === 'ready_for_submission')
+    (item.status === 'pending_confirmation' ||
+      item.status === 'ready_for_submission' ||
+      item.status === 'submitted')
   );
 };
 
@@ -63,7 +94,9 @@ export class LocalCaptureRepository {
   }
 
   async listRecoverable(): Promise<LocalCaptureMetadata[]> {
-    const captures = await this.listAll();
+    const captures = (await this.listAll()).filter(
+      (capture) => capture.status !== 'submitted',
+    );
     const checked = await Promise.all(
       captures.map(async (capture) => ({
         capture,
@@ -84,13 +117,16 @@ export class LocalCaptureRepository {
     id: string;
     sceneId: string;
     sceneName: string;
+    sceneSnapshot?: ShiyanSceneSnapshot;
     recording: CompletedRecording;
   }): Promise<LocalCaptureMetadata> {
+    const sceneSnapshot = input.sceneSnapshot ?? snapshotShiyanSceneById(input.sceneId);
     const capture: LocalCaptureMetadata = {
       id: input.id,
       filePath: input.recording.filePath,
-      sceneId: input.sceneId,
-      sceneName: input.sceneName,
+      sceneId: sceneSnapshot?.id ?? input.sceneId,
+      sceneName: sceneSnapshot?.name ?? input.sceneName,
+      ...(sceneSnapshot ? { sceneSnapshot } : {}),
       title: '',
       startedAt: input.recording.startedAt,
       endedAt: input.recording.endedAt,
@@ -108,6 +144,7 @@ export class LocalCaptureRepository {
     title: string;
     sceneId: string;
     sceneName: string;
+    sceneSnapshot?: ShiyanSceneSnapshot;
   }): Promise<LocalCaptureMetadata> {
     const title = input.title.trim();
     if (!title) throw new Error('请填写录音标题。');
@@ -121,6 +158,7 @@ export class LocalCaptureRepository {
           title,
           sceneId: input.sceneId,
           sceneName: input.sceneName,
+          ...(input.sceneSnapshot ? { sceneSnapshot: input.sceneSnapshot } : {}),
           status: 'ready_for_submission',
         };
         return updated;
@@ -128,6 +166,14 @@ export class LocalCaptureRepository {
     );
     if (!updated) throw new Error('本地录音草稿不存在。');
     return updated;
+  }
+
+  async markSubmitted(id: string): Promise<void> {
+    await this.mutate((captures) =>
+      captures.map((capture) =>
+        capture.id === id ? { ...capture, status: 'submitted' } : capture,
+      ),
+    );
   }
 
   async delete(id: string): Promise<void> {
