@@ -13,17 +13,36 @@ import { RefreshCw } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
-import { ShiyanTaskDetailScreen } from './ShiyanTaskDetailScreen';
+import {
+  ShiyanTaskDetailScreen,
+  type ShiyanFinalEditorState,
+} from './ShiyanTaskDetailScreen';
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
 import type { ShiyanDeliveryView, ShiyanFinalDraftView } from './client/contracts';
-import { deliverFinalDraftToGithub } from './client/delivery';
+import {
+  deliverFinalDraftToGithub,
+  githubDeliveryIdempotencyKey,
+} from './client/delivery';
 
 type DetailRoute = RouteProp<RootStackParamList, 'ShiyanTaskDetail'>;
+type DeliveryWithIdentity = ShiyanDeliveryView & { idempotencyKey?: unknown };
+
+const EMPTY_EDITOR_STATE: ShiyanFinalEditorState = {
+  open: false,
+  dirty: false,
+  saving: false,
+};
 
 const belongsToFinalDraft = (
   delivery: ShiyanDeliveryView,
   finalDraft: ShiyanFinalDraftView,
-): boolean => delivery.finalDraftId === finalDraft.id;
+): boolean => {
+  const idempotencyKey = (delivery as DeliveryWithIdentity).idempotencyKey;
+  return (
+    delivery.finalDraftId === finalDraft.id &&
+    idempotencyKey === githubDeliveryIdempotencyKey(finalDraft.taskId, finalDraft)
+  );
+};
 
 export function ShiyanTaskDetailWithDeliveryScreen() {
   const route = useRoute<DetailRoute>();
@@ -33,6 +52,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   const [delivery, setDelivery] = useState<ShiyanDeliveryView | null>(null);
   const [deliveryError, setDeliveryError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editorState, setEditorState] = useState<ShiyanFinalEditorState>(EMPTY_EDITOR_STATE);
 
   const refreshDeliveryState = useCallback(async () => {
     let nextFinalDraft: ShiyanFinalDraftView | null = null;
@@ -86,8 +106,10 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     return () => clearInterval(timer);
   }, [refreshDeliveryState]);
 
+  const deliveryBlocked = editorState.dirty || editorState.saving;
+
   const deliver = async () => {
-    if (!finalDraft || busy) return;
+    if (!finalDraft || busy || deliveryBlocked) return;
     setBusy(true);
     setDeliveryError('');
     try {
@@ -103,7 +125,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
   };
 
   const openDelivery = async () => {
-    if (!delivery?.fileUrl) return;
+    if (!delivery?.fileUrl || deliveryBlocked) return;
     try {
       await Linking.openURL(delivery.fileUrl);
     } catch {
@@ -119,9 +141,17 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       delivery.fileUrl,
   );
 
+  const statusCopy = deliveryBlocked
+    ? editorState.saving
+      ? 'Final Draft 正在保存，保存完成后才能投递。'
+      : '当前 Final Draft 有未保存修改，请先保存再投递。'
+    : currentSucceeded
+      ? '已投递当前已保存的 Final Draft，可打开真实文档。'
+      : deliveryError || 'Final Draft 已确认，可以投递到默认 GitHub 仓库。';
+
   return (
     <View style={styles.root}>
-      <ShiyanTaskDetailScreen />
+      <ShiyanTaskDetailScreen onFinalEditorStateChange={setEditorState} />
       {finalDraft ? (
         <View
           style={[
@@ -132,20 +162,18 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
           <View style={styles.deliveryCopy}>
             <Text style={[styles.deliveryTitle, { color: colors.text.ink }]}>GitHub Destination</Text>
             <Text style={[styles.deliveryMeta, { color: colors.text.soft }]} numberOfLines={2}>
-              {currentSucceeded
-                ? '已投递当前 Final Draft，可打开真实文档。'
-                : deliveryError || 'Final Draft 已确认，可以投递到默认 GitHub 仓库。'}
+              {statusCopy}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            disabled={busy}
+            disabled={busy || deliveryBlocked}
             onPress={() => void (currentSucceeded ? openDelivery() : deliver())}
             style={({ pressed }) => [
               styles.deliveryButton,
               {
                 backgroundColor: pressed ? colors.primaryActive : colors.primary,
-                opacity: busy ? 0.65 : 1,
+                opacity: busy || deliveryBlocked ? 0.55 : 1,
               },
             ]}
           >
