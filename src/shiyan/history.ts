@@ -1,5 +1,8 @@
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
-import { parseShiyanDeliveriesResult } from './client/contracts';
+import {
+  hasCanonicalGithubDeliveryEvidence,
+  parseShiyanDeliveriesResult,
+} from './client/contracts';
 import { deliveryBelongsToFinalDraft } from './client/delivery';
 import { localCaptureRepository } from './recording/localCaptureRepository';
 import { canonicalShiyanSceneId, shiyanSceneNameForId } from './scenes';
@@ -39,8 +42,7 @@ const destinationUrlFor = async (taskId: string): Promise<string | null> => {
       deliveries.deliveries.find(
         (delivery) =>
           deliveryBelongsToFinalDraft(delivery, draft) &&
-          delivery.status === 'succeeded' &&
-          Boolean(delivery.fileUrl),
+          hasCanonicalGithubDeliveryEvidence(delivery),
       )?.fileUrl ?? null
     );
   } catch (error) {
