@@ -18,6 +18,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 
 type MediaRequest = { url: string; headers: Record<string, string> };
+type ViewerSource = { uri: string; headers: Record<string, string> };
 type AttachmentPart = Extract<RemoteMessagePart, { type: 'image' | 'file' }>;
 
 const MAX_TEXT_PREVIEW_BYTES = 1_000_000;
@@ -90,7 +91,7 @@ function TextAttachmentViewer({
   source,
   onFailure,
 }: {
-  source: MediaRequest;
+  source: ViewerSource;
   onFailure: (message: string) => void;
 }) {
   const { colors } = useTheme();
@@ -105,7 +106,7 @@ function TextAttachmentViewer({
 
     const load = async () => {
       try {
-        const response = await fetch(source.url, {
+        const response = await fetch(source.uri, {
           method: 'GET',
           headers: source.headers,
           signal: controller.signal,
@@ -241,7 +242,7 @@ function FileAttachment({
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const standaloneUri = useMemo(() => safeStandaloneUri(part.data), [part.data]);
-  const viewerSource = previewKind
+  const viewerSource: ViewerSource | null = previewKind
     ? request
       ? { uri: request.url, headers: request.headers }
       : !part.fileId && standaloneUri
@@ -337,10 +338,7 @@ function FileAttachment({
               />
             </View>
           ) : viewerSource && previewKind === 'text' ? (
-            <TextAttachmentViewer
-              source={viewerSource}
-              onFailure={handleViewerFailure}
-            />
+            <TextAttachmentViewer source={viewerSource} onFailure={handleViewerFailure} />
           ) : null}
         </View>
       </Modal>
