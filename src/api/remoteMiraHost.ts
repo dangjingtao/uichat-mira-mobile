@@ -311,15 +311,70 @@ export class RemoteMiraHostClient {
   }
 
   async createThread(title?: string): Promise<RemoteThread> {
-    return this.withCredential(credential =>
-      this.requestCredentialJson(credential, {
+    return this.withCredential(async credential => {
+      const operation: JsonOperation<RemoteThread> = {
         path: '/threads',
         method: 'POST',
         credential: credential.credential,
         ...(title ? { body: { title } } : {}),
         parse: parseRemoteThread,
-      }),
-    );
+      };
+      const order = this.transportOrder(credential);
+      let lastError: unknown = new RemoteHostError(
+        'REMOTE_ENDPOINT_UNAVAILABLE',
+        'No Mira remote endpoint is available for creating a thread',
+      );
+
+      // Pick a reachable transport using an idempotent manifest probe first.
+      // Once POST /threads is dispatched we never replay it through another
+      // transport because a lost response cannot prove the Host did not create it.
+      for (let index = 0; index < order.length; index += 1) {
+        const transport = order[index];
+        try {
+          await this.requestJsonOnTransport(credential, transport, {
+            path: '/remote/v1/manifest',
+            credential: credential.credential,
+            parse: parseRemoteManifest,
+          });
+          if (transport === 'direct') this.directRetryAfter = 0;
+        } catch (error) {
+          lastError = error;
+          const hasNext = index + 1 < order.length;
+          if (!hasNext) throw error;
+          if (transport === 'direct' && isDirectNetworkError(error)) {
+            this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
+            continue;
+          }
+          if (transport === 'relay' && isRelayTransportError(error)) {
+            continue;
+          }
+          throw error;
+        }
+
+        try {
+          return await this.requestJsonOnTransport(
+            credential,
+            transport,
+            operation,
+          );
+        } catch (error) {
+          if (
+            (transport === 'direct' && isDirectNetworkError(error)) ||
+            (transport === 'relay' && isRelayTransportError(error))
+          ) {
+            throw new RemoteHostError(
+              'THREAD_CREATE_UNCERTAIN',
+              'Mira Host may have created the conversation; refresh the conversation list before retrying',
+              undefined,
+              error,
+            );
+          }
+          throw error;
+        }
+      }
+
+      throw lastError;
+    });
   }
 
   async renameThread(threadId: string, title: string): Promise<RemoteThread> {
