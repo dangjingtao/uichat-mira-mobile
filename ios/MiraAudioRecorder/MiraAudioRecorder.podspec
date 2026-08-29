@@ -10,5 +10,4 @@ Pod::Spec.new do |s|
   s.source_files = 'MiraAudioRecorder.mm'
   s.frameworks = 'AVFoundation'
   s.dependency 'React-Core'
-  s.compiler_flags = '-DRCT_NEW_ARCH_ENABLED=1'
 end
