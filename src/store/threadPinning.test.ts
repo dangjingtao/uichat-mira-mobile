@@ -5,6 +5,7 @@ import {
 } from '../storage/localKeyValueStore';
 import {
   sortSessionsByLocalPin,
+  splitSessionsByLocalPin,
   ThreadPinRepository,
   type ThreadPinMap,
 } from './threadPinning';
@@ -115,5 +116,67 @@ describe('local thread pin ordering', () => {
     const refreshed = [session('a', '2026-08-28T00:10:00.000Z', 'New title')];
 
     expect(sortSessionsByLocalPin(refreshed, pins)[0].id).toBe('a');
+  });
+});
+
+describe('drawer session grouping', () => {
+  it('separates pinned sessions into their own group before the recent cap', () => {
+    const sessions = [
+      session('a', '2026-08-28T00:10:00.000Z'),
+      session('b', '2026-08-28T00:09:00.000Z'),
+      session('c', '2026-08-28T00:08:00.000Z'),
+      session('d', '2026-08-28T00:07:00.000Z'),
+    ];
+    const pins: ThreadPinMap = { c: '2026-08-28T00:00:00.000Z' };
+
+    const groups = splitSessionsByLocalPin(sessions, pins, 2);
+
+    expect(groups.pinned.map(({ id }) => id)).toEqual(['c']);
+    expect(groups.recent.map(({ id }) => id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps an older pinned thread visible even beyond the recent cap', () => {
+    const sessions = [
+      session('a', '2026-08-28T00:10:00.000Z'),
+      session('b', '2026-08-28T00:09:00.000Z'),
+      session('c', '2026-08-28T00:08:00.000Z'),
+      session('d', '2026-08-28T00:07:00.000Z'),
+    ];
+    const pins: ThreadPinMap = { d: '2026-08-28T00:00:00.000Z' };
+
+    const groups = splitSessionsByLocalPin(sessions, pins, 2);
+
+    expect(groups.pinned.map(({ id }) => id)).toEqual(['d']);
+    expect(groups.recent.map(({ id }) => id)).toEqual(['a', 'b']);
+  });
+
+  it('returns an empty pinned group when nothing is pinned', () => {
+    const sessions = [
+      session('a', '2026-08-28T00:10:00.000Z'),
+      session('b', '2026-08-28T00:09:00.000Z'),
+    ];
+
+    const groups = splitSessionsByLocalPin(sessions, {}, 20);
+
+    expect(groups.pinned).toEqual([]);
+    expect(groups.recent.map(({ id }) => id)).toEqual(['a', 'b']);
+  });
+
+  it('moves a thread back to recent after unpinning', () => {
+    const sessions = [
+      session('a', '2026-08-28T00:10:00.000Z'),
+      session('b', '2026-08-28T00:09:00.000Z'),
+    ];
+
+    const pinned = splitSessionsByLocalPin(
+      sessions,
+      { b: '2026-08-28T00:00:00.000Z' },
+      20,
+    );
+    const unpinned = splitSessionsByLocalPin(sessions, {}, 20);
+
+    expect(pinned.pinned.map(({ id }) => id)).toEqual(['b']);
+    expect(unpinned.pinned).toEqual([]);
+    expect(unpinned.recent.map(({ id }) => id)).toEqual(['a', 'b']);
   });
 });

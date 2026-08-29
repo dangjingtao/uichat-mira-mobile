@@ -69,3 +69,32 @@ export const sortSessionsByLocalPin = (
       return left.index - right.index;
     })
     .map(({ session }) => session);
+
+export interface DrawerSessionGroups {
+  pinned: Session[];
+  recent: Session[];
+}
+
+/**
+ * Split sessions into the drawer's pinned and recent groups.
+ *
+ * Grouping happens before the recent display cap so an older-but-pinned
+ * thread never disappears from the drawer just because it falls outside the
+ * recent limit.
+ */
+export const splitSessionsByLocalPin = (
+  sessions: Session[],
+  pins: ThreadPinMap,
+  recentLimit: number,
+): DrawerSessionGroups => {
+  const pinned: Session[] = [];
+  const recent: Session[] = [];
+  for (const session of sortSessionsByLocalPin(sessions, pins)) {
+    if (isThreadPinned(pins, session.id)) {
+      pinned.push(session);
+    } else if (recent.length < recentLimit) {
+      recent.push(session);
+    }
+  }
+  return { pinned, recent };
+};

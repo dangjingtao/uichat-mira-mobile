@@ -1,5 +1,6 @@
 import React, {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -57,6 +58,7 @@ import { resolveSessionOpenTarget } from './sessionNavigation';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 const SWIPE_ACTION_WIDTH = 72;
+const SWIPE_ACTION_GAP = 8;
 const SWIPE_OPEN_THRESHOLD = 44;
 
 function formatTime(date: Date): string {
@@ -94,6 +96,8 @@ interface SessionRowProps {
   isPinned: boolean;
   isUnread: boolean;
   canDelete: boolean;
+  isOpen: boolean;
+  onSwipeStateChange: (open: boolean) => void;
   onOpen: () => void;
   onTogglePin: () => void;
   onDelete: () => void;
@@ -107,13 +111,16 @@ function SessionRow({
   isPinned,
   isUnread,
   canDelete,
+  isOpen,
+  onSwipeStateChange,
   onOpen,
   onTogglePin,
   onDelete,
 }: SessionRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpenRef = useRef(false);
-  const actionsWidth = SWIPE_ACTION_WIDTH * (canDelete ? 2 : 1);
+  const actionsWidth =
+    (SWIPE_ACTION_WIDTH + SWIPE_ACTION_GAP) * (canDelete ? 2 : 1);
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
   const preview = belongsToWorkspace
@@ -126,6 +133,7 @@ function SessionRow({
 
   const settle = useCallback(
     (open: boolean) => {
+      if (isOpenRef.current === open && !open) return;
       isOpenRef.current = open;
       Animated.spring(translateX, {
         toValue: open ? actionsWidth : 0,
@@ -133,16 +141,35 @@ function SessionRow({
         friction: 9,
         tension: 80,
       }).start();
+      onSwipeStateChange(open);
     },
-    [actionsWidth, translateX],
+    [actionsWidth, onSwipeStateChange, translateX],
   );
+
+  // Close this row when another row opens. settle() already skips redundant
+  // close notifications, so this cannot loop.
+  useEffect(() => {
+    if (!isOpen && isOpenRef.current) {
+      settle(false);
+    }
+  }, [isOpen, settle]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_event, gesture) => {
-          const horizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
-          if (!horizontal || Math.abs(gesture.dx) < 8) return false;
+        // Never steal the responder on touch-down so taps reach the row
+        // content and the list keeps its native press feedback.
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
+        // Capture on move: the row content is a Pressable, which becomes the
+        // responder on Android as soon as it is touched. A non-capture
+        // onMoveShouldSetPanResponder never fires in that case, which is why
+        // swiping used to be unreliable on real devices. The capture phase
+        // lets the row take over once the gesture is clearly horizontal,
+        // while vertical movement still bubbles up to the FlatList scroll.
+        onMoveShouldSetPanResponderCapture: (_event, gesture) => {
+          if (Math.abs(gesture.dx) <= Math.abs(gesture.dy)) return false;
+          if (Math.abs(gesture.dx) < 6) return false;
           return gesture.dx > 0 || isOpenRef.current;
         },
         onPanResponderMove: (_event, gesture) => {
@@ -152,10 +179,14 @@ function SessionRow({
         },
         onPanResponderRelease: (_event, gesture) => {
           if (isOpenRef.current) {
-            settle(gesture.dx > -SWIPE_OPEN_THRESHOLD);
+            const shouldClose =
+              gesture.dx <= -SWIPE_OPEN_THRESHOLD || gesture.vx < -0.5;
+            settle(!shouldClose);
             return;
           }
-          settle(gesture.dx >= SWIPE_OPEN_THRESHOLD);
+          const shouldOpen =
+            gesture.dx >= SWIPE_OPEN_THRESHOLD || gesture.vx > 0.5;
+          settle(shouldOpen);
         },
         onPanResponderTerminate: () => settle(isOpenRef.current),
       }),
@@ -311,6 +342,7 @@ export function SessionListScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openSwipeRowId, setOpenSwipeRowId] = useState<string | null>(null);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const backdropAnim = useState(new Animated.Value(0))[0];
 
@@ -509,6 +541,12 @@ export function SessionListScreen() {
               isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
               isUnread={selectThreadUnread(progressByThreadId, item.id)}
               canDelete={canDeleteSessions}
+              isOpen={openSwipeRowId === item.id}
+              onSwipeStateChange={(open) =>
+                setOpenSwipeRowId(open ? item.id : (current) =>
+                  current === item.id ? null : current,
+                )
+              }
               onOpen={() => openSession(item)}
               onTogglePin={() => void togglePin(item)}
               onDelete={() => confirmDelete(item)}
@@ -658,9 +696,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'flex-start',
+    paddingVertical: 6,
+    paddingLeft: SWIPE_ACTION_GAP,
+    gap: SWIPE_ACTION_GAP,
   },
   swipeAction: {
     width: SWIPE_ACTION_WIDTH,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
