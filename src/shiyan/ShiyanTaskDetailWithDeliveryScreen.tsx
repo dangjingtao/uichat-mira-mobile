@@ -18,7 +18,11 @@ import {
   type ShiyanFinalEditorState,
 } from './ShiyanTaskDetailScreen';
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
-import type { ShiyanDeliveryView, ShiyanFinalDraftView } from './client/contracts';
+import {
+  parseShiyanDeliveriesResult,
+  type ShiyanDeliveryView,
+  type ShiyanFinalDraftView,
+} from './client/contracts';
 import {
   deliverFinalDraftToGithub,
   deliveryBelongsToFinalDraft,
@@ -59,7 +63,16 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     }
 
     try {
-      const result = await shiyanClient.getDeliveries(taskId);
+      const raw = await shiyanClient.getDeliveries(taskId);
+      const result = parseShiyanDeliveriesResult(raw, taskId);
+      if (!result) {
+        throw new ShiyanClientError(
+          '拾言 Cloud 返回了不完整的投递记录。',
+          'invalid_response',
+          true,
+          taskId,
+        );
+      }
       const matching = result.deliveries.filter((item) =>
         nextFinalDraft ? deliveryBelongsToFinalDraft(item, nextFinalDraft) : false,
       );
