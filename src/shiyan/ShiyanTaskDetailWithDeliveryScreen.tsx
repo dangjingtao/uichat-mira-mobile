@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
-import { Github, RefreshCw } from 'lucide-react-native';
+import { RefreshCw } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
@@ -129,10 +129,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
           ]}
         >
           <View style={styles.deliveryCopy}>
-            <View style={styles.deliveryTitleRow}>
-              <Github size={18} color={colors.primary} />
-              <Text style={[styles.deliveryTitle, { color: colors.text.ink }]}>GitHub Destination</Text>
-            </View>
+            <Text style={[styles.deliveryTitle, { color: colors.text.ink }]}>GitHub Destination</Text>
             <Text style={[styles.deliveryMeta, { color: colors.text.soft }]} numberOfLines={2}>
               {currentSucceeded
                 ? '已投递当前 Final Draft，可打开真实文档。'
@@ -182,7 +179,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   deliveryCopy: { flex: 1, gap: 4 },
-  deliveryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   deliveryTitle: { fontSize: 14, fontWeight: '700' },
   deliveryMeta: { fontSize: 12, lineHeight: 17 },
   deliveryButton: {
