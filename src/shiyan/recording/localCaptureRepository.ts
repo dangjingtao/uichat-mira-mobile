@@ -7,7 +7,10 @@ import { nativeAudioRecorder } from './nativeAudioRecorder';
 
 const STORAGE_KEY = 'mira.shiyan.local-captures.v1';
 
-export type LocalCaptureStatus = 'pending_confirmation' | 'ready_for_submission';
+export type LocalCaptureStatus =
+  | 'pending_confirmation'
+  | 'ready_for_submission'
+  | 'submitted';
 
 export interface LocalCaptureMetadata {
   id: string;
@@ -45,7 +48,9 @@ const isCapture = (value: unknown): value is LocalCaptureMetadata => {
     typeof item.endedAt === 'string' &&
     typeof item.durationMs === 'number' &&
     typeof item.fileSizeBytes === 'number' &&
-    (item.status === 'pending_confirmation' || item.status === 'ready_for_submission')
+    (item.status === 'pending_confirmation' ||
+      item.status === 'ready_for_submission' ||
+      item.status === 'submitted')
   );
 };
 
@@ -63,7 +68,9 @@ export class LocalCaptureRepository {
   }
 
   async listRecoverable(): Promise<LocalCaptureMetadata[]> {
-    const captures = await this.listAll();
+    const captures = (await this.listAll()).filter(
+      (capture) => capture.status !== 'submitted',
+    );
     const checked = await Promise.all(
       captures.map(async (capture) => ({
         capture,
@@ -128,6 +135,14 @@ export class LocalCaptureRepository {
     );
     if (!updated) throw new Error('本地录音草稿不存在。');
     return updated;
+  }
+
+  async markSubmitted(id: string): Promise<void> {
+    await this.mutate((captures) =>
+      captures.map((capture) =>
+        capture.id === id ? { ...capture, status: 'submitted' } : capture,
+      ),
+    );
   }
 
   async delete(id: string): Promise<void> {
