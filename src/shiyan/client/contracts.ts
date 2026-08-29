@@ -232,6 +232,18 @@ export const isShiyanDeliveryView = (value: unknown): value is ShiyanDeliveryVie
   );
 };
 
+export const hasCanonicalGithubDeliveryEvidence = (
+  delivery: ShiyanDeliveryView,
+): boolean =>
+  delivery.status === 'succeeded' &&
+  Boolean(
+    delivery.repository?.trim() &&
+      delivery.path?.trim() &&
+      delivery.commitSha?.trim() &&
+      delivery.fileUrl?.trim() &&
+      delivery.deliveredAt?.trim(),
+  );
+
 export const parseShiyanDeliveriesResult = (
   value: unknown,
   expectedTaskId?: string,
