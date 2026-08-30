@@ -215,6 +215,10 @@ RCT_EXPORT_METHOD(playerLoad:(NSString *)path
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
   dispatch_async(dispatch_get_main_queue(), ^{
+    // A new load attempt owns the single native player. Clear the previous
+    // recording first even when the incoming file later proves unreadable.
+    [self releasePlayer];
+
     NSError *error = nil;
     NSURL *url = [self checkedRecordingURL:path error:&error];
     if (url == nil) {
@@ -228,17 +232,20 @@ RCT_EXPORT_METHOD(playerLoad:(NSString *)path
       return;
     }
 
-    [self releasePlayer];
-
     AVAudioSession *session = [AVAudioSession sharedInstance];
-    [session setCategory:AVAudioSessionCategoryPlayback
-                    mode:AVAudioSessionModeDefault
-                 options:0
-                   error:nil];
-    [session setActive:YES error:nil];
+    if (![session setCategory:AVAudioSessionCategoryPlayback
+                         mode:AVAudioSessionModeDefault
+                      options:0
+                        error:&error] ||
+        ![session setActive:YES error:&error]) {
+      [self releasePlayer];
+      reject(@"PLAYER_AUDIO_SESSION_FAILED", @"Unable to activate audio playback", error);
+      return;
+    }
 
     AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
     if (player == nil) {
+      [self releasePlayer];
       reject(@"PLAYER_LOAD_FAILED", @"Unable to open the local recording", error);
       return;
     }
