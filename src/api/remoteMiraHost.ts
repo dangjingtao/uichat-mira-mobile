@@ -316,7 +316,10 @@ export class RemoteMiraHostClient {
         path: '/threads',
         method: 'POST',
         credential: credential.credential,
-        ...(title ? { body: { title } } : {}),
+        // The Host schema-validates the request body as a JSON object. An
+        // omitted body is validated as null and rejected with 400 Invalid
+        // request payload, so always send at least an empty object.
+        body: title ? { title } : {},
         parse: parseRemoteThread,
       };
       const order = this.transportOrder(credential);

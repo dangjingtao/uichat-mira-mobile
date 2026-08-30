@@ -317,6 +317,37 @@ describe('RemoteMiraHostClient transport selection', () => {
     ]);
   });
 
+  it('sends an object body when creating a thread without a title', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'messages:write'],
+      savedAt: '2026-08-30T00:00:00.000Z',
+    });
+
+    const jsonMock = jest.fn();
+    const json: JsonTransport = async request => {
+      jsonMock(request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(manifestPayload);
+      }
+      return request.parse(createdThreadPayload);
+    };
+    const client = new RemoteMiraHostClient(store, json);
+
+    await expect(client.createThread()).resolves.toMatchObject({
+      id: 'thread-new',
+    });
+
+    const createRequest = jsonMock.mock.calls
+      .map(call => call[0])
+      .find(request => request.path === '/threads');
+    expect(createRequest?.body).toEqual({});
+  });
+
   it('does not replay an uncertain dispatched thread create through Relay', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
