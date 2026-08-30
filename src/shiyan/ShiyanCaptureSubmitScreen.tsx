@@ -1,6 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,9 +20,12 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  Check,
+  ChevronRight,
   CloudUpload,
   FileAudio,
-  Settings2,
+  Pause,
+  Play,
   Trash2,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
@@ -31,11 +36,18 @@ import {
   type LocalCaptureMetadata,
 } from './recording/localCaptureRepository';
 import {
-  SHIYAN_BUILT_IN_SCENES,
+  playbackAdapter,
+  type PlaybackSnapshot,
+} from './playback/PlaybackAdapter';
+import {
+  confirmableSceneOrThrow,
+  resolveSelectedScene,
+  selectableScenesForCapture,
+} from './confirmation/sceneConfirmation';
+import {
   canonicalShiyanSceneId,
   getCustomSceneDraft,
   toShiyanSceneSnapshot,
-  type ShiyanSceneDefinition,
 } from './scenes';
 import { submitLocalCapture, type SubmitCaptureProgress } from './submitCapture';
 
@@ -59,6 +71,133 @@ const progressLabel = (progress: SubmitCaptureProgress | null) => {
   return `正在上传 ${Math.round((progress.uploadFraction ?? 0) * 100)}%`;
 };
 
+function RecordingPlayerCard({
+  filePath,
+  fallbackDurationMs,
+  sizeLabel,
+  disabled,
+}: {
+  filePath: string;
+  fallbackDurationMs: number;
+  sizeLabel: string;
+  disabled: boolean;
+}) {
+  const { colors } = useTheme();
+  const [snapshot, setSnapshot] = useState<PlaybackSnapshot>(() => playbackAdapter.getSnapshot());
+  const trackWidthRef = useRef(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      void playbackAdapter.load(filePath);
+      return () => {
+        void playbackAdapter.dispose();
+      };
+    }, [filePath]),
+  );
+
+  useEffect(() => playbackAdapter.subscribe(setSnapshot), []);
+
+  const durationMs = snapshot.durationMs || fallbackDurationMs;
+  const progressRatio =
+    durationMs > 0 ? Math.min(Math.max(snapshot.positionMs / durationMs, 0), 1) : 0;
+
+  const seekFromLocationX = (locationX: number) => {
+    if (disabled || durationMs <= 0 || trackWidthRef.current <= 0) return;
+    const ratio = Math.min(Math.max(locationX / trackWidthRef.current, 0), 1);
+    void playbackAdapter.seek(ratio * durationMs);
+  };
+
+  const trackResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          seekFromLocationX(event.nativeEvent.locationX);
+        },
+        onPanResponderMove: (event) => {
+          seekFromLocationX(event.nativeEvent.locationX);
+        },
+        onPanResponderRelease: () => {},
+        onPanResponderTerminate: () => {},
+      }),
+    // Rebuilt when the controlling inputs change so handlers see fresh values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [disabled, durationMs],
+  );
+
+  const canControl =
+    !disabled &&
+    (snapshot.state === 'ready' ||
+      snapshot.state === 'playing' ||
+      snapshot.state === 'paused' ||
+      snapshot.state === 'ended');
+  const isPlaying = snapshot.state === 'playing';
+
+  return (
+    <View style={[styles.playerCard, { backgroundColor: colors.bg.soft }]}>
+      <View style={styles.playerTopRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? '暂停播放' : '播放录音'}
+          disabled={!canControl}
+          onPress={() => void (isPlaying ? playbackAdapter.pause() : playbackAdapter.play())}
+          style={({ pressed }) => [
+            styles.playerToggle,
+            {
+              backgroundColor: canControl ? (pressed ? colors.primaryActive : colors.primary) : colors.bg.card,
+            },
+          ]}
+        >
+          {isPlaying ? (
+            <Pause size={20} color={canControl ? colors.onPrimary : colors.text.soft} />
+          ) : (
+            <Play size={20} color={canControl ? colors.onPrimary : colors.text.soft} />
+          )}
+        </Pressable>
+        <View style={styles.playerMeta}>
+          <Text style={[styles.playerTimes, { color: colors.text.ink }]}>
+            {formatDuration(snapshot.positionMs)} / {formatDuration(durationMs)}
+          </Text>
+          <Text style={[styles.muted, { color: colors.text.soft }]}>{sizeLabel} · 已安全保存在手机</Text>
+        </View>
+      </View>
+
+      <View
+        {...trackResponder.panHandlers}
+        onLayout={(event) => {
+          trackWidthRef.current = event.nativeEvent.layout.width;
+        }}
+        style={[styles.track, { backgroundColor: colors.border.default }]}
+        accessibilityRole="adjustable"
+        accessibilityLabel="播放进度"
+      >
+        <View
+          style={[
+            styles.trackFill,
+            { backgroundColor: canControl ? colors.primary : colors.text.soft, width: `${progressRatio * 100}%` },
+          ]}
+        />
+        <View
+          style={[
+            styles.trackThumb,
+            {
+              backgroundColor: canControl ? colors.primary : colors.text.soft,
+              left: `${progressRatio * 100}%`,
+            },
+          ]}
+        />
+      </View>
+
+      {snapshot.state === 'failed' && snapshot.error ? (
+        <Text style={[styles.playerError, { color: colors.status.error }]}>
+          {snapshot.error} 录音文件本身不受影响。
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function ShiyanCaptureSubmitScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'ShiyanCaptureConfirm'>>();
@@ -66,6 +205,7 @@ export function ShiyanCaptureSubmitScreen() {
   const [capture, setCapture] = useState<LocalCaptureMetadata | null>(null);
   const [title, setTitle] = useState('');
   const [sceneId, setSceneId] = useState('');
+  const [sceneSheetOpen, setSceneSheetOpen] = useState(false);
   const [progress, setProgress] = useState<SubmitCaptureProgress | null>(null);
   const [errorText, setErrorText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -85,44 +225,16 @@ export function ShiyanCaptureSubmitScreen() {
     }, [route.params.captureId]),
   );
 
-  const scenes = useMemo(() => {
-    const custom = getCustomSceneDraft();
-    const base: ShiyanSceneDefinition[] = [...SHIYAN_BUILT_IN_SCENES];
-    if (custom) base.push(custom);
+  const scenes = useMemo(
+    () => selectableScenesForCapture(capture, getCustomSceneDraft()),
+    [capture],
+  );
 
-    if (capture?.sceneSnapshot && !base.some((scene) => scene.id === capture.sceneSnapshot?.id)) {
-      base.push({
-        id: capture.sceneSnapshot.id,
-        name: capture.sceneSnapshot.name,
-        description: '录音时冻结的自定义场景规则。',
-        organizationRequirement: capture.sceneSnapshot.instruction,
-        outputStructure: capture.sceneSnapshot.sections.map((section) => section.title),
-        builtIn: capture.sceneSnapshot.builtIn,
-      });
-    } else if (
-      capture &&
-      !base.some((scene) => scene.id === canonicalShiyanSceneId(capture.sceneId)) &&
-      !capture.sceneSnapshot
-    ) {
-      base.push({
-        id: capture.sceneId,
-        name: capture.sceneName,
-        description: '旧版录音中的场景；提交前需要重新选择或重新配置场景。',
-        organizationRequirement: '',
-        outputStructure: [],
-        builtIn: false,
-      });
-    }
-    return base;
-  }, [capture]);
+  const selectedScene = resolveSelectedScene(scenes, sceneId);
 
   const confirmLocally = async () => {
     if (!capture) return null;
-    const scene = scenes.find((item) => canonicalShiyanSceneId(item.id) === canonicalShiyanSceneId(sceneId));
-    if (!scene) throw new Error('请选择场景。');
-    if (!scene.builtIn && (!scene.organizationRequirement.trim() || scene.outputStructure.length === 0)) {
-      throw new Error('这条旧录音缺少自定义场景规则，请重新配置并选择一个自定义场景后再提交。');
-    }
+    const scene = confirmableSceneOrThrow(scenes, sceneId);
     const snapshot = toShiyanSceneSnapshot(scene);
     return localCaptureRepository.confirm({
       id: capture.id,
@@ -174,10 +286,19 @@ export function ShiyanCaptureSubmitScreen() {
       {
         text: '删除本地文件',
         style: 'destructive',
-        onPress: () =>
-          void localCaptureRepository
-            .delete(capture.id)
-            .then(() => navigation.navigate('ShiyanLocalDrafts')),
+        onPress: () => {
+          // Stop playback before the file disappears from the sandbox.
+          void playbackAdapter
+            .dispose()
+            .then(() => localCaptureRepository.delete(capture.id))
+            .then(() => navigation.navigate('ShiyanLocalDrafts'))
+            .catch((error) => {
+              Alert.alert(
+                '无法删除',
+                error instanceof Error ? error.message : '本地录音未能删除，请稍后重试。',
+              );
+            });
+        },
       },
     ]);
   };
@@ -189,9 +310,7 @@ export function ShiyanCaptureSubmitScreen() {
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text.ink }]}>确认并提交</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="配置拾言 Cloud" disabled={busy} onPress={() => navigation.navigate('ShiyanCloudConfig')} style={styles.headerButton}>
-          <Settings2 size={19} color={colors.text.ink} />
-        </Pressable>
+        <View style={styles.headerButton} />
       </View>
 
       {!capture ? (
@@ -201,34 +320,54 @@ export function ShiyanCaptureSubmitScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={[styles.summary, { backgroundColor: colors.bg.soft }]}>
-            <FileAudio size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.summaryTitle, { color: colors.text.ink }]}>录音已安全保存在手机</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>{formatDuration(capture.durationMs)} · {formatSize(capture.fileSizeBytes)}</Text>
-            </View>
-          </View>
+          <RecordingPlayerCard
+            filePath={capture.filePath}
+            fallbackDurationMs={capture.durationMs}
+            sizeLabel={`${formatDuration(capture.durationMs)} · ${formatSize(capture.fileSizeBytes)}`}
+            disabled={busy}
+          />
 
           <Text style={[styles.label, { color: colors.text.base }]}>标题</Text>
           <TextInput value={title} onChangeText={setTitle} editable={!busy} placeholder="例如：8 月 29 日产品评审" placeholderTextColor={colors.text.soft} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
 
           <Text style={[styles.label, { color: colors.text.base }]}>场景</Text>
-          <View style={styles.sceneList}>
-            {scenes.map((scene) => {
-              const selected = canonicalShiyanSceneId(scene.id) === canonicalShiyanSceneId(sceneId);
-              return (
-                <Pressable key={scene.id} accessibilityRole="button" accessibilityState={{ selected, disabled: busy }} disabled={busy} onPress={() => setSceneId(scene.id)} style={({ pressed }) => [styles.sceneButton, { borderColor: selected ? colors.primary : colors.border.default, backgroundColor: pressed || selected ? colors.bg.soft : colors.bg.card }]}>
-                  <Text style={{ color: colors.text.ink, fontWeight: '600' }}>{scene.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="修改场景"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
+            onPress={() => setSceneSheetOpen(true)}
+            style={({ pressed }) => [
+              styles.sceneRow,
+              {
+                borderColor: colors.border.default,
+                backgroundColor: pressed ? colors.bg.soft : colors.bg.card,
+              },
+            ]}
+          >
+            <View style={styles.sceneRowLeading}>
+              <View
+                style={[
+                  styles.sceneRadio,
+                  { borderColor: selectedScene ? colors.primary : colors.border.default },
+                ]}
+              >
+                {selectedScene ? (
+                  <View style={[styles.sceneRadioDot, { backgroundColor: colors.primary }]} />
+                ) : null}
+              </View>
+              <Text style={{ color: colors.text.ink, fontWeight: '600' }}>
+                {selectedScene ? selectedScene.name : '请选择场景'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.text.soft} />
+          </Pressable>
 
           {errorText ? (
             <View style={[styles.errorBox, { borderColor: colors.status.error, backgroundColor: colors.bg.card }]}>
               <Text style={[styles.errorTitle, { color: colors.status.error }]}>这次提交没有完成</Text>
               <Text style={[styles.muted, { color: colors.text.base }]}>{errorText}</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试；若提示 Cloud 未配置，可点右上角设置。</Text>
+              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试；若提示 Cloud 未配置，可回到拾言主页右上角配置。</Text>
             </View>
           ) : null}
 
@@ -247,6 +386,70 @@ export function ShiyanCaptureSubmitScreen() {
           </Pressable>
         </ScrollView>
       )}
+
+      <Modal
+        visible={sceneSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSceneSheetOpen(false)}
+      >
+        <Pressable
+          accessibilityLabel="关闭场景选择"
+          style={styles.sheetBackdrop}
+          onPress={() => setSceneSheetOpen(false)}
+        >
+          <View
+            style={[styles.sheetPanel, { backgroundColor: colors.bg.card }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.sheetTitle, { color: colors.text.ink }]}>选择场景</Text>
+            <ScrollView style={styles.sheetList} bounces={false}>
+              {scenes.map((scene) => {
+                const selected = canonicalShiyanSceneId(scene.id) === canonicalShiyanSceneId(sceneId);
+                return (
+                  <Pressable
+                    key={scene.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setSceneId(scene.id);
+                      setSceneSheetOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.sheetRow,
+                      { backgroundColor: pressed || selected ? colors.bg.soft : colors.bg.card },
+                    ]}
+                  >
+                    <View style={styles.sceneRowLeading}>
+                      <View
+                        style={[
+                          styles.sceneRadio,
+                          { borderColor: selected ? colors.primary : colors.border.default },
+                        ]}
+                      >
+                        {selected ? (
+                          <View style={[styles.sceneRadioDot, { backgroundColor: colors.primary }]} />
+                        ) : null}
+                      </View>
+                      <Text style={{ color: colors.text.ink, fontWeight: selected ? '600' : '400' }}>
+                        {scene.name}
+                      </Text>
+                    </View>
+                    {selected ? <Check size={18} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSceneSheetOpen(false)}
+              style={[styles.sheetCancelButton, { borderColor: colors.border.default }]}
+            >
+              <Text style={{ color: colors.text.ink, fontWeight: '600' }}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -258,17 +461,32 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '600' },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.md },
-  summary: { borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  summaryTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  playerCard: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  playerTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  playerToggle: { width: 46, height: 46, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  playerMeta: { flex: 1, gap: 2 },
+  playerTimes: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  playerError: { fontSize: 12, lineHeight: 18 },
+  track: { height: 28, borderRadius: radius.full, justifyContent: 'center', overflow: 'hidden' },
+  trackFill: { position: 'absolute', left: 0, top: 12, bottom: 12, borderRadius: radius.full },
+  trackThumb: { position: 'absolute', top: 9, marginLeft: -7, width: 14, height: 14, borderRadius: radius.full },
   muted: { fontSize: 13, lineHeight: 19 },
   label: { fontSize: 13, fontWeight: '600' },
   input: { minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: 15 },
-  sceneList: { gap: spacing.sm },
-  sceneButton: { minHeight: 46, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: 'center' },
+  sceneRow: { minHeight: 50, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sceneRowLeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sceneRadio: { width: 18, height: 18, borderRadius: radius.full, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  sceneRadioDot: { width: 9, height: 9, borderRadius: radius.full },
   errorBox: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
   errorTitle: { fontSize: 14, fontWeight: '700' },
   primaryButton: { minHeight: 50, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   primaryText: { fontSize: 15, fontWeight: '600' },
   outlineButton: { minHeight: 46, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   deleteButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', justifyContent: 'flex-end' },
+  sheetPanel: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: spacing.lg, maxHeight: '70%' },
+  sheetTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', paddingVertical: spacing.md },
+  sheetList: { paddingHorizontal: spacing.md },
+  sheetRow: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetCancelButton: { minHeight: 46, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.sm },
 });

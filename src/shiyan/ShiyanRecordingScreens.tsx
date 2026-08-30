@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +17,7 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
-  Clock3,
+  Cloud,
   FileAudio,
   History,
   Mic2,
@@ -50,10 +49,12 @@ function ScreenShell({
   title,
   children,
   onBack,
+  headerRight,
 }: {
   title: string;
   children: React.ReactNode;
   onBack?: () => void;
+  headerRight?: React.ReactNode;
 }) {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
@@ -69,7 +70,7 @@ function ScreenShell({
           <ArrowLeft size={22} color={colors.text.ink} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text.ink }]}>{title}</Text>
-        <View style={styles.backButton} />
+        {headerRight ?? <View style={styles.backButton} />}
       </View>
       {children}
     </SafeAreaView>
@@ -149,7 +150,19 @@ export function ShiyanHomeScreen() {
   );
 
   return (
-    <ScreenShell title="拾言">
+    <ScreenShell
+      title="拾言"
+      headerRight={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="配置拾言 Cloud"
+          onPress={() => navigation.navigate('ShiyanCloudConfig')}
+          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.65 }]}
+        >
+          <Cloud size={20} color={colors.text.ink} />
+        </Pressable>
+      }
+    >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.hero, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
           <Mic2 size={28} color={colors.primary} />
@@ -367,138 +380,6 @@ export function ShiyanRecordScreen() {
   );
 }
 
-export function ShiyanCaptureConfirmScreen() {
-  const navigation = useNavigation<NavProp>();
-  const route = useRoute<RouteProp<RootStackParamList, 'ShiyanCaptureConfirm'>>();
-  const { colors } = useTheme();
-  const [capture, setCapture] = useState<LocalCaptureMetadata | null>(null);
-  const [title, setTitle] = useState('');
-  const [sceneId, setSceneId] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => {
-    let active = true;
-    localCaptureRepository.get(route.params.captureId).then((next) => {
-      if (!active || !next) return;
-      setCapture(next);
-      setTitle(next.title);
-      setSceneId(next.sceneId);
-    });
-    return () => {
-      active = false;
-    };
-  }, [route.params.captureId]);
-
-  useFocusEffect(load);
-
-  const scenes = useMemo(() => {
-    if (!capture) return [...SHIYAN_BUILT_IN_SCENES];
-    if (SHIYAN_BUILT_IN_SCENES.some((scene) => scene.id === capture.sceneId)) return [...SHIYAN_BUILT_IN_SCENES];
-    return [
-      ...SHIYAN_BUILT_IN_SCENES,
-      {
-        id: capture.sceneId,
-        name: capture.sceneName,
-        description: '录音时使用的本地自定义场景。',
-        organizationRequirement: '',
-        outputStructure: [],
-        builtIn: false,
-      } as ShiyanSceneDefinition,
-    ];
-  }, [capture]);
-
-  if (!capture) {
-    return (
-      <ScreenShell title="确认录音">
-        <View style={styles.emptyState}>
-          <FileAudio size={32} color={colors.text.soft} />
-          <Text style={[styles.cardDescription, { color: colors.text.soft }]}>正在读取本地录音草稿…</Text>
-        </View>
-      </ScreenShell>
-    );
-  }
-
-  const save = async () => {
-    const scene = scenes.find((item) => item.id === sceneId);
-    if (!scene) return;
-    setSaving(true);
-    try {
-      await localCaptureRepository.confirm({ id: capture.id, title, sceneId: scene.id, sceneName: scene.name });
-      Alert.alert('已保存在本机', '标题与场景已经确认。本卡不会创建云端 CaptureTask。', [
-        { text: '好', onPress: () => navigation.navigate('ShiyanHome') },
-      ]);
-    } catch (error) {
-      Alert.alert('无法保存', error instanceof Error ? error.message : '请检查标题与场景。');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = () => {
-    Alert.alert('删除这条本地录音？', '录音文件和本地 metadata 都会永久删除。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: () => {
-          void localCaptureRepository.delete(capture.id).then(() => navigation.navigate('ShiyanLocalDrafts'));
-        },
-      },
-    ]);
-  };
-
-  return (
-    <ScreenShell title="确认录音">
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={[styles.summaryBox, { backgroundColor: colors.bg.soft }]}>
-          <Clock3 size={18} color={colors.text.soft} />
-          <Text style={[styles.cardDescription, { color: colors.text.soft }]}>
-            {formatDuration(capture.durationMs)} · {formatSize(capture.fileSizeBytes)} · 已保存在本机
-          </Text>
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.text.base }]}>标题</Text>
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="例如：8 月 29 日产品评审"
-          placeholderTextColor={colors.text.soft}
-          style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]}
-        />
-
-        <Text style={[styles.fieldLabel, { color: colors.text.base }]}>场景</Text>
-        {scenes.map((scene) => {
-          const selected = scene.id === sceneId;
-          return (
-            <Pressable
-              key={scene.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              onPress={() => setSceneId(scene.id)}
-              style={[styles.compactScene, { borderColor: selected ? colors.primary : colors.border.default, backgroundColor: selected ? colors.bg.soft : colors.bg.card }]}
-            >
-              <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{scene.name}</Text>
-            </Pressable>
-          );
-        })}
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={() => void save()}
-          style={({ pressed }) => [styles.primaryButton, { backgroundColor: pressed ? colors.primaryActive : colors.primary }]}
-        >
-          <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>{saving ? '正在保存' : '保存本地确认'}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={remove} style={styles.deleteButton}>
-          <Trash2 size={17} color={colors.text.soft} />
-          <Text style={[styles.deleteText, { color: colors.text.soft }]}>删除本地录音</Text>
-        </Pressable>
-      </ScrollView>
-    </ScreenShell>
-  );
-}
-
 export function ShiyanLocalDraftsScreen() {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
@@ -581,7 +462,6 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDescription: { fontSize: 14, lineHeight: 20 },
   sceneCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: 7 },
-  compactScene: { minHeight: 48, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: 'center' },
   structureText: { fontSize: 12, lineHeight: 18 },
   primaryButton: { minHeight: 50, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
   primaryButtonText: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
@@ -594,11 +474,6 @@ const styles = StyleSheet.create({
   recordActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl },
   roundAction: { width: 58, height: 58, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   stopAction: { width: 68, height: 68, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
-  summaryBox: { minHeight: 48, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
-  fieldLabel: { fontSize: 14, fontWeight: '600', marginTop: spacing.sm },
-  input: { minHeight: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: 15 },
-  deleteButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  deleteText: { fontSize: 14, fontWeight: '600' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, gap: spacing.sm },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: spacing.sm },
   emptyText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
