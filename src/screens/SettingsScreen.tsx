@@ -127,6 +127,9 @@ export function SettingsScreen() {
       case 'disconnect-host':
         requestDisconnect();
         break;
+      case 'plugins':
+        navigation.navigate('Plugins');
+        break;
       case 'report-error':
         navigation.navigate('ReportError');
         break;
@@ -185,7 +188,7 @@ export function SettingsScreen() {
         <RowGroup onAction={handleSettingAction}>
           <Row icon={Smile} title="个性化" actionId="personalization" isFirst isLast={false} />
           <Row icon={BookOpen} title="记忆" isLast={false} />
-          <Row icon={Grid3x3} title="插件" isLast />
+          <Row icon={Grid3x3} title="插件" actionId="plugins" isLast />
         </RowGroup>
 
         <SectionHeader>账户</SectionHeader>
