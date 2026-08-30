@@ -2,7 +2,9 @@
 
 状态：技术设计基线，可进入任务拆分
 
-日期：2026-08-29
+初版日期：2026-08-29
+
+最近核对：2026-08-31
 
 唯一真相目录：`docs/shiyan/`
 
@@ -105,7 +107,7 @@ Mobile 本地录音
 └──────┬───────────────────┘
        │
        ▼
- DeepSeek / Volcano / Kimi / other OpenAI-compatible providers
+ Any OpenAI-compatible provider
 
 Final Draft
    │
@@ -304,8 +306,11 @@ Service Binding 不需要公开第二个 Worker，也不会因为拆成两个 Wo
 职责固定为：
 
 - Secrets 管理。
-- Provider 适配。
-- 默认 Provider + 一个 fallback。
+- OpenAI-compatible Provider 适配，协议层使用 AI SDK v6 + `@ai-sdk/openai-compatible`。
+- 一个 primary + 可选 fallback；不得在业务合同中绑定具体厂商。
+- primary 最小配置为 `LLM_PRIMARY_BASE_URL`、`LLM_PRIMARY_MODEL`、`LLM_PRIMARY_API_KEY`；`LLM_PRIMARY_PROVIDER` 仅作可选观测标签。
+- fallback 使用对应 `LLM_FALLBACK_*` 键，整组可不配置。
+- 非敏感 endpoint / model 配置使用 Cloudflare Vars，API Key 使用 Cloudflare Secrets；部署保留控制台 Vars，不将凭据写入仓库。
 - 结构化输出校验。
 - Provider error 归一。
 - latency / token / usage 元数据。
@@ -324,6 +329,8 @@ interface LlmGateway {
   generateStructured(input: OrganizeRequest): Promise<OrganizeResult>
 }
 ```
+
+当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。该结论只证明实现与 Cloudflare Workers 构建合同成立，不等价于真实 dev 环境已经完成部署；实际部署仍受 D1 ID、运行时 Secrets / Vars 等环境前置约束。
 
 错误只允许表达 Provider 层事实，例如：
 

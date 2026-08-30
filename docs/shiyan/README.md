@@ -163,7 +163,11 @@ MVP：
 - MVP 可使用设备身份；正式账户模型预留 `userId`，不得把 `deviceId` 固化为最终用户体系。
 - 录音结束后上传；大文件应直接进入对象存储，不通过业务 Worker 中转。
 - STT Provider 可替换。
-- LLM 不要求使用 Workers AI；使用独立轻量 LLM 服务层统一保管现有 Provider Key、基础路由、fallback 与错误归一。
+- LLM 不要求使用 Workers AI；`shiyan-llm` 使用 AI SDK v6 + `@ai-sdk/openai-compatible` 作为 OpenAI-compatible 协议层，不绑定 DeepSeek / Kimi / 火山等具体厂商。
+- primary 的最小配置合同为 `LLM_PRIMARY_BASE_URL` + `LLM_PRIMARY_MODEL` + `LLM_PRIMARY_API_KEY`；`LLM_PRIMARY_PROVIDER` 仅为可选观测标签。
+- fallback 整组为可选；配置时使用对应 `LLM_FALLBACK_*` 键。
+- Base URL / Model 等非敏感配置放 Cloudflare Vars，API Key 放 Cloudflare Secrets；部署不得把 Secret 写入仓库或日志。
+- 2026-08-31 已验证 AI SDK 在 Cloudflare Workers 上通过类型检查、全部拾言测试、public/private Worker dry-run；真实 dev 部署仍依赖 `SHIYAN_D1_DATABASE_ID` 等环境前置。
 - LLM 服务层不得拥有 CaptureTask 业务状态解释权。
 
 具体实现以 `TECHNICAL_DESIGN.md` 为技术基线；API 路径、表字段和库内部细节仍允许施工在不违反该基线的前提下按稳定性、落地成本与 Debug 成本调整。
