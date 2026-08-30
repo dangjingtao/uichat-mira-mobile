@@ -1,15 +1,31 @@
+const { execFileSync } = require('node:child_process');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const path = require('path');
+const { resolveReleaseChannel } = require('./scripts/resolve-release-channel');
+
+const currentBranch = () => {
+  try {
+    return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: __dirname,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
+  }
+};
 
 /**
  * Build-time release channel truth (MOB-028).
  *
- * CI sets MIRA_RELEASE_CHANNEL (`dev` or `prod`) when bundling; local builds
- * default to `dev`. The channel decides which GitHub Release tags the update
- * check is allowed to consider, so a prod build never sees dev prereleases.
+ * dev builds compare only dev prereleases; prod builds compare only stable
+ * prod releases. GitHub branch/base refs and local dev/prod checkouts are
+ * authoritative so a production build cannot silently become a dev build.
  */
-const releaseChannel =
-  process.env.MIRA_RELEASE_CHANNEL === 'prod' ? 'prod' : 'dev';
+const releaseChannel = resolveReleaseChannel({
+  env: process.env,
+  branchName: currentBranch(),
+});
 const channelModulePath = path.resolve(
   __dirname,
   'src',
