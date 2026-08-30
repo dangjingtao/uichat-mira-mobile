@@ -86,12 +86,14 @@ function RecordingPlayerCard({
   const [snapshot, setSnapshot] = useState<PlaybackSnapshot>(() => playbackAdapter.getSnapshot());
   const trackWidthRef = useRef(0);
 
-  useEffect(() => {
-    void playbackAdapter.load(filePath);
-    return () => {
-      void playbackAdapter.dispose();
-    };
-  }, [filePath]);
+  useFocusEffect(
+    useCallback(() => {
+      void playbackAdapter.load(filePath);
+      return () => {
+        void playbackAdapter.dispose();
+      };
+    }, [filePath]),
+  );
 
   useEffect(() => playbackAdapter.subscribe(setSnapshot), []);
 
@@ -288,10 +290,14 @@ export function ShiyanCaptureSubmitScreen() {
           // Stop playback before the file disappears from the sandbox.
           void playbackAdapter
             .dispose()
-            .catch(() => undefined)
             .then(() => localCaptureRepository.delete(capture.id))
             .then(() => navigation.navigate('ShiyanLocalDrafts'))
-            .catch(() => navigation.navigate('ShiyanLocalDrafts'));
+            .catch((error) => {
+              Alert.alert(
+                '无法删除',
+                error instanceof Error ? error.message : '本地录音未能删除，请稍后重试。',
+              );
+            });
         },
       },
     ]);
