@@ -23,7 +23,6 @@ interface ConversationMenuItem {
   id: string;
   label: string;
   icon: MenuIcon;
-  enabled?: boolean;
   destructive?: boolean;
   hasChevron?: boolean;
   addTopSpacing?: boolean;
@@ -53,6 +52,8 @@ interface ConversationMenuProps {
     right: number;
   };
   onClose: () => void;
+  onShare?: () => void;
+  onFindInChat?: () => void;
 }
 
 export function ConversationMenu({
@@ -60,8 +61,16 @@ export function ConversationMenu({
   title,
   anchor,
   onClose,
+  onShare,
+  onFindInChat,
 }: ConversationMenuProps) {
   const { colors } = useTheme();
+
+  const actionForItem = (id: string) => {
+    if (id === 'share') return onShare;
+    if (id === 'search') return onFindInChat;
+    return undefined;
+  };
 
   return (
     <Modal
@@ -96,7 +105,8 @@ export function ConversationMenu({
             {title}
           </Text>
           {menuItems.map((item) => {
-            const disabled = item.enabled !== true;
+            const action = actionForItem(item.id);
+            const disabled = action === undefined;
             const itemColor = item.destructive
               ? colors.status.error
               : colors.text.ink;
@@ -110,6 +120,10 @@ export function ConversationMenu({
                 }
                 accessibilityState={{ disabled }}
                 disabled={disabled}
+                onPress={() => {
+                  onClose();
+                  action?.();
+                }}
                 style={({ pressed }) => [
                   styles.item,
                   item.addTopSpacing && styles.itemWithTopSpacing,

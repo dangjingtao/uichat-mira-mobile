@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# MOB-028: build-time release channel truth consumed by metro.config.js.
+# prod builds must never fall back to the dev channel.
+env:
+  MIRA_RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/prod' && 'prod' || 'dev' }}
+
 concurrency:
   group: mobile-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -229,6 +234,12 @@ jobs:
           derived_data='ios/build/SimulatorDerivedData'
           rm -rf "$derived_data"
 
+          # Keep the installed bundle version identical to the version the
+          # About screen compares against (package.json), so iOS update checks
+          # reason about the real installed version.
+          package_version=$(node -p "require('./package.json').version")
+          test -n "$package_version"
+
           xcodebuild \
             -workspace ios/UIChatMira.xcworkspace \
             -scheme UIChatMira \
@@ -236,6 +247,7 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$derived_data" \
+            MARKETING_VERSION="$package_version" \
             CODE_SIGNING_ALLOWED=NO \
             build
 
@@ -259,6 +271,9 @@ jobs:
           derived_data='ios/build/UnsignedDeviceDerivedData'
           rm -rf "$derived_data"
 
+          package_version=$(node -p "require('./package.json').version")
+          test -n "$package_version"
+
           xcodebuild \
             -workspace ios/UIChatMira.xcworkspace \
             -scheme UIChatMira \
@@ -266,6 +281,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$derived_data" \
+            MARKETING_VERSION="$package_version" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY='' \

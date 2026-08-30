@@ -11,11 +11,16 @@ import {
 } from './remoteMiraHost';
 import type {
   RemoteChatStreamEvent,
+  RemoteManifest,
   RemoteMessage,
   RemoteThread,
 } from '../protocol/remoteHostV1';
 import { RemoteHostError } from './remoteHttp';
+import { readThreadMediaText } from './threadMedia';
 import type { MiraHostApi } from './miraHost';
+
+const THREAD_CREATE_ROUTE = 'POST /threads';
+const THREAD_MEDIA_ROUTE = 'GET /threads/:id/media/:mediaId/content';
 
 const threadToSession = (thread: RemoteThread): Session => ({
   id: thread.id,
@@ -37,7 +42,23 @@ const messageToChatMessage = (message: RemoteMessage): ChatMessage => ({
       : message.role,
   content: message.content,
   timestamp: new Date(message.createdAt),
+  ...(message.role === 'user' || message.role === 'assistant'
+    ? { parts: message.parts }
+    : {}),
+  metadata: message.metadata,
 });
+
+const supportsThreadCreation = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('messages:write') &&
+  manifest.routes.threads.includes(THREAD_CREATE_ROUTE);
+
+const supportsThreadDeletion = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('messages:write') &&
+  manifest.routes.threads.includes('DELETE /threads/:id');
+
+const supportsThreadMediaRead = (manifest: RemoteManifest): boolean =>
+  manifest.device.scopes.includes('artifacts:read') &&
+  manifest.routes.artifacts.includes(THREAD_MEDIA_ROUTE);
 
 const unsupportedMutation = (operation: string): never => {
   throw new Error(
@@ -70,6 +91,13 @@ const toContextMessage = (message: RemoteMessage) => {
   };
 };
 
+export interface CanonicalMessageSnapshot {
+  sessionId: string;
+  messages: ChatMessage[];
+}
+
+type MessageSnapshotListener = (snapshot: CanonicalMessageSnapshot) => void;
+
 /**
  * Mobile runtime compatibility adapter.
  *
@@ -85,6 +113,7 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
   private lastRuntimeEvents: Array<
     Extract<RemoteChatStreamEvent, { type: 'data-tool-event' | 'data-execution-node' }>
   > = [];
+  private readonly messageSnapshotListeners = new Set<MessageSnapshotListener>();
 
   constructor(private readonly remote: RemoteMiraHostClient) {}
 
@@ -127,20 +156,94 @@ export class PairedRemoteMiraHostClient implements MiraHostApi {
     return threadToSession(await this.remote.getThread(sessionId));
   }
 
-  async createSession(_title?: string): Promise<Session> {
-    return unsupportedMutation('Creating a thread');
+  async createSession(title?: string): Promise<Session> {
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadCreation(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_CREATE_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端新建会话',
+        403,
+      );
+    }
+    return threadToSession(await this.remote.createThread(title));
   }
 
-  async deleteSession(_sessionId: string): Promise<void> {
-    return unsupportedMutation('Deleting a thread');
+  async canDeleteSession(): Promise<boolean> {
+    try {
+      return supportsThreadDeletion(await this.remote.getManifest());
+    } catch {
+      return false;
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadDeletion(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_DELETE_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端删除会话',
+      );
+    }
+    await this.remote.deleteThread(sessionId);
   }
 
   async renameSession(_sessionId: string, _title: string): Promise<Session> {
     return unsupportedMutation('Renaming a thread');
   }
 
+  subscribeMessageSnapshots(listener: MessageSnapshotListener): () => void {
+    this.messageSnapshotListeners.add(listener);
+    return () => {
+      this.messageSnapshotListeners.delete(listener);
+    };
+  }
+
+  private publishMessageSnapshot(sessionId: string, messages: ChatMessage[]) {
+    const snapshot: CanonicalMessageSnapshot = {
+      sessionId,
+      messages: [...messages],
+    };
+    for (const listener of this.messageSnapshotListeners) {
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.warn('[miraHostClient] message snapshot listener failed', error);
+      }
+    }
+  }
+
   async getMessages(sessionId: string): Promise<ChatMessage[]> {
-    return (await this.remote.getMessages(sessionId)).map(messageToChatMessage);
+    const messages = (await this.remote.getMessages(sessionId)).map(
+      messageToChatMessage,
+    );
+    this.publishMessageSnapshot(sessionId, messages);
+    return messages;
+  }
+
+  async getThreadMediaRequest(sessionId: string, mediaId: string) {
+    const stableMediaId = mediaId.trim();
+    if (!stableMediaId) {
+      throw new RemoteHostError(
+        'MEDIA_ID_REQUIRED',
+        'A canonical media id is required to read an attachment',
+      );
+    }
+
+    const manifest = await this.remote.getManifest();
+    if (!supportsThreadMediaRead(manifest)) {
+      throw new RemoteHostError(
+        'THREAD_MEDIA_READ_UNAVAILABLE',
+        '当前 Mira Host 未授权移动端读取会话附件',
+        403,
+      );
+    }
+
+    return this.remote.getThreadMediaRequest(sessionId, stableMediaId);
+  }
+
+  async getThreadMediaText(sessionId: string, mediaId: string): Promise<string> {
+    const request = await this.getThreadMediaRequest(sessionId, mediaId);
+    return readThreadMediaText(request);
   }
 
   async sendMessage(

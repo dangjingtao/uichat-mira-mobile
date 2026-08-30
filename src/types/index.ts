@@ -1,3 +1,5 @@
+import type { RemoteMessagePart } from '../protocol/remoteHostV1';
+
 export interface MiraHostConfig {
   hostUrl: string;
   token: string;
@@ -22,6 +24,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  /** Canonical Host message parts. Mobile renders supported read-only parts only. */
+  parts?: RemoteMessagePart[];
+  /** Canonical Host metadata. Mobile must not invent or rewrite these fields. */
+  metadata?: Record<string, unknown>;
 }
 
 export type ConnectionStatus =

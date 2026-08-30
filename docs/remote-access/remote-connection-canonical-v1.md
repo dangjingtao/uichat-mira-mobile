@@ -4,9 +4,9 @@
 
 适用分支：`dev`
 
-最近修订：2026-08-26
+最近修订：2026-08-29
 
-本文定义 Mira Mobile 首次配对与配对后远程连接的 Transport 行为。其他移动端远程连接文档必须引用本文；如有冲突，以本文为准。
+本文定义 Mira Mobile 首次配对、配对后远程连接与 Remote capability discovery 的权威行为。其他移动端远程连接文档必须引用本文；如有冲突，以本文为准。
 
 ## 1. Transport 边界
 
@@ -109,7 +109,40 @@ claim 已发出但响应不确定时：
 
 Desktop 创建配对挑战时，只要 Relay connected 或 Direct ready 任一成立即可；二维码同时携带当前可用 endpoint。收到 claim 后展示实际申请通道：Mira Relay、Tailscale Direct 或未知。
 
-## 7. 验收
+## 7. Remote capability 合同
+
+自 **2026-08-29** 起，旧 V1 文档中的**固定 route allowlist 失效**，不再具有规范效力。这里失效的是“V1 的能力集合由一张静态 route 表永久冻结”的规则，**不是整个 Remote Host V1 协议**：pairing URI、device credential、Transport、消息协议与 `protocolVersion: 1` 均保持兼容。
+
+Mobile 判断某项远程能力可用时，必须同时满足：
+
+1. Host Remote Gateway 对当前 `method + path` 有显式 scope 映射；
+2. 当前 paired device 实际持有该 scope；
+3. `/remote/v1/manifest` 在对应 route group 中声明该 route；
+4. canonical Host route 继续执行 owner-user 与业务数据边界校验。
+
+因此，**runtime manifest + device scope 是客户端 capability discovery 的权威事实**。文档可以记录当前 route 快照，但不能再用历史静态列表否决已经通过 Gateway + manifest 明确发布的新能力。
+
+MOB-024 增加当前能力：
+
+```text
+POST /threads -> messages:write
+```
+
+这是针对现有 0.2.x 已配对设备的显式兼容决定。已经持有 `messages:write` 的设备在 Host manifest 声明 `POST /threads` 后可以直接创建 canonical Thread，**无需重新配对**。
+
+该决定不扩展到以下能力，它们继续保持未授权：
+
+```text
+PATCH /threads/:id
+POST /threads/:id/archive
+POST /threads/:id/restore
+DELETE /threads/history
+Workspace create / update / delete
+```
+
+后续若新增语义更精确的 `threads:write`，必须提供显式 scope 迁移方案，不能让旧设备在无感知情况下获得新的权限集合。
+
+## 8. 验收
 
 - Relay + Direct：先 Relay `/health`，成功后只发 Relay claim；
 - Relay preflight 失败：claim 前才切 Direct；
@@ -118,4 +151,8 @@ Desktop 创建配对挑战时，只要 Relay connected 或 Direct ready 任一�
 - Direct-only：旧二维码继续可用；
 - 缺少 `transport`：兼容旧 Mobile；
 - 配对后 Direct 网络失败：可回 Relay；
-- 401/403 与业务错误：不触发 Transport fallback。
+- 401/403 与业务错误：不触发 Transport fallback；
+- capability discovery 以实时 manifest + device scope 为准，不以旧固定 route 表为准；
+- 已持有 `messages:write` 且 Host manifest 声明 `POST /threads` 的现有设备，无需重新配对即可创建 canonical Thread；
+- manifest 未声明 route 或设备缺 scope 时，Mobile 不得尝试创建；
+- 未显式映射的 Thread / Workspace 写 route 继续拒绝。

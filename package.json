@@ -1,12 +1,13 @@
 {
   "name": "uichat-mira-mobile",
-  "version": "0.2.0",
+  "version": "0.2.10",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
     "android:device": "powershell -ExecutionPolicy Bypass -File scripts/android-device.ps1",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "review:pull": "node scripts/pull-ai-review.mjs",
     "start": "react-native start",
     "test": "jest",
     "typecheck": "tsc --noEmit"
