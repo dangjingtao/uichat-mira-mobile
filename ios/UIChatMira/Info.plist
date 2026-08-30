@@ -18,8 +18,9 @@
 	<string>UIChat Mira</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Mirrored from package.json; buildTruth.contract.test.js prevents drift. -->
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>0.2.9</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
