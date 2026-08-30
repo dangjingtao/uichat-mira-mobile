@@ -20,7 +20,6 @@ import {
   Grid3x3,
   Image as ImageIcon,
   Monitor,
-  Pin,
   Search,
   SquarePen,
 } from 'lucide-react-native';
@@ -32,7 +31,7 @@ import { getSessionRoleName } from '../api/roleApi';
 import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { useThreadPinStore } from '../store/threadPinStore';
-import { isThreadPinned } from '../store/threadPinning';
+import { isThreadPinned, splitSessionsByLocalPin } from '../store/threadPinning';
 import {
   selectThreadUnread,
   useThreadReadStore,
@@ -66,6 +65,8 @@ const categories: CategoryItem[] = [
   { id: 'plugins', label: '插件', icon: Grid3x3 },
 ];
 
+const RECENT_THREAD_LIMIT = 20;
+
 interface CustomDrawerProps {
   onClose: () => void;
 }
@@ -90,7 +91,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     setLoadError(null);
     try {
       const list = await miraHostClient.listSessions();
-      setSessions(list.slice(0, 20));
+      setSessions(list);
       void syncUnreadSessions(list.slice(0, 20)).catch(() => undefined);
     } catch (error) {
       setSessions([]);
@@ -106,13 +107,27 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     void loadSessions();
   }, [hydratePins, hydrateReads, loadSessions]);
 
+  // Group by device-local pin state first, then apply the Recent display cap.
+  // A pinned thread that falls outside the Recent cap must stay visible in the
+  // pinned group instead of disappearing from the drawer.
+  const { pinned: pinnedSessions, recent: recentSessions } = React.useMemo(
+    () => splitSessionsByLocalPin(sessions, pinnedAtByThreadId, RECENT_THREAD_LIMIT),
+    [pinnedAtByThreadId, sessions],
+  );
+
+  // Pinned threads beyond the Recent cap still need unread observation.
+  React.useEffect(() => {
+    if (pinnedSessions.length === 0) return;
+    void syncUnreadSessions(pinnedSessions).catch(() => undefined);
+  }, [pinnedSessions, syncUnreadSessions]);
+
   const collectionState = resolveSessionCollectionState(
     loading,
     loadError,
     sessions.length,
   );
 
-  const handleOpenSession = (session: Session) => {
+  const handleOpenSession = useCallback((session: Session) => {
     const target = resolveSessionOpenTarget(session);
     onClose();
 
@@ -128,7 +143,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       sessionId: session.id,
       title: session.title,
     });
-  };
+  }, [navigation, onClose]);
 
   const handleOpenWorkspaces = () => {
     onClose();
@@ -165,6 +180,73 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       Alert.alert('无法新建会话', message);
     }
   }, [creatingChat, navigation, onClose]);
+
+  const renderDrawerSession = useCallback(
+    ({ item }: { item: Session }) => {
+      const belongsToWorkspace =
+        typeof item.workspaceId === 'string' &&
+        item.workspaceId.trim().length > 0;
+      const pinned = isThreadPinned(pinnedAtByThreadId, item.id);
+      const unread = selectThreadUnread(progressByThreadId, item.id);
+      const roleName = getSessionRoleName(item, roleNames);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
+          style={({ pressed }) => [
+            styles.recentItem,
+            pressed && { backgroundColor: colors.bg.soft },
+          ]}
+          onPress={() => handleOpenSession(item)}
+        >
+          <SessionKindIcon
+            session={item}
+            size={18}
+            strokeWidth={1.8}
+            color={colors.text.muted}
+          />
+          <View style={styles.recentText}>
+            <Text
+              style={[styles.recentLabel, { color: colors.text.base }]}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+            {roleName ? (
+              <Text
+                style={[styles.recentRole, { color: colors.text.soft }]}
+                numberOfLines={1}
+              >
+                {roleName}
+              </Text>
+            ) : null}
+          </View>
+          {unread ? (
+            <View
+              accessibilityElementsHidden
+              style={[styles.unreadDot, { backgroundColor: colors.primary }]}
+            />
+          ) : null}
+          {belongsToWorkspace ? (
+            <FolderOpen size={16} color={colors.text.soft} strokeWidth={1.7} />
+          ) : null}
+        </Pressable>
+      );
+    },
+    [colors, handleOpenSession, pinnedAtByThreadId, progressByThreadId, roleNames],
+  );
+
+  const listSeparator = useCallback(
+    () => (
+      <View
+        style={[
+          styles.separator,
+          { backgroundColor: colors.border.soft },
+        ]}
+      />
+    ),
+    [colors],
+  );
 
   return (
     <View
@@ -243,74 +325,30 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
 
         {collectionState === 'data' ? (
           <>
-            <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>最近</Text>
-            <FlatList
-              data={sessions}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              renderItem={({ item }) => {
-                const belongsToWorkspace =
-                  typeof item.workspaceId === 'string' &&
-                  item.workspaceId.trim().length > 0;
-                const pinned = isThreadPinned(pinnedAtByThreadId, item.id);
-                const unread = selectThreadUnread(progressByThreadId, item.id);
-                const roleName = getSessionRoleName(item, roleNames);
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${pinned ? '，已在本机置顶' : ''}${unread ? '，未读' : ''}`}
-                    style={({ pressed }) => [
-                      styles.recentItem,
-                      pressed && { backgroundColor: colors.bg.soft },
-                    ]}
-                    onPress={() => handleOpenSession(item)}
-                  >
-                    <SessionKindIcon
-                      session={item}
-                      size={18}
-                      strokeWidth={1.8}
-                      color={colors.text.muted}
-                    />
-                    <View style={styles.recentText}>
-                      <Text
-                        style={[styles.recentLabel, { color: colors.text.base }]}
-                        numberOfLines={1}
-                      >
-                        {item.title}
-                      </Text>
-                      {roleName ? (
-                        <Text
-                          style={[styles.recentRole, { color: colors.text.soft }]}
-                          numberOfLines={1}
-                        >
-                          {roleName}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {unread ? (
-                      <View
-                        accessibilityElementsHidden
-                        style={[styles.unreadDot, { backgroundColor: colors.primary }]}
-                      />
-                    ) : null}
-                    {pinned ? (
-                      <Pin size={15} color={colors.primary} strokeWidth={2} />
-                    ) : null}
-                    {belongsToWorkspace ? (
-                      <FolderOpen size={16} color={colors.text.soft} strokeWidth={1.7} />
-                    ) : null}
-                  </Pressable>
-                );
-              }}
-              ItemSeparatorComponent={() => (
-                <View
-                  style={[
-                    styles.separator,
-                    { backgroundColor: colors.border.soft },
-                  ]}
+            {pinnedSessions.length > 0 ? (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>置顶</Text>
+                <FlatList
+                  data={pinnedSessions}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  renderItem={renderDrawerSession}
+                  ItemSeparatorComponent={listSeparator}
                 />
-              )}
-            />
+              </>
+            ) : null}
+            {recentSessions.length > 0 ? (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.text.soft }]}>最近</Text>
+                <FlatList
+                  data={recentSessions}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  renderItem={renderDrawerSession}
+                  ItemSeparatorComponent={listSeparator}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
 
