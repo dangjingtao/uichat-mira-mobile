@@ -168,14 +168,39 @@ const canonicalThread = {
   messageCount: 7,
 };
 
+const deleteManifest = {
+  protocolVersion: 1,
+  device: {
+    id: 'device-1',
+    name: 'Android phone',
+    platform: 'android',
+    scopes: ['threads:read', 'messages:write'],
+  },
+  routes: {
+    threads: ['GET /threads', 'GET /threads/:id', 'DELETE /threads/:id'],
+    messages: [],
+    agent: [],
+    artifacts: [],
+  },
+  reconnect: {
+    mode: 'canonical-state-replay',
+    eventCursor: false,
+  },
+  serverTime: '2026-08-27T11:00:00.000Z',
+};
+
 const makeSessionClient = () => {
   const listThreads = jest.fn().mockResolvedValue([canonicalThread]);
   const getThread = jest.fn().mockResolvedValue(canonicalThread);
-  const remote = { listThreads, getThread } as never;
+  const getManifest = jest.fn().mockResolvedValue(deleteManifest);
+  const deleteThread = jest.fn().mockResolvedValue(undefined);
+  const remote = { listThreads, getThread, getManifest, deleteThread } as never;
   return {
     client: new PairedRemoteMiraHostClient(remote),
     listThreads,
     getThread,
+    getManifest,
+    deleteThread,
   };
 };
 
@@ -210,5 +235,32 @@ describe('PairedRemoteMiraHostClient session mapping', () => {
       messageCount: 7,
     });
     expect(getThread).toHaveBeenCalledWith('thread-1');
+  });
+
+  it('advertises deletion only when manifest route and scope both allow it', async () => {
+    const { client, getManifest } = makeSessionClient();
+
+    await expect(client.canDeleteSession()).resolves.toBe(true);
+    getManifest.mockResolvedValue({
+      ...deleteManifest,
+      routes: { ...deleteManifest.routes, threads: ['GET /threads'] },
+    });
+    await expect(client.canDeleteSession()).resolves.toBe(false);
+  });
+
+  it('delegates thread deletion only after the manifest advertises it', async () => {
+    const { client, getManifest, deleteThread } = makeSessionClient();
+
+    await expect(client.deleteSession('thread-1')).resolves.toBeUndefined();
+    expect(deleteThread).toHaveBeenCalledWith('thread-1');
+
+    getManifest.mockResolvedValue({
+      ...deleteManifest,
+      routes: { ...deleteManifest.routes, threads: ['GET /threads'] },
+    });
+    await expect(client.deleteSession('thread-2')).rejects.toMatchObject({
+      code: 'THREAD_DELETE_UNAVAILABLE',
+    });
+    expect(deleteThread).not.toHaveBeenCalledWith('thread-2');
   });
 });

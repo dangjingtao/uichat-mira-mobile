@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,11 @@ import {
   resolveSessionCollectionState,
 } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
+import {
+  GlobalSearchController,
+  SEARCH_DEBOUNCE_MS,
+  type GlobalSearchState,
+} from '../search/globalSearch';
 
 const tabs = [
   { id: 'all', label: '全部', implemented: true },
@@ -60,6 +65,13 @@ export function SearchScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchState, setSearchState] = useState<GlobalSearchState>({
+    status: 'idle',
+    query: '',
+    threadMatches: [],
+    messageMatches: [],
+  });
+  const searchControllerRef = useRef<GlobalSearchController | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -82,20 +94,36 @@ export function SearchScreen() {
     void loadSessions();
   }, [hydratePins, hydrateReads, loadSessions]);
 
-  const results = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return sessions;
-    return sessions.filter((session) =>
-      session.title.toLowerCase().includes(normalizedQuery),
-    );
-  }, [query, sessions]);
+  useEffect(() => {
+    const controller = new GlobalSearchController({
+      listSessions: () => miraHostClient.listSessions(),
+      getMessages: (sessionId) => miraHostClient.getMessages(sessionId),
+      onStateChange: setSearchState,
+    });
+    searchControllerRef.current = controller;
+    return () => {
+      searchControllerRef.current = null;
+      controller.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = searchControllerRef.current;
+    if (!controller) return;
+    if (!query.trim()) {
+      controller.search('');
+      return;
+    }
+    const timer = setTimeout(() => controller.search(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const hasQuery = query.trim().length > 0;
+  const threadResults = hasQuery ? searchState.threadMatches : sessions;
+  const messageResults = hasQuery ? searchState.messageMatches : [];
 
   const openSession = (session: Session) => {
     const target = resolveSessionOpenTarget(session);
-    if (target.kind === 'workspace-list') {
-      navigation.navigate('WorkspaceList');
-      return;
-    }
     if (target.kind === 'contract-error') {
       Alert.alert('无法打开会话', target.message);
       return;
@@ -152,7 +180,7 @@ export function SearchScreen() {
       >
         {!isImplementedTab ? (
           <Text style={[styles.placeholderText, { color: colors.text.soft }]}>该类型搜索即将支持</Text>
-        ) : collectionState === 'loading' ? (
+        ) : collectionState === 'loading' && !hasQuery ? (
           <View
             style={styles.centerState}
             accessibilityLabel="正在加载会话"
@@ -160,7 +188,10 @@ export function SearchScreen() {
           >
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        ) : collectionState === 'error' ? (
+        ) : collectionState === 'error' && !hasQuery ? (
+          // The collection list and the search controller fetch sessions
+          // independently, so a failed initial load must not mask search
+          // results that arrived through the controller's own request.
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>加载会话失败</Text>
             <Text style={[styles.stateText, { color: colors.text.soft }]}>{loadError}</Text>
@@ -176,8 +207,38 @@ export function SearchScreen() {
               <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
             </Pressable>
           </View>
-        ) : results.length > 0 ? (
-          results.map((session) => {
+        ) : hasQuery && searchState.status === 'failed' ? (
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索失败</Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+              无法连接 Mira Host 完成搜索，请重试。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试搜索"
+              onPress={() => searchControllerRef.current?.search(query)}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
+        ) : hasQuery && searchState.status === 'searching' ? (
+          <View
+            style={styles.centerState}
+            accessibilityLabel="正在搜索"
+            accessibilityRole="progressbar"
+          >
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : threadResults.length > 0 || messageResults.length > 0 ? (
+          <>
+            {threadResults.length > 0 && hasQuery ? (
+              <Text style={[styles.resultSectionLabel, { color: colors.text.soft }]}>对话</Text>
+            ) : null}
+            {threadResults.map((session) => {
             const belongsToWorkspace =
               typeof session.workspaceId === 'string' &&
               session.workspaceId.trim().length > 0;
@@ -226,7 +287,7 @@ export function SearchScreen() {
                       {belongsToWorkspace ? (
                         <>
                           <FolderOpen size={13} color={colors.text.soft} strokeWidth={1.7} />
-                          <Text style={[styles.projectHintText, { color: colors.text.soft }]}>从项目中打开</Text>
+                          <Text style={[styles.projectHintText, { color: colors.text.soft }]}>项目会话</Text>
                         </>
                       ) : null}
                       {pinned ? (
@@ -237,7 +298,74 @@ export function SearchScreen() {
                 </View>
               </Pressable>
             );
-          })
+          })}
+            {messageResults.length > 0 ? (
+              <Text style={[styles.resultSectionLabel, { color: colors.text.soft }]}>消息</Text>
+            ) : null}
+            {messageResults.map((match) => (
+              <Pressable
+                key={`${match.session.id}:${match.message.id}`}
+                accessibilityRole="button"
+                accessibilityLabel={`消息命中：${match.session.title}，${match.message.role === 'user' ? '你' : 'Mira'}的消息`}
+                style={styles.result}
+                onPress={() => openSession(match.session)}
+              >
+                <View style={[styles.resultIcon, { backgroundColor: colors.bg.soft }]}>
+                  <SessionKindIcon
+                    session={match.session}
+                    size={20}
+                    strokeWidth={1.8}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={[styles.resultLine, { backgroundColor: colors.bg.soft }]}>
+                  <View style={styles.resultTitleRow}>
+                    <Text
+                      style={[styles.resultTitle, { color: colors.text.ink }]}
+                      numberOfLines={1}
+                    >
+                      {match.session.title}
+                    </Text>
+                    <Text style={[styles.messageRole, { color: colors.text.soft }]}>
+                      {match.message.role === 'user' ? '你' : 'Mira'}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.messageSnippet, { color: colors.text.muted }]}
+                    numberOfLines={2}
+                  >
+                    {match.snippet}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+            {searchState.status === 'degraded' ? (
+              <Text style={[styles.degradedHint, { color: colors.text.soft }]}>
+                部分会话未能完成搜索，结果可能不完整。
+              </Text>
+            ) : null}
+          </>
+        ) : hasQuery && searchState.status === 'degraded' ? (
+          // Every message lookup failed and no title matched. This must not
+          // render as a definitive "no results" — Host availability is the
+          // unknown here, not the absence of matches.
+          <View style={styles.centerState}>
+            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索未能完成</Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+              部分会话消息暂时无法读取，无法确认是否存在匹配。
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="重试搜索"
+              onPress={() => searchControllerRef.current?.search(query)}
+              style={({ pressed }) => [
+                styles.retryButton,
+                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+              ]}
+            >
+              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
@@ -351,6 +479,23 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   projectHintText: { fontSize: fontSize.xs },
+  resultSectionLabel: {
+    fontSize: fontSize.captionUppercase,
+    fontWeight: '600',
+    paddingHorizontal: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  messageRole: { fontSize: fontSize.xs, flexShrink: 0 },
+  messageSnippet: {
+    marginTop: 2,
+    fontSize: fontSize.button,
+  },
+  degradedHint: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    fontSize: fontSize.button,
+    textAlign: 'center',
+  },
   placeholderText: {
     textAlign: 'center',
     marginTop: spacing.xl,

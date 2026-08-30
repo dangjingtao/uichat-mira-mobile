@@ -13,16 +13,16 @@ describe('resolveSessionOpenTarget', () => {
     ).toEqual({ kind: 'chat' });
   });
 
-  it('routes workspace-owned sessions through the project hierarchy', () => {
+  it('opens workspace-owned sessions directly in chat', () => {
     expect(
       resolveSessionOpenTarget({ workspaceId: 'workspace-1', agentEnabled: false }),
-    ).toEqual({ kind: 'workspace-list' });
+    ).toEqual({ kind: 'chat' });
   });
 
-  it('routes workspace-owned Agent sessions through the project hierarchy', () => {
+  it('opens valid workspace-owned Agent sessions directly in chat', () => {
     expect(
       resolveSessionOpenTarget({ workspaceId: 'workspace-agent', agentEnabled: true }),
-    ).toEqual({ kind: 'workspace-list' });
+    ).toEqual({ kind: 'chat' });
   });
 
   it('rejects Agent sessions that violate the workspace ownership contract', () => {
@@ -30,7 +30,7 @@ describe('resolveSessionOpenTarget', () => {
       resolveSessionOpenTarget({ workspaceId: '   ', agentEnabled: true }),
     ).toEqual({
       kind: 'contract-error',
-      message: '该 Agent 会话缺少项目归属，无法从移动端绕过项目层级打开。',
+      message: '该 Agent 会话缺少项目归属，无法在移动端打开。',
     });
   });
 });
