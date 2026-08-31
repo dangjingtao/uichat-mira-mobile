@@ -682,7 +682,7 @@ export class RemoteMiraHostClient {
       return Promise.reject(
         new RemoteHostError(
           'RELAY_ENDPOINT_UNAVAILABLE',
-          'Relay endpoint is unavailable',
+          'Mira Relay endpoint is unavailable',
         ),
       );
     }
