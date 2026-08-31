@@ -1,0 +1,91 @@
+name: Patch Shiyan Cloud Truth
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/patch-shiyan-cloud-truth.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Sync current Shiyan cloud facts
+        shell: python
+        run: |
+          from pathlib import Path
+
+          readme = Path('docs/shiyan/README.md')
+          text = readme.read_text()
+          old = '- 2026-08-31 已验证 AI SDK 在 Cloudflare Workers 上通过类型检查、全部拾言测试、public/private Worker dry-run；真实 dev 部署仍依赖 `SHIYAN_D1_DATABASE_ID` 等环境前置。'
+          new = '''- 2026-08-31 已验证 AI SDK 在 Cloudflare Workers 上通过类型检查、全部拾言测试、public/private Worker dry-run。
+          - 2026-08-31 dev 云资源已落地：D1 `mira-shiyan`（ID `5f923203-bb4f-40a1-9b83-d6cf493f3114`）；远端已应用 `0001_capture_foundation.sql`、`0002_stt_transcript.sql`、`0004_delivery_records.sql`、`0005_llm_organization.sql`；已初始化设备 `mira-mobile-primary`；R2 bucket `mira-shiyan-audio` 已创建；API Worker dry-run 已通过。
+          - D1 资源“已存在”和 GitHub Actions 的部署输入是两个层次：Cloud repo 可继续保留 D1 placeholder 并在部署时通过 `SHIYAN_D1_DATABASE_ID` 注入；placeholder 本身不得再被解释成 D1 尚未创建。'''
+          if text.count(old) != 1:
+              raise SystemExit(f'README expected one old cloud-status line; got {text.count(old)}')
+          readme.write_text(text.replace(old, new, 1))
+
+          tech = Path('docs/shiyan/TECHNICAL_DESIGN.md')
+          text = tech.read_text()
+          old = '当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。该结论只证明实现与 Cloudflare Workers 构建合同成立，不等价于真实 dev 环境已经完成部署；实际部署仍受 D1 ID、运行时 Secrets / Vars 等环境前置约束。'
+          new = '''当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。
+
+          当前 dev 云资源事实（2026-08-31）：
+
+          - D1 已创建：`mira-shiyan`，database id `5f923203-bb4f-40a1-9b83-d6cf493f3114`。
+          - 远端 D1 已应用：`0001_capture_foundation.sql`、`0002_stt_transcript.sql`、`0004_delivery_records.sql`、`0005_llm_organization.sql`。
+          - 已初始化设备：`mira-mobile-primary`。
+          - R2 bucket 已创建：`mira-shiyan-audio`。
+          - API Worker dry-run 构建通过。
+
+          Cloud repo 中 D1 ID 可以继续采用部署时环境注入，而不是把具体环境 ID 固化进 canonical 架构合同。若 `wrangler.api.jsonc` 仍显示 placeholder，只表示仓库配置采用环境注入策略，不表示 D1 资源未创建。GitHub Actions 是否能自动部署，仍需单独确认 `SHIYAN_D1_DATABASE_ID` 已进入 workflow 的 vars 输入；LLM 与其它运行时 Secrets / Vars 也按各自门禁验收。'''
+          if text.count(old) != 1:
+              raise SystemExit(f'TECH expected one old engineering-facts paragraph; got {text.count(old)}')
+          tech.write_text(text.replace(old, new, 1))
+
+          card = Path('docs/task-cards/MOB-018-shiyan-cloud-foundation.md')
+          text = card.read_text()
+          replacements = [
+              ('状态：待实施', '状态：已实施（Cloud Foundation 已落地；端到端稳定性由后续任务继续验收）'),
+              ('当前目标基线：仓库现有 `main`', '当前实现基线：`dangjingtao/mira-shiyan-cloud/dev`'),
+              ('`mira-shiyan-cloud` 当前只定义了仓库边界，尚未有正式云端实现。技术基线要求一个 Cloud repo 内保持两个 Worker：公开 `shiyan-api` 与私有 `shiyan-llm`；D1 保存任务事实，R2 保存音频 / 原始资产，异步处理使用 Workflow。', '`mira-shiyan-cloud` 已完成首版 Cloud Foundation 实现。本卡保留为基础合同与验收记录：一个 Cloud repo 内保持两个 Worker（公开 `shiyan-api` 与私有 `shiyan-llm`）；D1 保存任务事实，R2 保存音频 / 原始资产，异步处理使用 Workflow。')
+          ]
+          for old_value, new_value in replacements:
+              if text.count(old_value) != 1:
+                  raise SystemExit(f'MOB-018 expected one match for {old_value[:40]!r}; got {text.count(old_value)}')
+              text = text.replace(old_value, new_value, 1)
+
+          marker = '## 非目标\n'
+          progress = '''## 已落地环境事实（2026-08-31）
+
+- D1：`mira-shiyan`，database id `5f923203-bb4f-40a1-9b83-d6cf493f3114`。
+- 远端 migration：`0001_capture_foundation.sql`、`0002_stt_transcript.sql`、`0004_delivery_records.sql`、`0005_llm_organization.sql` 已应用。
+- 设备：`mira-mobile-primary` 已初始化。
+- R2：`mira-shiyan-audio` 已创建。
+- `shiyan-api`：dry-run 构建通过。
+- D1 ID 在仓库配置中允许保持 placeholder，由部署流程通过环境变量注入；不得据此把资源状态误判为“未创建”。
+
+'''
+          if marker not in text:
+              raise SystemExit('MOB-018 non-goals marker not found')
+          if '## 已落地环境事实（2026-08-31）' not in text:
+              text = text.replace(marker, progress + marker, 1)
+          card.write_text(text)
+
+      - name: Commit truth update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/shiyan/README.md docs/shiyan/TECHNICAL_DESIGN.md docs/task-cards/MOB-018-shiyan-cloud-foundation.md
+          git commit -m 'docs: record Shiyan dev cloud resources'
+          git push origin HEAD:dev
