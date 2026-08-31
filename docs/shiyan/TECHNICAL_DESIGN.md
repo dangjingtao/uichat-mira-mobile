@@ -12,6 +12,7 @@
 
 - 产品基线：[`PRD.md`](./PRD.md)
 - 跨仓库治理：[`README.md`](./README.md)
+- Dev 云环境状态：[`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md)
 
 > 本文负责回答“如何稳定、低成本、可调试地实现 PRD”。若本文与 PRD 冲突，以 PRD 为准；若实现需要改变产品行为或跨仓库合同，先更新 Mobile 的 `docs/shiyan/`，再修改下游仓库。
 
@@ -330,7 +331,9 @@ interface LlmGateway {
 }
 ```
 
-当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。该结论只证明实现与 Cloudflare Workers 构建合同成立，不等价于真实 dev 环境已经完成部署；实际部署仍受 D1 ID、运行时 Secrets / Vars 等环境前置约束。
+当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。
+
+当前 dev 的 D1、远端 migration、初始化设备、R2 bucket 与运行时配置状态属于可变环境事实，统一以 [`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md) 为准。架构设计不再用仓库中的 D1 placeholder 推断“资源未创建”，也不把具体环境 ID 固化为长期架构合同。
 
 错误只允许表达 Provider 层事实，例如：
 
@@ -709,8 +712,9 @@ MVP 不引入：
 1. `uichat-mira-mobile/docs/shiyan/PRD.md`
 2. `uichat-mira-mobile/docs/shiyan/TECHNICAL_DESIGN.md`
 3. `uichat-mira-mobile/docs/shiyan/README.md`
-4. `mira-shiyan-cloud` 实现与 README
-5. `mira-shiyan` Destination 边界
+4. `uichat-mira-mobile/docs/shiyan/DEV_CLOUD_STATE.md`
+5. `mira-shiyan-cloud` 实现与 README
+6. `mira-shiyan` Destination 边界
 
 若 cloud 或 Destination 的既有实现与 Mobile canonical truth 冲突，修改下游实现；不得反向把实现现状写成产品事实。
 
