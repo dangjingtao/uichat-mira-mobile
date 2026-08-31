@@ -275,7 +275,7 @@ describe('RemoteMiraHostClient transport selection', () => {
     expect(relayJsonMock).toHaveBeenCalledTimes(1);
   });
 
-  it('selects a reachable transport before dispatching thread creation', async () => {
+  it('selects a reachable transport and sends an empty body for untitled thread creation', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
       hostUrl: 'https://mira.example.ts.net',
@@ -315,6 +315,7 @@ describe('RemoteMiraHostClient transport selection', () => {
       '/remote/v1/manifest',
       '/threads',
     ]);
+    expect(relayJsonMock.mock.calls[1][1].body).toEqual({});
   });
 
   it('does not replay an uncertain dispatched thread create through Relay', async () => {

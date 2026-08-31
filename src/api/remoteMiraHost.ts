@@ -316,7 +316,7 @@ export class RemoteMiraHostClient {
         path: '/threads',
         method: 'POST',
         credential: credential.credential,
-        ...(title ? { body: { title } } : {}),
+        body: title ? { title } : {},
         parse: parseRemoteThread,
       };
       const order = this.transportOrder(credential);
