@@ -316,7 +316,7 @@ export class RemoteMiraHostClient {
         path: '/threads',
         method: 'POST',
         credential: credential.credential,
-        ...(title ? { body: { title } } : {}),
+        body: title ? { title } : {},
         parse: parseRemoteThread,
       };
       const order = this.transportOrder(credential);
@@ -682,7 +682,7 @@ export class RemoteMiraHostClient {
       return Promise.reject(
         new RemoteHostError(
           'RELAY_ENDPOINT_UNAVAILABLE',
-          'Mira Relay endpoint is unavailable',
+          'Relay endpoint is unavailable',
         ),
       );
     }
