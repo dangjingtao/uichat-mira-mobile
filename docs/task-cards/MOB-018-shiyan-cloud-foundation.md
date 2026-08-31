@@ -1,12 +1,12 @@
 # MOB-018：拾言 Cloud 基础与 CaptureTask / 上传闭环
 
-状态：待实施
+状态：已实施（Cloud Foundation 已落地；端到端稳定性由后续任务继续验收）
 
 负责人：`mob_018_shiyan_cloud_foundation`
 
 执行仓库：`dangjingtao/mira-shiyan-cloud`
 
-当前目标基线：仓库现有 `main`
+当前实现基线：`dangjingtao/mira-shiyan-cloud/dev`
 
 目标里程碑：Shiyan MVP
 
@@ -14,7 +14,7 @@
 
 ## 背景
 
-`mira-shiyan-cloud` 当前只定义了仓库边界，尚未有正式云端实现。技术基线要求一个 Cloud repo 内保持两个 Worker：公开 `shiyan-api` 与私有 `shiyan-llm`；D1 保存任务事实，R2 保存音频 / 原始资产，异步处理使用 Workflow。
+`mira-shiyan-cloud` 已完成首版 Cloud Foundation 实现。本卡保留为基础合同与验收记录：一个 Cloud repo 内保持两个 Worker（公开 `shiyan-api` 与私有 `shiyan-llm`）；D1 保存任务事实，R2 保存音频 / 原始资产，异步处理使用 Workflow。
 
 ## 目标
 
@@ -46,13 +46,14 @@
 
 ## Execution Entry Points
 
-本仓库当前实现为空，Builder 应先读取：
+Builder 应先读取：
 
 - `README.md`
 - Mobile canonical `docs/shiyan/PRD.md`
 - Mobile canonical `docs/shiyan/TECHNICAL_DESIGN.md`
+- Mobile current environment truth `docs/shiyan/DEV_CLOUD_STATE.md`
 
-随后建立最小 `src/`、配置、migration 与测试结构；不得先生成与 MVP 无关的大型平台脚手架。
+后续施工应在现有 Cloud Foundation 上增量修改，不得重建与 MVP 无关的大型平台脚手架。
 
 ## Validation
 
@@ -72,6 +73,17 @@
 6. 错误与日志可定位且不泄露秘密；
 7. 未实现 STT / LLM 时状态仍真实，不伪造处理完成。
 
+## 已落地环境事实（2026-08-31）
+
+- D1：`mira-shiyan`，database id `5f923203-bb4f-40a1-9b83-d6cf493f3114`。
+- 远端 migration：`0001_capture_foundation.sql`、`0002_stt_transcript.sql`、`0004_delivery_records.sql`、`0005_llm_organization.sql` 已应用。
+- 设备：`mira-mobile-primary` 已初始化。
+- R2：`mira-shiyan-audio` 已创建。
+- `shiyan-api`：dry-run 构建通过。
+- D1 ID 在仓库配置中允许保持 placeholder，由部署流程通过环境变量注入；不得据此把资源状态误判为“未创建”。
+
+详细、可变的 dev 环境事实统一以 `docs/shiyan/DEV_CLOUD_STATE.md` 为准。
+
 ## 非目标
 
 - 不做 STT；
@@ -82,4 +94,4 @@
 
 ## 并行边界
 
-可与 MOB-016、MOB-017 并行。MOB-018 独占首版 Cloud schema / CaptureTask / Stage / upload contract 的建立；MOB-019、MOB-020 不应在本卡合同尚未合入前并行修改同一 schema / Workflow 主状态机。
+MOB-018 的 Cloud Foundation 合同已经建立；后续 MOB-019、MOB-020、MOB-021、MOB-022 应在该合同上增量施工。若后续任务需要改变 CaptureTask / Stage / upload 的跨仓库语义，必须先更新 Mobile canonical truth，不得直接在 Cloud 实现中漂移合同。
