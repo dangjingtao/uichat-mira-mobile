@@ -2,7 +2,9 @@
 
 状态：技术设计基线，可进入任务拆分
 
-日期：2026-08-29
+初版日期：2026-08-29
+
+最近核对：2026-08-31
 
 唯一真相目录：`docs/shiyan/`
 
@@ -10,6 +12,7 @@
 
 - 产品基线：[`PRD.md`](./PRD.md)
 - 跨仓库治理：[`README.md`](./README.md)
+- Dev 云环境状态：[`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md)
 
 > 本文负责回答“如何稳定、低成本、可调试地实现 PRD”。若本文与 PRD 冲突，以 PRD 为准；若实现需要改变产品行为或跨仓库合同，先更新 Mobile 的 `docs/shiyan/`，再修改下游仓库。
 
@@ -105,7 +108,7 @@ Mobile 本地录音
 └──────┬───────────────────┘
        │
        ▼
- DeepSeek / Volcano / Kimi / other OpenAI-compatible providers
+ Any OpenAI-compatible provider
 
 Final Draft
    │
@@ -304,8 +307,11 @@ Service Binding 不需要公开第二个 Worker，也不会因为拆成两个 Wo
 职责固定为：
 
 - Secrets 管理。
-- Provider 适配。
-- 默认 Provider + 一个 fallback。
+- OpenAI-compatible Provider 适配，协议层使用 AI SDK v6 + `@ai-sdk/openai-compatible`。
+- 一个 primary + 可选 fallback；不得在业务合同中绑定具体厂商。
+- primary 最小配置为 `LLM_PRIMARY_BASE_URL`、`LLM_PRIMARY_MODEL`、`LLM_PRIMARY_API_KEY`；`LLM_PRIMARY_PROVIDER` 仅作可选观测标签。
+- fallback 使用对应 `LLM_FALLBACK_*` 键，整组可不配置。
+- 非敏感 endpoint / model 配置使用 Cloudflare Vars，API Key 使用 Cloudflare Secrets；部署保留控制台 Vars，不将凭据写入仓库。
 - 结构化输出校验。
 - Provider error 归一。
 - latency / token / usage 元数据。
@@ -324,6 +330,10 @@ interface LlmGateway {
   generateStructured(input: OrganizeRequest): Promise<OrganizeResult>
 }
 ```
+
+当前已验证工程事实（2026-08-31）：AI SDK 依赖安装、Cloudflare runtime types、TypeScript、全部拾言测试、`shiyan-api` dry-run、`shiyan-llm` dry-run 与本地 D1 migration 校验均已通过。
+
+当前 dev 的 D1、远端 migration、初始化设备、R2 bucket 与运行时配置状态属于可变环境事实，统一以 [`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md) 为准。架构设计不再用仓库中的 D1 placeholder 推断“资源未创建”，也不把具体环境 ID 固化为长期架构合同。
 
 错误只允许表达 Provider 层事实，例如：
 
@@ -702,8 +712,9 @@ MVP 不引入：
 1. `uichat-mira-mobile/docs/shiyan/PRD.md`
 2. `uichat-mira-mobile/docs/shiyan/TECHNICAL_DESIGN.md`
 3. `uichat-mira-mobile/docs/shiyan/README.md`
-4. `mira-shiyan-cloud` 实现与 README
-5. `mira-shiyan` Destination 边界
+4. `uichat-mira-mobile/docs/shiyan/DEV_CLOUD_STATE.md`
+5. `mira-shiyan-cloud` 实现与 README
+6. `mira-shiyan` Destination 边界
 
 若 cloud 或 Destination 的既有实现与 Mobile canonical truth 冲突，修改下游实现；不得反向把实现现状写成产品事实。
 

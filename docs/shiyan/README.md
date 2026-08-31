@@ -16,6 +16,7 @@
 
 - `PRD.md`：产品问题、用户场景、功能范围、交互规则、异常与验收标准的产品基线。
 - `TECHNICAL_DESIGN.md`：端云架构、数据边界、状态实现、恢复策略、Provider / Destination 与工程约束的技术基线。
+- `DEV_CLOUD_STATE.md`：当前 dev 云环境已落地资源、运行时配置与部署前置的可变环境真相。
 - `README.md`：跨仓库边界、架构原则与一致性治理规则。
 
 另外两个仓库不得独立定义或修改拾言的产品行为或跨仓库合同：
@@ -163,7 +164,12 @@ MVP：
 - MVP 可使用设备身份；正式账户模型预留 `userId`，不得把 `deviceId` 固化为最终用户体系。
 - 录音结束后上传；大文件应直接进入对象存储，不通过业务 Worker 中转。
 - STT Provider 可替换。
-- LLM 不要求使用 Workers AI；使用独立轻量 LLM 服务层统一保管现有 Provider Key、基础路由、fallback 与错误归一。
+- LLM 不要求使用 Workers AI；`shiyan-llm` 使用 AI SDK v6 + `@ai-sdk/openai-compatible` 作为 OpenAI-compatible 协议层，不绑定 DeepSeek / Kimi / 火山等具体厂商。
+- primary 的最小配置合同为 `LLM_PRIMARY_BASE_URL` + `LLM_PRIMARY_MODEL` + `LLM_PRIMARY_API_KEY`；`LLM_PRIMARY_PROVIDER` 仅为可选观测标签。
+- fallback 整组为可选；配置时使用对应 `LLM_FALLBACK_*` 键。
+- Base URL / Model 等非敏感配置放 Cloudflare Vars，API Key 放 Cloudflare Secrets；部署不得把 Secret 写入仓库或日志。
+- 2026-08-31 已验证 AI SDK 在 Cloudflare Workers 上通过类型检查、全部拾言测试、public/private Worker dry-run。
+- 当前 dev D1、migration、device、R2 bucket 等真实环境状态以 [`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md) 为准；仓库中的 D1 placeholder 不得直接解释为“D1 尚未创建”。
 - LLM 服务层不得拥有 CaptureTask 业务状态解释权。
 
 具体实现以 `TECHNICAL_DESIGN.md` 为技术基线；API 路径、表字段和库内部细节仍允许施工在不违反该基线的前提下按稳定性、落地成本与 Debug 成本调整。
@@ -183,13 +189,13 @@ MVP：
 
 ### 修改前
 
-1. 阅读本目录的 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件相关章节。
+1. 阅读本目录的 `PRD.md`、`TECHNICAL_DESIGN.md`、`DEV_CLOUD_STATE.md` 与本文件相关章节。
 2. 确认修改属于局部实现细节还是会改变 canonical truth。
 3. 若会改变产品或跨仓库合同，先修改本目录真相并完成评审。
 
 ### 修改后
 
-1. 对照 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件逐项核对行为和状态语义。
+1. 对照 `PRD.md`、`TECHNICAL_DESIGN.md`、`DEV_CLOUD_STATE.md` 与本文件逐项核对行为、状态语义和当前环境事实。
 2. 检查 `mira-shiyan-cloud` 是否出现与本目录冲突的接口、状态或数据定义。
 3. 检查 `mira-shiyan` 是否被错误用作业务数据库或业务真相源。
 4. 若跨仓库合同发生变化，三个仓库中的引用必须同步更新。
@@ -200,6 +206,7 @@ MVP：
 
 - 正式 MVP PRD：[`PRD.md`](./PRD.md)
 - 正式 MVP 技术设计：[`TECHNICAL_DESIGN.md`](./TECHNICAL_DESIGN.md)
+- Dev 云环境状态：[`DEV_CLOUD_STATE.md`](./DEV_CLOUD_STATE.md)
 - 早期技术草案：`../meeting-capture-mvp.md`
 
-早期技术草案仅保留讨论与技术探索价值；与本目录正式真相冲突时，以 `PRD.md`、`TECHNICAL_DESIGN.md` 与本文件为准。
+早期技术草案仅保留讨论与技术探索价值；与本目录正式真相冲突时，以 `PRD.md`、`TECHNICAL_DESIGN.md`、`DEV_CLOUD_STATE.md` 与本文件为准。
