@@ -29,7 +29,9 @@
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **有条件完成**：代码 `1035da3` 已入 `dev` | Mobile；真机 dogfood smoke |
 | MOB-026 | 全局搜索命中消息正文 | **有条件完成**：代码 `e628d5a` 已入 `dev` | Mobile；长会话 / 降级状态 smoke |
 | MOB-027 | 设置页插件入口恢复可用 | **完成**：代码 `327b2e4` 已入 `dev` | Mobile；2026-09-01 产品验收通过 |
-| MOB-028 | 关于页版本更新检查与确认下载 | **有条件完成**：代码 `88d54a7` 已入 `dev` | Mobile；release metadata / 下载 smoke |
+| MOB-028 | 关于页版本更新检查与确认下载 | **有条件完成 / 发行源方案被替换** | 保留现有 UI/交互；运行时 GitHub Releases 方案由 MOB-028A/B 替换 |
+| MOB-028A | R2 分支发行真相与 Manifest | **待实施** | Mobile CI；predev/dev/test/prod 独立，`latest.json` 最后发布 |
+| MOB-028B | R2 分支隔离更新客户端 | **待实施** | Mobile；依赖 028A，只读自身 R2 channel manifest 与 signed APK |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **有条件完成**：代码 `24513fb` 已入 `dev` | Mobile；双平台真机 smoke |
 | MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
 | MOB-031 | 拾言确认页主次交互收口 | **待实施** | Mobile；基于现有播放器 / Scene Sheet 收轻主路径 |
@@ -49,7 +51,7 @@
 - MOB-025 是 MOB-007 之后的交互回归 / Drawer 展示收口，不改变 device-local pin 合同。
 - MOB-026 是新的**跨会话消息正文搜索**；MOB-014 仍只负责当前会话查找，不重开旧卡。
 - MOB-027 是明确的 Settings -> Plugins 接线回归，保持最小改动。
-- MOB-028 必须区分 dev / prod release channel；用户确认后触发系统 / 浏览器下载，不在本卡实现静默安装。
+- MOB-028 原实现保留 About UI、红点、确认与失败重试交互；2026-09-01 后续决策由 MOB-028A/B 将运行时更新源收敛为 **R2-only**，并按 `predev/dev/test/prod` 分支 / channel 隔离版本比较与下载。GitHub Release 仅保留归档追溯角色。
 - MOB-029 保持拾言“录音结束 -> 确认标题 / 场景 -> 提交”产品合同，仅收口确认页播放器、场景修改方式与 Cloud 配置入口。
 
 ## 2026-09-01 拾言 UX Follow-up
@@ -152,6 +154,8 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工并合入 Mobil
 - `MOB-026-global-message-search.md`
 - `MOB-027-settings-plugin-entry.md`
 - `MOB-028-app-update-check-download.md`
+- `MOB-028A-r2-release-truth.md`
+- `MOB-028B-r2-update-client.md`
 - `MOB-029-shiyan-confirmation-ux.md`
 - `MOB-030-shiyan-home-unified-records.md`
 - `MOB-031-shiyan-confirmation-hierarchy.md`
