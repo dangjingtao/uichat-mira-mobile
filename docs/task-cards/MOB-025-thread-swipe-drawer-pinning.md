@@ -1,6 +1,6 @@
 # MOB-025：线程右滑操作与 Drawer 置顶分组修复
 
-状态：**重新打开 / DOING**（`1035da3` 已入 `dev`，但 Android 真机连续复现右滑不可用；既有实现不得视为已修复）
+状态：**DOING / PR #83 Review 中**（旧实现 `1035da3` 已被 Android 真机失败证据推翻；新实现尚未取得最终 CI + Android 真机验收）
 
 负责人：`mob_025_thread_swipe_drawer_pinning`
 
@@ -10,20 +10,35 @@
 
 ## 2026-09-01 Reopen Evidence
 
-产品负责人确认：MOB-025 的右滑问题已经至少三次宣称修复但真机仍失败。当前 `dev` 的 `SessionListScreen` 仍使用自定义 `PanResponder` 与行内 `Pressable` / `FlatList` 做 responder 竞争；此前 MOB-011 与 MOB-025 的修改均继续沿用同一路线，只调整 capture、阈值、速度与 settle 行为。
+产品负责人确认：MOB-025 的右滑问题已经至少三次宣称修复但真机仍失败。旧 `dev` 的 `SessionListScreen` 使用自定义 `PanResponder` 与行内 `Pressable` / `FlatList` 做 responder 竞争；此前 MOB-011 与 MOB-025 的修改均继续沿用同一路线，只调整 capture、阈值、速度与 settle 行为。
 
 因此本卡重新打开，后续施工必须遵守：
 
 - 不再把调整 `dx`、`vx`、capture 阈值或 spring 参数作为主修复方案；
 - 优先替换脆弱的自定义 responder 手势层，采用经过 React Native 移动端验证的 swipe/gesture 方案；
 - 若需要新增原生手势依赖，必须按 `AGENTS.md` 明确记录依赖理由、双平台影响与构建验证；
-- **没有 Android 真机证据不得回到 REVIEW/PASS，也不得再写“有条件完成”来代替真实交互验收。**
+- **没有 Android 真机证据不得进入 PASS，也不得再写“有条件完成”来代替真实交互验收。**
+
+## 2026-09-01 Reimplementation Evidence
+
+PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而不是继续调 `PanResponder` 参数：
+
+- `SessionListScreen` 删除 Session row 的 `PanResponder`、capture、`dx` / `vx` 与 `Animated.Value` 手势实现；
+- 新增 `SessionSwipeRow`，使用 React Native 原生横向 `ScrollView` 承担横向 reveal，外层 `FlatList` 继续承担纵向滚动；
+- 未新增 native dependency，不修改 Pods / Gradle；
+- 保持产品方向为**向右滑动，露出左侧「置顶 / 删除」操作区**；
+- 保持单行打开、点击已打开行收起、纵向列表开始滚动时收起操作区；
+- 保持 MOB-007 device-local pin、Host-authoritative delete、Drawer pinned 分组与原有导航合同不变；
+- 44pt settle threshold 抽成纯函数并补单元测试；
+- 自查发现父组件 rerender 可能打断 settle 动画后，已在后续提交中改为 callback ref，并同时处理 momentum scroll end。
+
+PR #83 第一轮 head 的 typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding；最终 head 仍必须重新取得完整 CI 证据。即使 CI 全绿，本卡仍需 Android 真机 dogfood 后才可进入 PASS。
 
 ## 背景
 
 MOB-007 已完成设备本地线程置顶，现有合同继续有效：置顶状态只保存在当前设备，不同步为 Host / Desktop 的账户级事实。
 
-当前 `SessionListScreen` 已存在自定义 `PanResponder` 右滑实现，也已经渲染「置顶 / 删除」操作层；但 Android 真机 dogfood 复现为：线程列表右滑无法稳定呼出操作。与此同时，`CustomDrawer` 仍把线程放在一个「最近」分组里，只在行尾显示图钉，没有把置顶线程独立成组。
+当前目标是把主线程列表右滑稳定性真正收口，同时保留已经成立的 Drawer 置顶分组、设备本地 pin 与 authoritative delete 语义。
 
 这是一张 MOB-007 之后的交互回归 / 展示收口卡，不重开 MOB-007，也不改变其本地状态合同。
 
@@ -97,7 +112,9 @@ MOB-007 已完成设备本地线程置顶，现有合同继续有效：置顶状
 ## Execution Entry Points
 
 - `src/screens/SessionListScreen.tsx`
-- `src/components/CustomDrawer.tsx`
+- `src/screens/SessionSwipeRow.tsx`
+- `src/screens/sessionSwipe.ts` / `sessionSwipe.test.ts`
+- `src/components/CustomDrawer.tsx`（仅保持既有分组合同，不因本轮 swipe 重写）
 - `src/store/threadPinStore.ts`（仅在确有必要时）
 - `src/store/threadPinning.ts` / tests（如排序行为需要补回归）
 
@@ -126,12 +143,12 @@ npm test -- --runInBand
 
 ## Parallel / Integration
 
-可与 MOB-026、MOB-027、MOB-028、MOB-029 从同一 `dev` base 并行开独立分支。若施工中需要修改共享导航、全局 store 结构或 native config，先报告并重新评估并行关系。
+若 `dev` 在 PR Review 期间继续前进，PR #83 必须在合并前确认不落后于当前 `dev`，且不得覆盖其他 Mobile 卡的共享页面 / 台账改动。
 
 ## Open / Unknown
 
-当前唯一需要重新验证的核心未知项是：Android 真机上应采用哪种手势实现才能稳定与 `FlatList` 纵向滚动、行点击共存。不得继续以未经真机验证的 `PanResponder` 参数调优作为答案。
+当前核心未知项已经从“继续怎么调 PanResponder”收敛为：**新的 native horizontal ScrollView 方案是否在 Android 真机上稳定满足右滑、纵向滚动与点击三者共存。** 这个问题只能由最终 CI + 真机 dogfood 关闭。
 
 ## Handoff
 
-施工前先核对上述文件与当前代码。若当前 HEAD 已改变手势实现或 pin 语义，与本卡描述冲突时，以当前仓库事实为准并先报告冲突，不得直接按旧基线覆盖。
+PR #83 合并前：确认最终 head 的 typecheck / lint / Jest、Android debug build、iOS simulator / unsigned device build 与 AI Review；合并后状态进入 REVIEW，不进入 PASS。产品负责人完成 Android 真机验收后再决定是否 PASS。
