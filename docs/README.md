@@ -2,7 +2,8 @@
 
 ## 当前工程主线
 
-- [Mobile 工作台账](work-ledger.md)
+- [Mobile Canonical Work Ledger](workbench/00-work-ledger.md)
+- [Mobile 工作台账详细镜像](work-ledger.md)
 
 `docs/work-ledger.md` 是当前移动端线程、项目与角色展示工作的任务事实来源。任务状态、Host 依赖、产品决定和验收结果统一在台账维护。
 

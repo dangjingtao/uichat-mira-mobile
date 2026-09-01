@@ -1,6 +1,6 @@
 # MOB-025：线程右滑操作与 Drawer 置顶分组修复
 
-状态：**待实施**
+状态：**有条件完成**（代码已入 `dev`，真机 dogfood smoke 待验收）
 
 负责人：`mob_025_thread_swipe_drawer_pinning`
 

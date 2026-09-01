@@ -1,4 +1,6 @@
-# Mobile 工作台账
+# Mobile 工作台账（兼容镜像）
+
+> Canonical 台账已统一为 [`docs/workbench/00-work-ledger.md`](workbench/00-work-ledger.md)，状态语义遵循 Mira Forge：`TODO → DOING → REVIEW → PASS`。本文件保留详细范围与历史证据；若与 canonical 台账冲突，以 `00-work-ledger.md` 为准，并应立即修正镜像。
 
 更新时间：2026-09-01（Asia/Shanghai）
 
@@ -26,10 +28,10 @@
 - MOB-014：有条件完成，Mobile PR #62 已 squash 合入 `dev`，merge commit `cfff6b3f61d2469a279e1579f8c080c48c829a7a`；Share Sheet / 当前聊天查找代码与双平台自动构建已通过，真实 Share Sheet、长会话查找与关闭搜索后的交互 smoke 挂账。
 - MOB-015：有条件完成，Mobile PR #54 已合入 `dev`；真机设置持久化、system 主题切换、断开 / 重配对挂账。
 - MOB-024：有条件完成。Desktop PR #88 已合入 `dev`，merge commit `e1752500cafd300bb6c9c82e9b5a610beb985d2c`；Mobile PR #65 已 squash 合入 `dev`，merge commit `a668bf503b3d540a1bd521e3792684af258de0d4`。`POST /threads` 通过现有 `messages:write` 兼容 scope 正式发布，Mobile 以 runtime manifest + device scope 做 capability guard，Drawer“聊天”已接真实 canonical Thread 创建；创建 POST 响应不确定时不会跨 Direct / Relay 重放。Desktop `pnpm check` 已通过；Mobile typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding。真实已配对设备无需重配对的新建 Thread 跨端 smoke 挂账。
-- MOB-025：待实施。修复 Android dogfood 中主线程列表右滑无法稳定呼出置顶 / 删除，并把 Drawer 的 pinned Thread 独立为「置顶」分组；不改变 MOB-007 device-local pin 合同。
-- MOB-026：待实施。全局搜索需命中消息正文；当前基线 `SearchScreen` 只匹配 Thread 标题。不得为此私自发明 Host search route。
-- MOB-027：待实施。Settings「插件」行当前无 action 接线，但应用已有 `Plugins` route；按最小回归修复处理。
-- MOB-028：待实施。关于页增加 release-channel-aware 更新检查、红点、确认后下载；Android 只触发 signed Release APK 的系统 / 浏览器下载，不做静默安装。
+- MOB-025：有条件完成，代码已进入当前 `dev`（`1035da3`）；右滑置顶 / 删除稳定化与 Drawer「置顶」分组已落地，不改变 MOB-007 device-local pin 合同；真机 dogfood smoke 挂账。
+- MOB-026：有条件完成，代码已进入当前 `dev`（`e628d5a`）；全局搜索已覆盖消息正文且不新增 Host search route；真实长会话 / 降级状态 smoke 挂账。
+- MOB-027：有条件完成，代码已进入当前 `dev`（`327b2e4`）；Settings「插件」行已接现有 `Plugins` route；真机入口回归挂账。
+- MOB-028：有条件完成，代码已进入当前 `dev`（`88d54a7`）；已加入 release-channel-aware 更新检查与确认下载边界，Android 仍只交系统 / 浏览器下载、不做静默安装；真实 release metadata / 下载 smoke 挂账。
 
 ### 拾言 MVP
 
@@ -41,7 +43,7 @@
 - MOB-021：已合入 Mobile `dev`。PR #63 merge commit `72f854d9f378fb7a5e8ed9ec248c7b16565665a5`；其施工内容已对齐 MOB-020 PR #6，Mobile CI run #721 的 typecheck、lint、159 Jest、Android debug、iOS simulator 与 unsigned device build 全绿。真实 Cloud/device smoke 仍挂 MOB-023。
 - MOB-022：核心能力已进入 Cloud `dev`，最终接线未完成。DestinationAdapter、GitHub adapter、Delivery Record、幂等 / 并发恢复与 canonical evidence 已随 Cloud PR #5 合入；`mira-shiyan` 内容约定已落地。当前 Cloud `dev/src/api/index.ts` 只挂了 MOB-019 handler，尚未把 MOB-020 / MOB-022 public route 接入；因此 Final Draft -> GitHub Delivery POST、`GET /deliveries` 公网读取及真实 GitHub smoke 仍待 MOB-020 合入后收口。
 - MOB-023：待启动的最终集成验收卡。已完成任务卡阅读与边界确认；只有 MOB-020 合入 Cloud `dev`、MOB-021 合入 Mobile `dev`、MOB-022 完成 Final Draft / public API 接线后才进入正式验收施工。40 分钟真机会议、真实 Provider / Secret、真实 GitHub URL 是 MOB-023 的验收内容，不作为修改上游代码合同的理由。
-- MOB-029：待实施。拾言主页右上角成为 Cloud 配置 canonical 入口；确认页录音摘要改为可播放 / seek 的小播放器，场景改为当前值回显 + cross-platform Action Sheet；不改变 CaptureTask / Scene snapshot / Draft / Delivery 合同。
+- MOB-029：有条件完成，代码已进入当前 `dev`（`24513fb`）；拾言 Cloud 配置入口、确认页录音播放器与场景 Action Sheet 已落地，不改变 CaptureTask / Scene snapshot / Draft / Delivery 合同；双平台真机播放 / 场景修改 smoke 挂账。
 - MOB-030：待实施。拾言首页收成一个主 CTA，并用 presentation projection 统一展示 LocalCapture / CaptureTask；不合并底层事实模型。
 - MOB-031：待实施。基于既有播放器与场景 Sheet 收轻确认页，明确唯一主提交动作并保留本地恢复 / 稍后处理能力。
 - MOB-032：待实施。TaskDetail 改为结果优先；整理稿 / Transcript / AI candidate / Final Draft 的内部合同保持不变。
@@ -76,11 +78,11 @@
 | MOB-022 | 拾言 GitHub Destination | 核心已合入；Final Draft / public route 待接 | MOB-020 合入后补 route + real GitHub smoke |
 | MOB-023 | 拾言 E2E 验收与加固 | 待启动 | 等 020/022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | 有条件完成；Desktop #88 / Mobile #65 已合入 | 真实已配对设备新建 Thread 跨端 smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | 待实施 | 从最新 `dev` 独立开卡施工 |
-| MOB-026 | 全局搜索命中消息正文 | 待实施 | 从最新 `dev` 独立开卡施工 |
-| MOB-027 | 设置页插件入口恢复可用 | 待实施 | 从最新 `dev` 独立开卡施工 |
-| MOB-028 | 关于页版本更新检查与确认下载 | 待实施 | 从最新 `dev` 独立开卡施工 |
-| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | 有条件完成；代码 `1035da3` 已入 `dev` | 真机 dogfood smoke |
+| MOB-026 | 全局搜索命中消息正文 | 有条件完成；代码 `e628d5a` 已入 `dev` | 长会话 / 降级状态 smoke |
+| MOB-027 | 设置页插件入口恢复可用 | 有条件完成；代码 `327b2e4` 已入 `dev` | 真机入口回归 |
+| MOB-028 | 关于页版本更新检查与确认下载 | 有条件完成；代码 `88d54a7` 已入 `dev` | release metadata / 下载 smoke |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | 有条件完成；代码 `24513fb` 已入 `dev` | 双平台真机 smoke |
 | MOB-030 | 拾言首页与统一记录入口 | 待实施 | 可与 MOB-031 并行；从最新 `dev` 独立施工 |
 | MOB-031 | 拾言确认页主次交互收口 | 待实施 | 可与 MOB-030 并行；基于现有 MOB-029 能力收口 |
 | MOB-032 | 拾言结果优先 Review / Final Draft | 待实施 | 独立修改 TaskDetail 结果层级 |

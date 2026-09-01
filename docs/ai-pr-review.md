@@ -44,7 +44,7 @@ The following review controls are loaded from the PR base SHA (`dev`) instead of
 - `scripts/opencode-mobile-pr-review.mjs`
 - `.opencode/skills/mira-mobile-pr-review/SKILL.md`
 - `AGENTS.md`
-- `docs/work-ledger.md`
+- `docs/workbench/00-work-ledger.md`
 - `docs/task-cards/README.md`
 - matching `docs/task-cards/MOB-*.md`
 - relevant Remote/build/design docs selected by the reviewer

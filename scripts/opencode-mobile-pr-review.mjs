@@ -123,7 +123,7 @@ if (!diff.text.trim()) fail('The pull request diff could not be assembled.');
 const task = findTaskContext(pr, baseSha);
 const contexts = [];
 pushBaseContext(contexts, baseSha, 'Trusted repository rules (AGENTS.md from base)', 'AGENTS.md', 32_000);
-pushBaseContext(contexts, baseSha, 'Trusted Mobile work ledger from base', 'docs/work-ledger.md', 32_000);
+  pushBaseContext(contexts, baseSha, 'Trusted Mobile canonical work ledger from base', 'docs/workbench/00-work-ledger.md', 32_000);
 pushBaseContext(contexts, baseSha, 'Trusted Mobile task-card index from base', 'docs/task-cards/README.md', 16_000);
 if (task?.content) contexts.push([`Trusted task ${task.taskId} from base (${task.path})`, task.content]);
 

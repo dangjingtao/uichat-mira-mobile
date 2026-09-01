@@ -1,8 +1,8 @@
 # Mobile 任务卡索引
 
-本目录补充 `docs/work-ledger.md` 的 Mobile / 跨仓任务。旧任务编号不改号、不重开；拾言（Shiyan）虽然跨 `uichat-mira-mobile`、`mira-shiyan-cloud`、`mira-shiyan` 三仓施工，但任务编号、状态、依赖与验收统一回写 Mobile 总台账。
+本目录补充 `docs/workbench/00-work-ledger.md` 的 Mobile / 跨仓任务。旧任务编号不改号、不重开；拾言（Shiyan）虽然跨 `uichat-mira-mobile`、`mira-shiyan-cloud`、`mira-shiyan` 三仓施工，但任务编号、状态、依赖与验收统一回写 Mobile canonical 总台账。
 
-> `docs/work-ledger.md` 是唯一状态台账。本页只做索引与快速状态镜像。2026-08-29 夜间临时放行规则已经到期，历史文件仅供追溯。
+> `docs/workbench/00-work-ledger.md` 是唯一状态台账。本页只做索引与快速状态镜像。2026-08-29 夜间临时放行规则已经到期，历史文件仅供追溯。
 
 ## 当前状态
 
@@ -26,11 +26,11 @@
 | MOB-022 | 拾言 GitHub Destination | **核心已合入，最终接线待完成** | `mira-shiyan-cloud` + `mira-shiyan`；待 MOB-020 合入后接 Final Draft / public routes + real GitHub smoke |
 | MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | **有条件完成**：Desktop #88 / Mobile #65 已合入 | Mobile + Desktop Host；真实已配对设备新建 Thread 跨端 smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **待实施** | Mobile；修复真机右滑并收口置顶分组 |
-| MOB-026 | 全局搜索命中消息正文 | **待实施** | Mobile；不新增虚构 Host search route |
-| MOB-027 | 设置页插件入口恢复可用 | **待实施** | Mobile；最小接线现有 `Plugins` route |
-| MOB-028 | 关于页版本更新检查与确认下载 | **待实施** | Mobile；release channel 隔离 + signed APK 下载 |
-| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **待实施** | Mobile；可能触碰双平台 native audio |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **有条件完成**：代码 `1035da3` 已入 `dev` | Mobile；真机 dogfood smoke |
+| MOB-026 | 全局搜索命中消息正文 | **有条件完成**：代码 `e628d5a` 已入 `dev` | Mobile；长会话 / 降级状态 smoke |
+| MOB-027 | 设置页插件入口恢复可用 | **有条件完成**：代码 `327b2e4` 已入 `dev` | Mobile；真机入口回归 |
+| MOB-028 | 关于页版本更新检查与确认下载 | **有条件完成**：代码 `88d54a7` 已入 `dev` | Mobile；release metadata / 下载 smoke |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **有条件完成**：代码 `24513fb` 已入 `dev` | Mobile；双平台真机 smoke |
 | MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
 | MOB-031 | 拾言确认页主次交互收口 | **待实施** | Mobile；基于现有播放器 / Scene Sheet 收轻主路径 |
 | MOB-032 | 拾言结果优先 Review / Final Draft | **待实施** | Mobile；整理稿优先，Transcript / AI / Final Draft 合同不变 |
