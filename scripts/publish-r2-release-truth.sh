@@ -101,20 +101,24 @@ verify_object_size() {
 
 verify_existing_version() {
   local local_digest
-  local remote_digest
-  local local_size
-  local remote_size
+  local remote_checksum_digest
+  local remote_apk_digest
 
   local_digest=$(awk '{print $1}' "$checksum")
-  remote_digest=$(aws s3 cp \
+  remote_checksum_digest=$(aws s3 cp \
     "s3://${R2_BUCKET}/${release_checksum_key}" - \
     --endpoint-url "$endpoint" \
     --only-show-errors \
     | awk '{print $1}')
-  local_size=$(stat -c '%s' "$apk")
-  remote_size=$(object_size "$release_apk_key")
+  remote_apk_digest=$(aws s3 cp \
+    "s3://${R2_BUCKET}/${release_apk_key}" - \
+    --endpoint-url "$endpoint" \
+    --only-show-errors \
+    | sha256sum \
+    | awk '{print $1}')
 
-  if [ "$local_digest" != "$remote_digest" ] || [ "$local_size" != "$remote_size" ]; then
+  if [ "$local_digest" != "$remote_checksum_digest" ] \
+    || [ "$local_digest" != "$remote_apk_digest" ]; then
     echo "Version collision for ${channel}/${version}: immutable R2 release already contains different APK bytes. Bump package.json.version before publishing." >&2
     return 1
   fi
