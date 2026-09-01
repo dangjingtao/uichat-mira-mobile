@@ -30,7 +30,7 @@
 - MOB-024：有条件完成。Desktop PR #88 已合入 `dev`，merge commit `e1752500cafd300bb6c9c82e9b5a610beb985d2c`；Mobile PR #65 已 squash 合入 `dev`，merge commit `a668bf503b3d540a1bd521e3792684af258de0d4`。`POST /threads` 通过现有 `messages:write` 兼容 scope 正式发布，Mobile 以 runtime manifest + device scope 做 capability guard，Drawer“聊天”已接真实 canonical Thread 创建；创建 POST 响应不确定时不会跨 Direct / Relay 重放。Desktop `pnpm check` 已通过；Mobile typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding。真实已配对设备无需重配对的新建 Thread 跨端 smoke 挂账。
 - MOB-025：有条件完成，代码已进入当前 `dev`（`1035da3`）；右滑置顶 / 删除稳定化与 Drawer「置顶」分组已落地，不改变 MOB-007 device-local pin 合同；真机 dogfood smoke 挂账。
 - MOB-026：有条件完成，代码已进入当前 `dev`（`e628d5a`）；全局搜索已覆盖消息正文且不新增 Host search route；真实长会话 / 降级状态 smoke 挂账。
-- MOB-027：有条件完成，代码已进入当前 `dev`（`327b2e4`）；Settings「插件」行已接现有 `Plugins` route；真机入口回归挂账。
+- MOB-027：完成。代码已进入当前 `dev`（`327b2e4`）；Settings「插件」行已接现有 `Plugins` route；产品负责人于 2026-09-01 确认真机入口回归通过。
 - MOB-028：有条件完成，代码已进入当前 `dev`（`88d54a7`）；已加入 release-channel-aware 更新检查与确认下载边界，Android 仍只交系统 / 浏览器下载、不做静默安装；真实 release metadata / 下载 smoke 挂账。
 
 ### 拾言 MVP
@@ -80,7 +80,7 @@
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | 有条件完成；Desktop #88 / Mobile #65 已合入 | 真实已配对设备新建 Thread 跨端 smoke |
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | 有条件完成；代码 `1035da3` 已入 `dev` | 真机 dogfood smoke |
 | MOB-026 | 全局搜索命中消息正文 | 有条件完成；代码 `e628d5a` 已入 `dev` | 长会话 / 降级状态 smoke |
-| MOB-027 | 设置页插件入口恢复可用 | 有条件完成；代码 `327b2e4` 已入 `dev` | 真机入口回归 |
+| MOB-027 | 设置页插件入口恢复可用 | 完成；代码 `327b2e4` 已入 `dev` | 无 |
 | MOB-028 | 关于页版本更新检查与确认下载 | 有条件完成；代码 `88d54a7` 已入 `dev` | release metadata / 下载 smoke |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | 有条件完成；代码 `24513fb` 已入 `dev` | 双平台真机 smoke |
 | MOB-030 | 拾言首页与统一记录入口 | 待实施 | 可与 MOB-031 并行；从最新 `dev` 独立施工 |
