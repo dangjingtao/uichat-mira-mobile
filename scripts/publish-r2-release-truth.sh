@@ -49,12 +49,32 @@ latest_prefix="${channel_root}/latest"
 release_apk_key="${release_prefix}/uichat-mira-mobile-release.apk"
 release_checksum_key="${release_prefix}/uichat-mira-mobile-release.apk.sha256"
 
-object_exists() {
-  aws s3api head-object \
+# Return codes: 0 = exists, 1 = explicitly missing, 2 = lookup failed.
+# A transport/auth/API failure must never be treated as permission to overwrite
+# an immutable branch+version object.
+object_state() {
+  local key=$1
+  local output
+  local status
+
+  set +e
+  output=$(aws s3api head-object \
     --bucket "$R2_BUCKET" \
-    --key "$1" \
+    --key "$key" \
     --endpoint-url "$endpoint" \
-    >/dev/null 2>&1
+    2>&1)
+  status=$?
+  set -e
+
+  if [ "$status" -eq 0 ]; then
+    return 0
+  fi
+  if printf '%s' "$output" | grep -Eq '(404|Not Found|NoSuchKey)'; then
+    return 1
+  fi
+
+  echo "Unable to determine R2 object state for $key: $output" >&2
+  return 2
 }
 
 object_size() {
@@ -137,8 +157,18 @@ publish_new_versioned_assets() {
 
 apk_exists=false
 checksum_exists=false
-if object_exists "$release_apk_key"; then apk_exists=true; fi
-if object_exists "$release_checksum_key"; then checksum_exists=true; fi
+if object_state "$release_apk_key"; then
+  apk_exists=true
+else
+  state=$?
+  if [ "$state" -ne 1 ]; then exit 1; fi
+fi
+if object_state "$release_checksum_key"; then
+  checksum_exists=true
+else
+  state=$?
+  if [ "$state" -ne 1 ]; then exit 1; fi
+fi
 
 if [ "$apk_exists" = true ] || [ "$checksum_exists" = true ]; then
   if [ "$apk_exists" != true ] || [ "$checksum_exists" != true ]; then
