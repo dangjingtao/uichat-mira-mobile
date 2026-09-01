@@ -36,8 +36,11 @@ const r2ReleasePrefixFor = (channel, version) => {
   return `${r2ChannelRootFor(channel)}/releases/${version}`;
 };
 
-const releaseApkPathFor = (channel, version) =>
-  `releases/${version}/${RELEASED_APK_NAME}`;
+const releaseApkPathFor = (channel, version) => {
+  assertChannel(channel);
+  assertVersion(version);
+  return `releases/${version}/${RELEASED_APK_NAME}`;
+};
 
 const parseSha256File = text => {
   if (typeof text !== 'string') throw new Error('Invalid SHA-256 file');
