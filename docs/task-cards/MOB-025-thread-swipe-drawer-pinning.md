@@ -1,12 +1,23 @@
 # MOB-025：线程右滑操作与 Drawer 置顶分组修复
 
-状态：**有条件完成**（代码已入 `dev`，真机 dogfood smoke 待验收）
+状态：**重新打开 / DOING**（`1035da3` 已入 `dev`，但 Android 真机连续复现右滑不可用；既有实现不得视为已修复）
 
 负责人：`mob_025_thread_swipe_drawer_pinning`
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
 首次派卡基线：`dev @ a90dfb6c2d80079fd85084fff0214968e137e653`
+
+## 2026-09-01 Reopen Evidence
+
+产品负责人确认：MOB-025 的右滑问题已经至少三次宣称修复但真机仍失败。当前 `dev` 的 `SessionListScreen` 仍使用自定义 `PanResponder` 与行内 `Pressable` / `FlatList` 做 responder 竞争；此前 MOB-011 与 MOB-025 的修改均继续沿用同一路线，只调整 capture、阈值、速度与 settle 行为。
+
+因此本卡重新打开，后续施工必须遵守：
+
+- 不再把调整 `dx`、`vx`、capture 阈值或 spring 参数作为主修复方案；
+- 优先替换脆弱的自定义 responder 手势层，采用经过 React Native 移动端验证的 swipe/gesture 方案；
+- 若需要新增原生手势依赖，必须按 `AGENTS.md` 明确记录依赖理由、双平台影响与构建验证；
+- **没有 Android 真机证据不得回到 REVIEW/PASS，也不得再写“有条件完成”来代替真实交互验收。**
 
 ## 背景
 
@@ -119,7 +130,7 @@ npm test -- --runInBand
 
 ## Open / Unknown
 
-None。视觉微参数由 Builder 在现有 token 和当前页面风格内收敛，不构成新的产品决策。
+当前唯一需要重新验证的核心未知项是：Android 真机上应采用哪种手势实现才能稳定与 `FlatList` 纵向滚动、行点击共存。不得继续以未经真机验证的 `PanResponder` 参数调优作为答案。
 
 ## Handoff
 
