@@ -200,13 +200,21 @@ export function PairingAuthorizationSheet({
 
 const styles = StyleSheet.create({
   modalRoot: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(20, 20, 19, 0.42)',
     zIndex: 20,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   sheet: {
     borderTopLeftRadius: 24,

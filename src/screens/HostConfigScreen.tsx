@@ -422,11 +422,11 @@ export function HostConfigScreen() {
           <View
             style={[
               styles.toast,
-              { backgroundColor: colors.dark.elevated },
+              { backgroundColor: colors.text.ink },
             ]}
           >
             <CheckCircle2 size={18} color={colors.status.success} />
-            <Text style={[styles.toastText, { color: colors.dark.onDark }]}>
+            <Text style={[styles.toastText, { color: colors.bg.canvas }]}>
               配对成功
             </Text>
           </View>
