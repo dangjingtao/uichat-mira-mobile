@@ -47,6 +47,7 @@
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | TODO | Owner `t-zt`; after MOB-030..033 |
 | MOB-035 | 远程连接状态诊断与会话错误分层 | TODO | Distinguish unpaired/auth/permission/mobile-offline/Host-unreachable/session failures; never infer Host offline without authoritative evidence |
+| MOB-036 | 桌面配对入口与授权 Bottom Sheet 收口 | TODO | Default page only shows scan + paste entry; valid request opens authorization sheet; visual reference in task card |
 
 ## Deferred Engineering Governance
 
