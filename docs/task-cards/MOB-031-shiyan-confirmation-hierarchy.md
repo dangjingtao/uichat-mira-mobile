@@ -45,6 +45,14 @@
 - 只有用户明确提交后才创建云端 CaptureTask。
 - MOB-029 已定义并实现确认页播放器与场景 bottom sheet 基础模式；本卡不得复制第二套 playback / scene state machine。
 
+## Design Reference
+
+![MOB-031 Audio Player design](./assets/MOB-031-audio-player-design.webp)
+
+这张图是 MOB-031 的确认页与 Audio Player 视觉 / 交互参考，表达信息层级、播放器状态与可复用方式；它不是新的颜色、圆角、字号或 spacing 真相源，最终视觉仍必须使用现有 `src/theme/` Design Token。
+
+本轮 UI 审查新增明确决策：**播放器必须成为独立、可复用组件，而不是继续作为 `ShiyanCaptureSubmitScreen` 内部的一段页面实现。** 确认页只是它的第一个消费方；历史记录或任务详情需要回听音频时应能够复用同一组件，而不是复制另一套 seek / playback UI。
+
 ## Interaction Contract
 
 ### A. 页面主层级
@@ -69,12 +77,17 @@
 
 具体文案可在不改变语义前提下使用 `开始整理` 或现有 `提交并开始处理`；同一页面不得同时存在两个等权主按钮。
 
-### B. Mini Player
+### B. Audio Player / Mini Player
 
+- 播放器实现为独立、可复用的 Audio Player 组件；组件名可按当前代码约定确定，但组件边界必须独立于确认页。
+- 组件只负责音频播放语义：加载、播放 / 暂停、当前时间、总时长、seek、播放完成与 dispose；不得依赖 `CaptureTask`、Cloud、确认页提交状态或其它拾言业务概念。
+- 页面负责提供 audio source 与必要的展示 metadata；页面不得自行再实现第二套进度条或 seek 状态机。
 - 保留播放 / 暂停、当前时间 / 总时长、seek。
+- **完整轨道必须始终存在。** `progress` 只能控制 played fill / thumb 位置，不能控制整个 slider / track 容器宽度。
+- `0%`、播放中、播放完成、拖拽 seek 时都必须保留完整的 inactive track 和完整可触摸 seek 区域；不得再出现 `0:00` 时只剩半个 thumb、播放几秒后只显示一小截轨道的情况。
 - 文件大小、已安全保存等信息降为辅助信息，不得超过标题 / 场景 / 主 CTA 的视觉权重。
 - 播放失败只影响试听，不得把录音标成损坏。
-- 页面离开和删除前继续按既有 playback contract dispose。
+- 页面离开和删除前继续按既有 playback contract dispose；若组件内部承接 dispose 生命周期，必须保证不会与现有 `PlaybackAdapter` 形成第二套资源管理协议。
 
 ### C. 场景
 
@@ -117,26 +130,31 @@
 - 不修改 CaptureTask 创建时机。
 - 不修改 Scene snapshot 冻结规则。
 - 不重写 PlaybackAdapter / RecordingAdapter。
+- **不得把播放器继续写成确认页私有 UI；必须形成独立可复用组件。**
 - 不新增音频编辑、倍速、波形剪辑等能力。
 - 视觉必须使用当前 Design Token。
 
 ## Execution Entry Points
 
 - `src/shiyan/ShiyanCaptureSubmitScreen.tsx`
+- `src/shiyan/playback/`（新增/整理独立 Audio Player 组件的优先位置；具体文件名按现有结构确定）
 - `src/shiyan/recording/localCaptureRepository.ts`
 - `src/shiyan/confirmation/sceneConfirmation.ts`
-- `src/shiyan/playback/PlaybackAdapter.ts`（原则上只核对，不重构）
+- `src/shiyan/playback/PlaybackAdapter.ts`（原则上复用现有能力，不重写 adapter）
 
 ## Acceptance
 
 1. 页面只有一个视觉 Primary CTA。
-2. 当前场景以整行值 + chevron 回显；选项只在 Sheet 内出现。
-3. 用户返回后录音仍可恢复，不要求重新录音。
-4. 显式“稍后处理”能力若保留按钮，视觉等级低于主 CTA。
-5. 删除动作降级且必须二次确认。
-6. 技术进度不再用“创建任务 / 同步场景 / 确认录音”占据主要产品文案。
-7. 提交失败仍明确告诉用户本地录音安全、可重试。
-8. MOB-029 已有播放器 / Sheet 行为不回归。
+2. Audio Player 已形成独立组件，组件自身不依赖 `CaptureTask` / Cloud / 提交页业务状态；确认页只消费其公开 props / callbacks。
+3. `0%`、播放中、播放完成、拖拽 seek 四种状态均显示完整轨道；played fill 只表示播放比例，不改变轨道总宽度。
+4. seek 的可触摸区域覆盖完整轨道，用户可以从 `0:00` 直接拖到尚未播放的位置。
+5. 当前场景以整行值 + chevron 回显；选项只在 Sheet 内出现。
+6. 用户返回后录音仍可恢复，不要求重新录音。
+7. 显式“稍后处理”能力若保留按钮，视觉等级低于主 CTA。
+8. 删除动作降级且必须二次确认。
+9. 技术进度不再用“创建任务 / 同步场景 / 确认录音”占据主要产品文案。
+10. 提交失败仍明确告诉用户本地录音安全、可重试。
+11. MOB-029 已有 playback / scene 行为不回归；本卡只把播放器 UI 与生命周期边界收成可复用组件。
 
 ## Validation
 
@@ -150,6 +168,9 @@ npm test -- --runInBand
 
 测试 / smoke 至少覆盖：
 
+- 独立 Audio Player 在无拾言业务上下文时可渲染；
+- `0%` / playing / completed / seek-drag 的完整轨道与时间映射；
+- 从未播放位置直接 seek 到中后段；
 - 播放 / pause / seek / dispose 不回归；
 - 场景切换与 scene snapshot 正确；
 - 返回后 LocalCapture 可恢复；
@@ -168,4 +189,4 @@ None。若施工发现“返回自动保留”与当前 local confirmation persi
 
 ## Handoff
 
-先确认当前 `dev` 已有 MOB-029 的真实实现；已有正确能力不重写，只调整主次层级和产品文案。
+先确认当前 `dev` 已有 MOB-029 的真实实现；已有正确的 playback adapter / scene 行为不重写。播放器 UI 需要从确认页中抽离成独立可复用组件，再按本卡与设计参考收口页面主次层级。
