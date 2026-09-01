@@ -50,6 +50,7 @@ export function SessionSwipeRow({
 }: SessionSwipeRowProps) {
   const scrollRef = useRef<ScrollView | null>(null);
   const isOpenRef = useRef(false);
+  const onSwipeStateChangeRef = useRef(onSwipeStateChange);
   const [rowWidth, setRowWidth] = useState(0);
   const actionsWidth =
     (SWIPE_ACTION_WIDTH + SWIPE_ACTION_GAP) * (canDelete ? 2 : 1);
@@ -63,6 +64,10 @@ export function SessionSwipeRow({
         ? '继续与 Mira 对话'
         : '连接 Mira Host 后继续对话';
 
+  useEffect(() => {
+    onSwipeStateChangeRef.current = onSwipeStateChange;
+  }, [onSwipeStateChange]);
+
   const settle = useCallback(
     (open: boolean, animated = true, notify = true) => {
       const changed = isOpenRef.current !== open;
@@ -72,9 +77,9 @@ export function SessionSwipeRow({
         y: 0,
         animated,
       });
-      if (notify && changed) onSwipeStateChange(open);
+      if (notify && changed) onSwipeStateChangeRef.current(open);
     },
-    [actionsWidth, onSwipeStateChange],
+    [actionsWidth],
   );
 
   useEffect(() => {
@@ -96,7 +101,7 @@ export function SessionSwipeRow({
     [rowWidth, settle],
   );
 
-  const handleScrollEndDrag = useCallback(
+  const handleScrollSettled = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const open = resolveSessionSwipeOpen(
         isOpenRef.current,
@@ -141,7 +146,8 @@ export function SessionSwipeRow({
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         contentOffset={{ x: actionsWidth, y: 0 }}
-        onScrollEndDrag={handleScrollEndDrag}
+        onScrollEndDrag={handleScrollSettled}
+        onMomentumScrollEnd={handleScrollSettled}
         style={styles.swipeScroller}
         contentContainerStyle={styles.swipeContent}
       >
