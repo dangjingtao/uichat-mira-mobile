@@ -30,7 +30,6 @@ type UpdateCheckStatus =
   | 'checking'
   | 'available'
   | 'current'
-  | 'unavailable'
   | 'failed';
 
 const channelLabel = {
@@ -65,17 +64,12 @@ export function AboutScreen() {
     try {
       const latest = await fetchLatestRelease(releaseChannel, fetch);
       setLatestRelease(latest);
-      // "No published release on this channel" is not proof of being current;
-      // keep it distinct so the UI never claims an unverified "已是最新".
-      if (!latest) {
-        setUpdateStatus('unavailable');
-      } else {
-        setUpdateStatus(
-          isUpdateAvailable(parseSemver(version)!, latest) ? 'available' : 'current',
-        );
-      }
+      setUpdateStatus(
+        isUpdateAvailable(parseSemver(version)!, latest) ? 'available' : 'current',
+      );
     } catch (error) {
-      // A failed check must stay a retryable error; never "已是最新".
+      // A failed or invalid R2 manifest remains retryable; it must never be
+      // presented as proof that the installed build is current.
       setLatestRelease(null);
       setUpdateError(
         error instanceof Error && error.message
@@ -91,39 +85,30 @@ export function AboutScreen() {
   }, [checkForUpdate]);
 
   const openDownload = (latest: AppRelease) => {
-    // Android hands the signed Release APK to the system/browser downloader.
-    // Falling back to the GitHub release page on Android would break the
-    // signed-APK download contract, so a missing APK asset is an explicit
-    // dead end there. iOS has no installable signed artifact and always
-    // opens the release page.
-    if (Platform.OS === 'android' && !latest.apkUrl) {
+    const notes = releaseNotesPreview(latest.notes);
+
+    if (Platform.OS !== 'android') {
       Alert.alert(
-        '该版本未提供安装包',
-        `最新版本 ${latest.tag} 没有附带签名 APK，请等待发布流程补齐后再试。`,
+        '发现新版本',
+        `当前版本 ${installedDisplayVersion}\n最新版本 ${latest.displayVersion}${
+          notes ? `\n\n${notes}` : ''
+        }\n\niOS 当前没有可直接安装的已签名分发产物。`,
       );
       return;
     }
-    const targetUrl =
-      Platform.OS === 'android' && latest.apkUrl ? latest.apkUrl : latest.releaseUrl;
-    if (!targetUrl) {
-      Alert.alert('无法下载', '该版本没有提供可用的下载地址。');
-      return;
-    }
-    const notes = releaseNotesPreview(latest.notes);
+
     Alert.alert(
       '下载新版本',
-      `当前版本 ${installedDisplayVersion}\n最新版本 ${latest.tag}${notes ? `\n\n${notes}` : ''}\n\n${
-        Platform.OS === 'android'
-          ? '确认后将使用系统下载。'
-          : 'iOS 当前分发为无签名构建，将打开发布说明页面。'
-      }`,
+      `当前版本 ${installedDisplayVersion}\n最新版本 ${latest.displayVersion}${
+        notes ? `\n\n${notes}` : ''
+      }\n\n确认后将使用系统下载。`,
       [
         { text: '取消', style: 'cancel' },
         {
           text: '下载',
           onPress: () => {
-            Linking.openURL(targetUrl).catch(() => {
-              Alert.alert('打开下载失败', '请稍后重试，或手动访问发布页面。');
+            Linking.openURL(latest.apkUrl).catch(() => {
+              Alert.alert('打开下载失败', '请稍后重试。');
             });
           },
         },
@@ -144,21 +129,11 @@ export function AboutScreen() {
           { text: '重试', onPress: () => void checkForUpdate() },
         ]);
         return;
-      case 'unavailable':
-        Alert.alert(
-          '暂无发布信息',
-          `当前渠道（${channelLabel}）还没有可查询的发布版本，无法确认是否最新。`,
-          [
-            { text: '取消', style: 'cancel' },
-            { text: '重试', onPress: () => void checkForUpdate() },
-          ],
-        );
-        return;
       default:
         Alert.alert(
           '版本信息',
           `当前版本 ${installedDisplayVersion}（${channelLabel}渠道）${
-            latestRelease ? `\n最新发布 ${latestRelease.tag}` : ''
+            latestRelease ? `\n最新发布 ${latestRelease.displayVersion}` : ''
           }`,
         );
     }
@@ -179,11 +154,9 @@ export function AboutScreen() {
       case 'checking':
         return `${installedDisplayVersion} · 正在检查更新…`;
       case 'available':
-        return `${installedDisplayVersion} · 有新版本 ${latestRelease?.tag ?? ''}`;
+        return `${installedDisplayVersion} · 有新版本 ${latestRelease?.displayVersion ?? ''}`;
       case 'current':
         return `${installedDisplayVersion} · 已是最新`;
-      case 'unavailable':
-        return `${installedDisplayVersion} · 暂无发布信息`;
       case 'failed':
         return `${installedDisplayVersion} · 检查更新失败，点击重试`;
       default:
