@@ -41,7 +41,7 @@
 | MOB-028A | R2 分支发行真相与 Manifest | PASS | PR #82 merged as `34b7eee`; dev `0.2.11-dev` manifest generated; signed APK checksum verified; R2 publish log confirmed `Published R2 release truth: dev/0.2.11` |
 | MOB-028B | R2 分支隔离更新客户端 | PASS | PR #84 squash-merged as `d8134ba`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; same-channel R2 manifest/versioned APK validation covered; product owner accepted PASS on 2026-09-02 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Product owner conditionally accepted on 2026-09-01; code `24513fb`; dual-platform device smoke pending; Audio Player visual/component debt assigned to MOB-031 |
-| MOB-030 | 拾言首页与统一记录入口 | DOING | PR #86; single primary CTA + lightweight scene sheet + presentation-only unified records; final CI/review pending |
+| MOB-030 | 拾言首页与统一记录入口 | REVIEW | PR #86 squash-merged as `6065260`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; Android/iOS real-device + real Shiyan Cloud smoke pending |
 | MOB-031 | 拾言确认页主次交互收口 | TODO | Start from latest `dev` |
 | MOB-032 | 拾言结果优先 Review / Final Draft | TODO | Independent TaskDetail work |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
