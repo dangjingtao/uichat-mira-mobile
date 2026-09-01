@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +6,6 @@ import {
   Dimensions,
   FlatList,
   Modal,
-  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -21,25 +14,13 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import {
-  Menu,
-  MessageSquare,
-  Pin,
-  Settings as SettingsIcon,
-  Trash2,
-} from 'lucide-react-native';
+import { Menu, MessageSquare, Settings as SettingsIcon } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
 import { useThreadPinStore } from '../store/threadPinStore';
-import {
-  isThreadPinned,
-  sortSessionsByLocalPin,
-} from '../store/threadPinning';
-import {
-  selectThreadUnread,
-  useThreadReadStore,
-} from '../store/threadReadStore';
+import { isThreadPinned, sortSessionsByLocalPin } from '../store/threadPinning';
+import { selectThreadUnread, useThreadReadStore } from '../store/threadReadStore';
 import { miraHostClient } from '../api/miraHostClient';
 import { getSessionRoleName } from '../api/roleApi';
 import { useRoleNameMap } from '../hooks/useRoleNameMap';
@@ -47,31 +28,13 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
 import {
-  getSessionVisualKindLabel,
-  SessionKindIcon,
-} from '../components/SessionKindIcon';
-import {
   getSessionLoadErrorMessage,
   resolveSessionCollectionState,
 } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
+import { SessionSwipeRow } from './SessionSwipeRow';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
-const SWIPE_ACTION_WIDTH = 72;
-const SWIPE_ACTION_GAP = 8;
-const SWIPE_OPEN_THRESHOLD = 44;
-
-function formatTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / (1000 * 60));
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  return `${days}天前`;
-}
 
 function getStatusColor(
   status: string,
@@ -86,243 +49,6 @@ function getStatusColor(
     default:
       return colors.text.soft;
   }
-}
-
-interface SessionRowProps {
-  item: Session;
-  roleName: string | null;
-  connectionStatus: string;
-  colors: ReturnType<typeof useTheme>['colors'];
-  isPinned: boolean;
-  isUnread: boolean;
-  canDelete: boolean;
-  isOpen: boolean;
-  onSwipeStateChange: (open: boolean) => void;
-  onOpen: () => void;
-  onTogglePin: () => void;
-  onDelete: () => void;
-}
-
-function SessionRow({
-  item,
-  roleName,
-  connectionStatus,
-  colors,
-  isPinned,
-  isUnread,
-  canDelete,
-  isOpen,
-  onSwipeStateChange,
-  onOpen,
-  onTogglePin,
-  onDelete,
-}: SessionRowProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const isOpenRef = useRef(false);
-  const actionsWidth =
-    (SWIPE_ACTION_WIDTH + SWIPE_ACTION_GAP) * (canDelete ? 2 : 1);
-  const belongsToWorkspace =
-    typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
-  const preview = belongsToWorkspace
-    ? `项目会话${roleName ? ` · ${roleName}` : ''}`
-    : roleName
-      ? `角色 · ${roleName}`
-      : connectionStatus === 'connected'
-        ? '继续与 Mira 对话'
-        : '连接 Mira Host 后继续对话';
-
-  const settle = useCallback(
-    (open: boolean) => {
-      const wasOpen = isOpenRef.current;
-      isOpenRef.current = open;
-      // Always animate, even for a redundant close: a terminated gesture can
-      // leave a closed row visually displaced mid-swipe, and skipping the
-      // animation here would strand it off its rest position.
-      Animated.spring(translateX, {
-        toValue: open ? actionsWidth : 0,
-        useNativeDriver: true,
-        friction: 9,
-        tension: 80,
-      }).start();
-      if (wasOpen !== open) onSwipeStateChange(open);
-    },
-    [actionsWidth, onSwipeStateChange, translateX],
-  );
-
-  // Close this row when another row opens. settle() only notifies on an
-  // actual state change, so this cannot loop.
-  useEffect(() => {
-    if (!isOpen && isOpenRef.current) {
-      settle(false);
-    }
-  }, [isOpen, settle]);
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        // Never steal the responder on touch-down so taps reach the row
-        // content and the list keeps its native press feedback.
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: () => false,
-        // Capture on move: the row content is a Pressable, which becomes the
-        // responder on Android as soon as it is touched. A non-capture
-        // onMoveShouldSetPanResponder never fires in that case, which is why
-        // swiping used to be unreliable on real devices. The capture phase
-        // lets the row take over once the gesture is clearly horizontal,
-        // while vertical movement still bubbles up to the FlatList scroll.
-        onMoveShouldSetPanResponderCapture: (_event, gesture) => {
-          if (Math.abs(gesture.dx) <= Math.abs(gesture.dy)) return false;
-          if (Math.abs(gesture.dx) < 6) return false;
-          return gesture.dx > 0 || isOpenRef.current;
-        },
-        onPanResponderMove: (_event, gesture) => {
-          const base = isOpenRef.current ? actionsWidth : 0;
-          const next = Math.max(0, Math.min(actionsWidth, base + gesture.dx));
-          translateX.setValue(next);
-        },
-        onPanResponderRelease: (_event, gesture) => {
-          if (isOpenRef.current) {
-            const shouldClose =
-              gesture.dx <= -SWIPE_OPEN_THRESHOLD || gesture.vx < -0.5;
-            settle(!shouldClose);
-            return;
-          }
-          const shouldOpen =
-            gesture.dx >= SWIPE_OPEN_THRESHOLD || gesture.vx > 0.5;
-          settle(shouldOpen);
-        },
-        onPanResponderTerminate: () => settle(isOpenRef.current),
-      }),
-    [actionsWidth, settle, translateX],
-  );
-
-  const handleOpen = useCallback(() => {
-    if (isOpenRef.current) {
-      settle(false);
-      return;
-    }
-    onOpen();
-  }, [onOpen, settle]);
-
-  const handleTogglePin = useCallback(() => {
-    settle(false);
-    onTogglePin();
-  }, [onTogglePin, settle]);
-
-  const handleDelete = useCallback(() => {
-    settle(false);
-    onDelete();
-  }, [onDelete, settle]);
-
-  return (
-    <View style={[styles.swipeRow, { borderColor: colors.border.soft }]}>
-      <View style={styles.swipeActions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
-          accessibilityState={{ selected: isPinned }}
-          onPress={handleTogglePin}
-          style={({ pressed }) => [
-            styles.swipeAction,
-            { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-          ]}
-        >
-          <Pin size={18} color={colors.onPrimary} strokeWidth={2} />
-          <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>
-            {isPinned ? '取消置顶' : '置顶'}
-          </Text>
-        </Pressable>
-        {canDelete ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`删除：${item.title}`}
-            onPress={handleDelete}
-            style={({ pressed }) => [
-              styles.swipeAction,
-              { backgroundColor: colors.status.error },
-              pressed && { opacity: 0.82 },
-            ]}
-          >
-            <Trash2 size={18} color={colors.onPrimary} strokeWidth={2} />
-            <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={[
-          styles.sessionItem,
-          {
-            backgroundColor: colors.bg.canvas,
-            transform: [{ translateX }],
-          },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${getSessionVisualKindLabel(item)}：${item.title}${roleName ? `，角色${roleName}` : ''}${belongsToWorkspace ? '，项目会话' : ''}${isPinned ? '，已在本机置顶' : ''}${isUnread ? '，未读' : ''}`}
-          style={({ pressed }) => [
-            styles.sessionOpen,
-            pressed && { backgroundColor: colors.bg.soft },
-          ]}
-          onPress={handleOpen}
-        >
-          <View
-            style={[
-              styles.avatar,
-              {
-                backgroundColor: colors.bg.card,
-                borderColor: colors.border.default,
-              },
-            ]}
-          >
-            <SessionKindIcon
-              session={item}
-              size={22}
-              strokeWidth={1.7}
-              color={colors.primary}
-            />
-          </View>
-          <View style={styles.sessionContent}>
-            <View style={styles.sessionTopRow}>
-              <View style={styles.sessionTitleGroup}>
-                {isUnread ? (
-                  <View
-                    accessibilityElementsHidden
-                    style={[styles.unreadDot, { backgroundColor: colors.primary }]}
-                  />
-                ) : null}
-                <Text
-                  style={[styles.sessionTitle, { color: colors.text.ink }]}
-                  numberOfLines={1}
-                >
-                  {item.title}
-                </Text>
-                {isPinned ? (
-                  <Pin
-                    accessibilityElementsHidden
-                    size={14}
-                    strokeWidth={1.7}
-                    color={colors.text.soft}
-                  />
-                ) : null}
-              </View>
-              <Text style={[styles.sessionTime, { color: colors.text.soft }]}>
-                {formatTime(item.updatedAt)}
-              </Text>
-            </View>
-            <Text
-              style={[styles.sessionPreview, { color: colors.text.muted }]}
-              numberOfLines={1}
-            >
-              {preview}
-            </Text>
-          </View>
-        </Pressable>
-      </Animated.View>
-    </View>
-  );
 }
 
 export function SessionListScreen() {
@@ -528,6 +254,7 @@ export function SessionListScreen() {
         data={orderedSessions}
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
+        onScrollBeginDrag={() => setOpenSwipeRowId(null)}
         renderItem={({ item, index }) => (
           <>
             {index === 0 && pinnedCount > 0 ? (
@@ -536,7 +263,7 @@ export function SessionListScreen() {
             {index === pinnedCount && pinnedCount > 0 && pinnedCount < orderedSessions.length ? (
               <Text style={[styles.recentSectionLabel, { color: colors.text.soft }]}>最近对话</Text>
             ) : null}
-            <SessionRow
+            <SessionSwipeRow
               item={item}
               roleName={getSessionRoleName(item, roleNames)}
               connectionStatus={connectionStatus}
@@ -689,74 +416,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     fontSize: fontSize.captionUppercase,
   },
-  swipeRow: {
-    minHeight: 72,
-    overflow: 'hidden',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  swipeActions: {
-    ...StyleSheet.absoluteFill,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
-    paddingVertical: 6,
-    paddingLeft: SWIPE_ACTION_GAP,
-    gap: SWIPE_ACTION_GAP,
-  },
-  swipeAction: {
-    width: SWIPE_ACTION_WIDTH,
-    borderRadius: radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  swipeActionLabel: { fontSize: fontSize.xs, fontWeight: '600' },
-  sessionItem: {
-    minHeight: 72,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  sessionOpen: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.md,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  sessionContent: { flex: 1, minWidth: 0 },
-  sessionTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  sessionTitleGroup: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-    gap: spacing.xs,
-  },
-  sessionTitle: { fontSize: fontSize.bodyMd, fontWeight: '600', flex: 1 },
-  unreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: radius.full,
-    flexShrink: 0,
-  },
-  sessionTime: { fontSize: fontSize.xs },
-  sessionPreview: { fontSize: fontSize.button },
   emptyState: {
     flex: 1,
     alignItems: 'center',
