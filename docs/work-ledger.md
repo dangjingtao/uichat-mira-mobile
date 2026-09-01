@@ -28,7 +28,7 @@
 - MOB-014：有条件完成，Mobile PR #62 已 squash 合入 `dev`，merge commit `cfff6b3f61d2469a279e1579f8c080c48c829a7a`；Share Sheet / 当前聊天查找代码与双平台自动构建已通过，真实 Share Sheet、长会话查找与关闭搜索后的交互 smoke 挂账。
 - MOB-015：有条件完成，Mobile PR #54 已合入 `dev`；真机设置持久化、system 主题切换、断开 / 重配对挂账。
 - MOB-024：有条件完成。Desktop PR #88 已合入 `dev`，merge commit `e1752500cafd300bb6c9c82e9b5a610beb985d2c`；Mobile PR #65 已 squash 合入 `dev`，merge commit `a668bf503b3d540a1bd521e3792684af258de0d4`。`POST /threads` 通过现有 `messages:write` 兼容 scope 正式发布，Mobile 以 runtime manifest + device scope 做 capability guard，Drawer“聊天”已接真实 canonical Thread 创建；创建 POST 响应不确定时不会跨 Direct / Relay 重放。Desktop `pnpm check` 已通过；Mobile typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding。真实已配对设备无需重配对的新建 Thread 跨端 smoke 挂账。
-- MOB-025：有条件完成，代码已进入当前 `dev`（`1035da3`）；右滑置顶 / 删除稳定化与 Drawer「置顶」分组已落地，不改变 MOB-007 device-local pin 合同；真机 dogfood smoke 挂账。
+- MOB-025：REVIEW。PR #83 已 squash 合入 `dev`（`01fd9575`）；已删除 Session row 的自定义 `PanResponder` 路径，改用原生横向 `ScrollView`，保留 device-local pin、Host-authoritative delete 与 Drawer 置顶分组；最终 typecheck / lint / Jest、Android debug APK、iOS simulator / unsigned iPhone build 全绿，OpenCode Review 无高置信 P0-P2 finding；Android 真机 dogfood 通过前不得记为 PASS。
 - MOB-026：有条件完成，代码已进入当前 `dev`（`e628d5a`）；全局搜索已覆盖消息正文且不新增 Host search route；真实长会话 / 降级状态 smoke 挂账。
 - MOB-027：完成。代码已进入当前 `dev`（`327b2e4`）；Settings「插件」行已接现有 `Plugins` route；产品负责人于 2026-09-01 确认真机入口回归通过。
 - MOB-028：有条件完成，代码已进入当前 `dev`（`88d54a7`）；已加入 release-channel-aware 更新检查与确认下载边界，Android 仍只交系统 / 浏览器下载、不做静默安装；真实 release metadata / 下载 smoke 挂账。
@@ -79,7 +79,7 @@
 | MOB-022 | 拾言 GitHub Destination | 核心已合入；Final Draft / public route 待接 | MOB-020 合入后补 route + real GitHub smoke |
 | MOB-023 | 拾言 E2E 验收与加固 | 待启动 | 等 020/022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | 有条件完成；Desktop #88 / Mobile #65 已合入 | 真实已配对设备新建 Thread 跨端 smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | 有条件完成；代码 `1035da3` 已入 `dev` | 真机 dogfood smoke |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | REVIEW；PR #83 / `01fd9575` 已合入 `dev` | Android 真机验证右滑、纵向滚动、点击、置顶 / 删除与重启持久化；通过后再 PASS |
 | MOB-026 | 全局搜索命中消息正文 | 有条件完成；代码 `e628d5a` 已入 `dev` | 长会话 / 降级状态 smoke |
 | MOB-027 | 设置页插件入口恢复可用 | 完成；代码 `327b2e4` 已入 `dev` | 无 |
 | MOB-028 | 关于页版本更新检查与确认下载 | 有条件完成；代码 `88d54a7` 已入 `dev` | release metadata / 下载 smoke |
@@ -178,7 +178,3 @@ MOB-034 (`t-zt`)
 ## 历史追溯
 
 - 2026-08-28 及之前：`docs/archive/work-ledger-2026-08-28.md`
-- 2026-08-29 夜间临时授权：`docs/night-shift-handoff.md`
-- 2026-08-29 夜间并行执行计划：`docs/night-shift-execution-plan.md`
-
-历史文件只供追溯；若与本台账或 `docs/shiyan/` 最新 canonical truth 冲突，以后者为准。
