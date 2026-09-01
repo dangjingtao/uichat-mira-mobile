@@ -30,7 +30,7 @@ import {
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
-import { radius, spacing } from '../theme/tokens';
+import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import {
   SHIYAN_BUILT_IN_SCENES,
   getCustomSceneDraft,
@@ -165,6 +165,12 @@ export function ShiyanHomeScreen() {
     });
   };
 
+  const recordsEmptyText = recordsLoading
+    ? '正在读取记录…'
+    : recordsWarning
+      ? '记录暂时不可用'
+      : '还没有拾言记录';
+
   return (
     <ScreenShell
       title="拾言"
@@ -209,7 +215,7 @@ export function ShiyanHomeScreen() {
             onPress={() => setSceneSheetOpen(true)}
             style={({ pressed }) => [
               styles.currentSceneRow,
-              { backgroundColor: pressed ? colors.bg.soft : colors.bg.card },
+              { backgroundColor: colors.bg.soft, opacity: pressed ? 0.78 : 1 },
             ]}
           >
             <View style={styles.currentSceneText}>
@@ -256,7 +262,7 @@ export function ShiyanHomeScreen() {
               ]}
             >
               <Text style={[styles.recordsEmptyText, { color: colors.text.soft }]}>
-                {recordsLoading ? '正在读取记录…' : '还没有拾言记录'}
+                {recordsEmptyText}
               </Text>
             </View>
           )}
@@ -607,21 +613,21 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
   homeContent: { padding: spacing.lg, gap: spacing.xl, paddingBottom: 48 },
   intro: { gap: spacing.xs },
-  introTitle: { fontSize: 22, fontWeight: '700' },
+  introTitle: { fontSize: fontSize.titleLg, fontWeight: '700' },
   startPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
-  startButton: { minHeight: 56, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  startButtonText: { fontSize: 16, fontWeight: '600' },
-  currentSceneRow: { minHeight: 52, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  startButton: { minHeight: sizing.touchTarget, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  startButtonText: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  currentSceneRow: { minHeight: sizing.touchTarget, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   currentSceneText: { flex: 1, gap: 2 },
-  currentSceneLabel: { fontSize: 12, lineHeight: 17 },
-  currentSceneName: { fontSize: 14, fontWeight: '600' },
+  currentSceneLabel: { fontSize: fontSize.xs, lineHeight: 17 },
+  currentSceneName: { fontSize: fontSize.button, fontWeight: '600' },
   recordsSection: { gap: spacing.sm },
-  sectionHeader: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 16, fontWeight: '600' },
+  sectionHeader: { paddingVertical: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: fontSize.bodyMd, fontWeight: '600' },
   recordGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
-  recordsEmpty: { minHeight: 72, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  recordsEmptyText: { fontSize: 13 },
-  recordsWarning: { fontSize: 12, lineHeight: 18 },
+  recordsEmpty: { minHeight: sizing.touchTarget, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  recordsEmptyText: { fontSize: fontSize.caption },
+  recordsWarning: { fontSize: fontSize.xs, lineHeight: 18 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDescription: { fontSize: 14, lineHeight: 20 },
   sceneCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: 7 },
@@ -645,12 +651,12 @@ const styles = StyleSheet.create({
   trashButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', justifyContent: 'flex-end' },
   sheetPanel: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: spacing.lg, maxHeight: '70%' },
-  sheetTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', paddingVertical: spacing.md },
+  sheetTitle: { fontSize: fontSize.bodyMd, fontWeight: '700', textAlign: 'center', paddingVertical: spacing.md },
   sheetList: { paddingHorizontal: spacing.md },
   sheetRow: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sceneRowLeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sceneRadio: { width: 18, height: 18, borderRadius: radius.full, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   sceneRadioDot: { width: 9, height: 9, borderRadius: radius.full },
-  sceneConfigLink: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs },
+  sceneConfigLink: { minHeight: sizing.touchTarget, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs },
   sheetCancelButton: { minHeight: 46, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs },
 });

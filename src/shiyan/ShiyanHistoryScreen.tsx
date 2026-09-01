@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowLeft, FileText } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
-import { radius, spacing } from '../theme/tokens';
+import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { UnifiedRecordRow } from './UnifiedRecordRow';
 import { loadUnifiedRecords, type UnifiedRecordPresentation } from './unifiedRecords';
 
@@ -82,8 +82,17 @@ export function ShiyanHistoryScreen() {
       ) : records.length === 0 ? (
         <View style={styles.centerState}>
           <FileText size={34} color={colors.text.soft} />
-          <Text style={[styles.stateTitle, { color: colors.text.ink }]}>还没有拾言记录</Text>
-          {cloudWarning ? <Text style={[styles.stateText, { color: colors.text.soft }]}>{cloudWarning}</Text> : null}
+          <Text style={[styles.stateTitle, { color: colors.text.ink }]}>
+            {cloudWarning ? 'Cloud 记录暂时不可用' : '还没有拾言记录'}
+          </Text>
+          {cloudWarning ? (
+            <>
+              <Text style={[styles.stateText, { color: colors.text.soft }]}>{cloudWarning}</Text>
+              <Pressable accessibilityRole="button" onPress={() => load()} style={[styles.retryButton, { borderColor: colors.border.default }]}>
+                <Text style={{ color: colors.primary, fontWeight: '600' }}>重新加载</Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
@@ -110,10 +119,10 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '600' },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
   stateTitle: { fontSize: 18, fontWeight: '600' },
-  stateText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  retryButton: { minHeight: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.full, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center' },
+  stateText: { fontSize: fontSize.button, lineHeight: 21, textAlign: 'center' },
+  retryButton: { minHeight: sizing.touchTarget, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.full, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
   notice: { borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  noticeText: { fontSize: 12, lineHeight: 18 },
+  noticeText: { fontSize: fontSize.xs, lineHeight: 18 },
   recordGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
 });

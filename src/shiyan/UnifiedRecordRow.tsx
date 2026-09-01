@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { spacing } from '../theme/tokens';
+import { fontSize, sizing, spacing } from '../theme/tokens';
 import type { UnifiedRecordPresentation, UnifiedRecordTone } from './unifiedRecords';
 
 const formatRecordTime = (value: string) => {
@@ -60,7 +60,7 @@ export function UnifiedRecordRow({
 
 const styles = StyleSheet.create({
   row: {
-    minHeight: 72,
+    minHeight: sizing.touchTarget,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     flexDirection: 'row',
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   main: { flex: 1, gap: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { flex: 1, fontSize: 15, fontWeight: '600' },
-  status: { fontSize: 12, fontWeight: '600' },
-  meta: { fontSize: 12, lineHeight: 18 },
+  title: { flex: 1, fontSize: fontSize.md, fontWeight: '600' },
+  status: { fontSize: fontSize.xs, fontWeight: '600' },
+  meta: { fontSize: fontSize.xs, lineHeight: 18 },
 });
