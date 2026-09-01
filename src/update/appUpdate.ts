@@ -1,6 +1,6 @@
 import { compareSemver, parseSemver, type SemverVersion } from './semver';
 
-export type ReleaseChannel = 'dev' | 'prod';
+export type ReleaseChannel = 'predev' | 'dev' | 'test' | 'prod';
 
 export interface AppRelease {
   tag: string;
@@ -31,9 +31,9 @@ const GITHUB_RELEASES_URL =
 const RELEASED_APK_NAME = 'uichat-mira-mobile-release.apk';
 
 /**
- * Only tags matching the current channel are eligible:
- * - dev channel: `v<semver>-dev` prereleases
- * - prod channel: `v<semver>` stable releases
+ * Legacy GitHub release selection remains only until MOB-028B switches the
+ * runtime client to R2. GitHub currently has canonical tags for dev/prod only;
+ * predev/test must never fall through to a different channel.
  */
 const versionTextForChannelTag = (
   channel: ReleaseChannel,
@@ -43,8 +43,11 @@ const versionTextForChannelTag = (
     const match = /^v(\d+\.\d+\.\d+)-dev$/.exec(tag);
     return match ? match[1] : null;
   }
-  const match = /^v(\d+\.\d+\.\d+)$/.exec(tag);
-  return match ? match[1] : null;
+  if (channel === 'prod') {
+    const match = /^v(\d+\.\d+\.\d+)$/.exec(tag);
+    return match ? match[1] : null;
+  }
+  return null;
 };
 
 const findApkAssetUrl = (assets: unknown): string | null => {
@@ -74,6 +77,7 @@ export const selectLatestRelease = (
     // flagged as prereleases, prod releases must not be.
     if (channel === 'dev' && release.prerelease !== true) continue;
     if (channel === 'prod' && release.prerelease === true) continue;
+    if (channel === 'predev' || channel === 'test') continue;
     if (typeof release.tag_name !== 'string' || release.tag_name.length === 0) {
       continue;
     }
@@ -106,14 +110,17 @@ export type ReleaseFetcher = (
 ) => Promise<Response>;
 
 /**
- * Fetches the newest release published on the given channel. Throws on
- * network / HTTP failures so the caller can surface a retryable error instead
- * of pretending the app is up to date.
+ * Temporary bridge until MOB-028B replaces GitHub with the R2 manifest client.
+ * predev/test deliberately fail closed rather than consulting another channel.
  */
 export const fetchLatestRelease = async (
   channel: ReleaseChannel,
   fetchImpl: ReleaseFetcher,
 ): Promise<AppRelease | null> => {
+  if (channel === 'predev' || channel === 'test') {
+    throw new Error(`R2 更新源尚未接入当前 ${channel} 通道`);
+  }
+
   const response = await fetchImpl(GITHUB_RELEASES_URL, {
     headers: { Accept: 'application/vnd.github+json' },
   });
