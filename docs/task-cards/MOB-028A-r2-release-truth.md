@@ -1,6 +1,6 @@
 # MOB-028A：R2 分支发行真相与 Manifest
 
-状态：**待实施**
+状态：**施工中**（PR #82）
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
@@ -32,24 +32,24 @@ prod   -> 0.1.3
 
 ## R2 目录合同
 
-四条发行线独立：
+四条发行线独立。客户端指针与版本化产物分开：
 
 ```text
-mira/mobile/predev/latest/
-mira/mobile/dev/latest/
-mira/mobile/test/latest/
-mira/mobile/prod/latest/
+mira/mobile/<channel>/latest/latest.json
+mira/mobile/<channel>/releases/<version>/uichat-mira-mobile-release.apk
+mira/mobile/<channel>/releases/<version>/uichat-mira-mobile-release.apk.sha256
 ```
 
-每个目录至少包含：
+当前人工 / 测试固定下载地址继续保留：
 
 ```text
-latest.json
-uichat-mira-mobile-release.apk
-uichat-mira-mobile-release.apk.sha256
+mira/mobile/<channel>/latest/uichat-mira-mobile-release.apk
+mira/mobile/<channel>/latest/uichat-mira-mobile-release.apk.sha256
 ```
 
-已有其他产物可继续保留，但 MOB-028 客户端更新只依赖当前平台所需产物与 `latest.json`。
+但客户端 manifest **不得指向上述可变 latest APK mirror**。原因是发布过程中即使 `latest.json` 最后写，可变 APK 也可能先被覆盖，形成“旧 manifest + 新 APK”的短暂版本错配。
+
+因此 `latest.json` 是唯一移动的客户端指针，APK 使用同 channel 的版本化对象。
 
 ## latest.json 最小合同
 
@@ -60,10 +60,12 @@ uichat-mira-mobile-release.apk.sha256
   "version": "0.1.3",
   "channel": "dev",
   "displayVersion": "0.1.3-dev",
-  "apk": "uichat-mira-mobile-release.apk",
+  "apk": "releases/0.1.3/uichat-mira-mobile-release.apk",
   "sha256": "<sha256>"
 }
 ```
+
+`apk` 相对于 `mira/mobile/<channel>/` channel root 解析，只允许落在当前 channel 的 `releases/<version>/` 下。
 
 可选字段可以包括 `notes`、`commit`、`publishedAt`，但不得让客户端依赖 GitHub Release 才能完成版本判断或下载。
 
@@ -75,11 +77,12 @@ uichat-mira-mobile-release.apk.sha256
 
 1. 构建并签名 APK；
 2. 校验 APK 与 SHA-256；
-3. 上传 APK / checksum 到对应 R2 channel；
-4. 对远端对象做必要存在性 / 大小校验；
-5. **最后上传 / 覆盖 `latest.json`**。
+3. 上传 APK / checksum 到 `mira/mobile/<channel>/releases/<version>/`；
+4. 对版本化远端对象做存在性 / 大小校验；
+5. 可同步固定 `latest/` APK mirror 给人工 / 测试使用；
+6. **最后上传 / 覆盖 `latest/latest.json`**。
 
-若 APK 上传或校验失败，不得更新 `latest.json`。
+若版本化 APK 上传或校验失败，不得更新 `latest.json`。
 
 ## Scope
 
@@ -87,6 +90,7 @@ uichat-mira-mobile-release.apk.sha256
 - 不允许“非 prod = dev”的兜底语义继续存在于可发布构建。
 - 为各发行分支生成正确的 display version。
 - 为各 R2 channel 生成并发布 `latest.json`。
+- 为客户端更新保留同 channel 的版本化 signed APK / checksum。
 - 复用现有 R2 Secrets 与 `assets.tomz.io` 发布基础设施，不新建 Worker、数据库或第三方更新服务。
 - GitHub Release / Tag 可继续保留作为归档、追溯和人工查看能力，但不再是 MOB-028 客户端运行时更新真相。
 
@@ -95,7 +99,8 @@ uichat-mira-mobile-release.apk.sha256
 - 分支 / channel 绝不串线。
 - `dev` metadata 不得写入 `test` / `prod` 目录，反之亦然。
 - 不用 R2 文件存在与否猜版本号；版本来自本次构建的明确版本真相。
-- `latest.json` 不得先于对应 APK 成功发布。
+- `latest.json` 不得先于对应版本化 APK 成功发布。
+- manifest 不得指向可变的跨版本 latest APK mirror。
 - 不泄露或提交 R2 / signing Secrets。
 - 不改变既有签名与 Android 安装权限合同。
 
@@ -108,8 +113,9 @@ uichat-mira-mobile-release.apk.sha256
 3. prod 保持稳定版本语义；
 4. R2 prefix 由 channel 唯一确定；
 5. manifest 内容与当前构建版本 / channel 一致；
-6. APK / checksum 失败时不会发布 `latest.json`；
-7. `latest.json` 发布动作位于对应产物远端校验之后。
+6. manifest 的 APK 路径只能指向当前 channel 的版本化对象；
+7. APK / checksum 失败时不会发布 `latest.json`；
+8. `latest.json` 发布动作位于对应版本化产物远端校验之后。
 
 执行现有质量检查：
 
@@ -119,7 +125,20 @@ npm run lint
 npm test -- --runInBand
 ```
 
-并对修改后的 GitHub Actions 做语法 / 路径检查。
+并对新增 / 修改的 GitHub Actions 做语法、权限、artifact 与分支路径检查。
+
+## Current Implementation
+
+PR #82：`feature/mob-028a-r2-release-truth -> dev`。
+
+实现选择：新增独立 `R2 Release Truth` workflow。它等待对应分支现有 canonical CI 成功后再移动 R2 客户端真相：
+
+- `predev` 等待 `Predev CI`，复用其 signed Release artifact；
+- `dev` / `prod` 等待 `Mobile CI`，复用 signed Release artifact；
+- `test` 等待 `Mobile CI` 全绿后补 signed Release APK，再发布 test channel；
+- feature / fix / main 不发布 R2 客户端 release truth。
+
+这样不需要重写当前 dev/prod/predev 的历史 GitHub Release / 固定 R2 mirror 流程，同时让新的 R2 manifest 成为独立且可验证的客户端真相。
 
 ## Handoff
 

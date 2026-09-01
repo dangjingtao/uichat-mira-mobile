@@ -52,9 +52,35 @@ prod   -> https://assets.tomz.io/mira/mobile/prod/latest/latest.json
 
 ## Android 下载合同
 
-用户确认更新后，从**当前 manifest 对应的同 channel R2 路径**下载 signed Release APK。
+用户确认更新后，从**当前 manifest 对应的同 channel R2 版本化路径**下载 signed Release APK。
 
-推荐将 manifest 的 `apk` 视为当前 `latest/` 目录下的受控相对文件名；客户端不得接受跨域、跨 channel 或任意外部下载 URL。
+MOB-028A 的 manifest 形态：
+
+```json
+{
+  "version": "0.1.3",
+  "channel": "dev",
+  "displayVersion": "0.1.3-dev",
+  "apk": "releases/0.1.3/uichat-mira-mobile-release.apk",
+  "sha256": "<sha256>"
+}
+```
+
+`apk` 相对于当前 channel root 解析：
+
+```text
+https://assets.tomz.io/mira/mobile/<channel>/<apk>
+```
+
+客户端必须验证：
+
+- `channel` 与当前构建 channel 完全一致；
+- `apk` 只能是相对路径；
+- 路径必须严格落在 `releases/<manifest.version>/` 下；
+- 文件名必须是 signed Release APK canonical name；
+- 不接受 `..`、绝对 URL、跨 channel 路径或其它域名。
+
+固定 `latest/uichat-mira-mobile-release.apk` 继续可供人工 / 测试直接下载，但**不是 MOB-028 客户端安装源**，避免发布时出现旧 manifest 与新可变 APK 短暂错配。
 
 MVP 继续交给系统 / 浏览器下载：
 
@@ -94,6 +120,7 @@ GitHub Release / Tag 可以继续由 CI 生成，作为：
 - manifest channel 不匹配必须拒绝。
 - 不 fallback 到其他 channel。
 - 不允许 manifest 把客户端下载导向任意第三方地址。
+- 不允许客户端更新下载使用可变 latest APK mirror。
 - 不降低已有网络失败、取消下载、缺产物等错误处理质量。
 
 ## Validation
@@ -108,8 +135,9 @@ GitHub Release / Tag 可以继续由 CI 生成，作为：
 6. 当前版本高于远端版本；
 7. 网络失败不返回“已是最新”；
 8. manifest 非法 / 缺 APK 字段时不触发下载；
-9. APK 下载地址只能落在当前 channel 的 R2 `latest/` 路径；
-10. GitHub Releases API 不再出现在客户端更新请求路径中。
+9. APK 路径只能落在当前 channel 的 `releases/<manifest.version>/`；
+10. 绝对 URL、`..`、跨 channel / 跨版本路径被拒绝；
+11. GitHub Releases API 不再出现在客户端更新请求路径中。
 
 执行：
 
@@ -125,7 +153,7 @@ Android smoke：
 - 当前 channel 有更高版本出现红点；
 - 点击后先确认；
 - 取消不下载；
-- 确认后打开当前 channel 的 R2 signed APK；
+- 确认后打开当前 channel 的版本化 R2 signed APK；
 - R2 manifest 请求失败可重试；
 - 其他 channel 即使版本更高也不会触发更新。
 

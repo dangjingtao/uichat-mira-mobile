@@ -33,7 +33,14 @@ type UpdateCheckStatus =
   | 'unavailable'
   | 'failed';
 
-const channelLabel = releaseChannel === 'prod' ? '正式' : '开发';
+const channelLabel = {
+  predev: '预开发',
+  dev: '开发',
+  test: '测试',
+  prod: '正式',
+}[releaseChannel];
+const installedDisplayVersion =
+  releaseChannel === 'prod' ? version : `${version}-${releaseChannel}`;
 
 const releaseNotesPreview = (notes: string | null): string => {
   const firstLine = notes
@@ -105,7 +112,7 @@ export function AboutScreen() {
     const notes = releaseNotesPreview(latest.notes);
     Alert.alert(
       '下载新版本',
-      `当前版本 ${version}\n最新版本 ${latest.tag}${notes ? `\n\n${notes}` : ''}\n\n${
+      `当前版本 ${installedDisplayVersion}\n最新版本 ${latest.tag}${notes ? `\n\n${notes}` : ''}\n\n${
         Platform.OS === 'android'
           ? '确认后将使用系统下载。'
           : 'iOS 当前分发为无签名构建，将打开发布说明页面。'
@@ -150,7 +157,7 @@ export function AboutScreen() {
       default:
         Alert.alert(
           '版本信息',
-          `当前版本 ${version}（${channelLabel}渠道）${
+          `当前版本 ${installedDisplayVersion}（${channelLabel}渠道）${
             latestRelease ? `\n最新发布 ${latestRelease.tag}` : ''
           }`,
         );
@@ -170,17 +177,17 @@ export function AboutScreen() {
   const updateSubtitle = (() => {
     switch (updateStatus) {
       case 'checking':
-        return `${version} · 正在检查更新…`;
+        return `${installedDisplayVersion} · 正在检查更新…`;
       case 'available':
-        return `${version} · 有新版本 ${latestRelease?.tag ?? ''}`;
+        return `${installedDisplayVersion} · 有新版本 ${latestRelease?.tag ?? ''}`;
       case 'current':
-        return `${version} · 已是最新`;
+        return `${installedDisplayVersion} · 已是最新`;
       case 'unavailable':
-        return `${version} · 暂无发布信息`;
+        return `${installedDisplayVersion} · 暂无发布信息`;
       case 'failed':
-        return `${version} · 检查更新失败，点击重试`;
+        return `${installedDisplayVersion} · 检查更新失败，点击重试`;
       default:
-        return version;
+        return installedDisplayVersion;
     }
   })();
 
