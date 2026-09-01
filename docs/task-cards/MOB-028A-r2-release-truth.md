@@ -1,6 +1,6 @@
 # MOB-028A：R2 分支发行真相与 Manifest
 
-状态：**施工中**（PR #82）
+状态：**PASS**
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
@@ -127,19 +127,29 @@ npm test -- --runInBand
 
 并对新增 / 修改的 GitHub Actions 做语法、权限、artifact 与分支路径检查。
 
-## Current Implementation
+## Accepted Implementation
 
-PR #82：`feature/mob-028a-r2-release-truth -> dev`。
+PR #82 已合入 `dev`，merge commit `34b7eeeda68c4c47f4ad56953437ea61b4c3d899`。
 
-实现选择：新增独立 `R2 Release Truth` workflow。它等待对应分支现有 canonical CI 成功后再移动 R2 客户端真相：
+实现采用独立 `R2 Release Truth` workflow。它等待对应分支 canonical CI 成功后再移动 R2 客户端真相：
 
 - `predev` 等待 `Predev CI`，复用其 signed Release artifact；
 - `dev` / `prod` 等待 `Mobile CI`，复用 signed Release artifact；
 - `test` 等待 `Mobile CI` 全绿后补 signed Release APK，再发布 test channel；
 - feature / fix / main 不发布 R2 客户端 release truth。
 
-这样不需要重写当前 dev/prod/predev 的历史 GitHub Release / 固定 R2 mirror 流程，同时让新的 R2 manifest 成为独立且可验证的客户端真相。
+验收证据：
+
+- PR #82 最新 AI Review 无 P0-P2 阻断；
+- Typecheck / lint / Jest 通过；
+- Android signed Release、Android debug、iOS simulator / unsigned device CI 通过；
+- dev manifest 成功生成 `0.2.11-dev`；
+- signed APK SHA-256 校验通过；
+- R2 workflow 在远端对象校验完成后明确输出 `Published R2 release truth: dev/0.2.11`；
+- `latest.json` 在版本化 APK / checksum 发布并验证后才移动。
+
+后续 `dev` 新提交触发 concurrency 导致该已完成发布 job 的 workflow 总状态显示 cancelled，不影响上述已经完成并记录的 R2 发布事实。
 
 ## Handoff
 
-本卡先于 MOB-028B。MOB-028B 必须消费本卡确定的 R2 manifest 合同，不得自行发明第二套 channel / version 规则。
+MOB-028B 必须消费本卡确定的 R2 manifest 合同，不得自行发明第二套 channel / version 规则。
