@@ -9,9 +9,9 @@ on:
 permissions:
   contents: read
 
-# MOB-028: predev is a dev-channel rolling buffer.
+# MOB-028A: predev builds carry an explicit predev release identity.
 env:
-  MIRA_RELEASE_CHANNEL: dev
+  MIRA_RELEASE_CHANNEL: predev
 
 concurrency:
   group: predev-ci-${{ github.ref }}
@@ -249,7 +249,7 @@ jobs:
           entries="$RUNNER_TEMP/ios-unsigned-device-entries.txt"
           unzip -Z1 "$ipa" > "$entries"
           grep -Eq '^Payload/[^/]+\.app/Info\.plist$' "$entries"
-          grep -Eq '^Payload/[^/]+\.app/main\.jsbundle$' "$entries"
+          grep -Eq '^Payload/[^/]+\.app/main.jsbundle$' "$entries"
           if grep -Eq '^Payload/[^/]+\.app/embedded\.mobileprovision$' "$entries"; then
             echo 'Unsigned IPA unexpectedly contains an embedded provisioning profile.' >&2
             exit 1
