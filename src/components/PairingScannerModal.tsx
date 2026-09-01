@@ -47,7 +47,7 @@ export function PairingScannerModal({
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLocked = useRef(false);
   const { width: windowWidth } = useWindowDimensions();
-  const finderSize = Math.min(Math.max(windowWidth - 48, 0), 300);
+  const finderSize = Math.min(Math.max(windowWidth - 64, 0), 292);
 
   const ensureCameraPermission = useCallback(async () => {
     setCameraState('checking');
@@ -88,6 +88,7 @@ export function PairingScannerModal({
         setScanError('这不是有效的 Mira 配对二维码');
         setTimeout(() => {
           scanLocked.current = false;
+          setScanError(null);
         }, 1200);
       }
     },
@@ -96,9 +97,9 @@ export function PairingScannerModal({
 
   const permissionMessage =
     cameraState === 'blocked'
-      ? '相机权限已被关闭，请在系统设置中允许 Mira 使用相机。'
+      ? '相机权限已关闭，请在系统设置中允许 Mira 使用相机。'
       : cameraState === 'unavailable'
-      ? '当前设备无法使用相机扫码，请粘贴完整配对链接。'
+      ? '当前设备无法使用相机扫码，请返回后粘贴配对链接。'
       : '需要相机权限才能扫描配对二维码。';
 
   return (
@@ -109,24 +110,8 @@ export function PairingScannerModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="关闭扫码"
-            onPress={onClose}
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <X size={24} color="#ffffff" />
-          </Pressable>
-          <Text style={styles.title}>扫描配对二维码</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
         {cameraState === 'granted' ? (
-          <View style={styles.cameraContainer}>
+          <>
             <Camera
               style={StyleSheet.absoluteFill}
               cameraType={CameraType.Back}
@@ -139,22 +124,35 @@ export function PairingScannerModal({
               }
               onError={() => setCameraState('unavailable')}
             />
+
+            <View pointerEvents="none" style={styles.cameraShade} />
+
             <View pointerEvents="none" style={styles.finderLayer}>
               <View
-                style={[styles.finder, { width: finderSize, height: finderSize }]}
+                style={[
+                  styles.finder,
+                  { width: finderSize, height: finderSize },
+                ]}
               >
-                <View style={[styles.finderCorner, styles.finderCornerTopLeft]} />
-                <View style={[styles.finderCorner, styles.finderCornerTopRight]} />
-                <View style={[styles.finderCorner, styles.finderCornerBottomLeft]} />
-                <View style={[styles.finderCorner, styles.finderCornerBottomRight]} />
+                <View
+                  style={[styles.finderCorner, styles.finderCornerTopLeft]}
+                />
+                <View
+                  style={[styles.finderCorner, styles.finderCornerTopRight]}
+                />
+                <View
+                  style={[styles.finderCorner, styles.finderCornerBottomLeft]}
+                />
+                <View
+                  style={[styles.finderCorner, styles.finderCornerBottomRight]}
+                />
+                <View style={styles.scanLine} />
               </View>
+              <Text style={styles.helperText}>
+                对准 Mira Desktop 上的配对二维码
+              </Text>
             </View>
-            {scanError ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{scanError}</Text>
-              </View>
-            ) : null}
-          </View>
+          </>
         ) : cameraState === 'checking' ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color="#ffffff" />
@@ -197,24 +195,61 @@ export function PairingScannerModal({
             ) : null}
           </View>
         )}
+
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关闭扫码"
+            onPress={onClose}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <X size={24} color="#ffffff" />
+          </Pressable>
+          <Text style={styles.title}>扫描配对二维码</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        {scanError ? (
+          <View pointerEvents="none" style={styles.errorBanner}>
+            <Text style={styles.errorText}>{scanError}</Text>
+          </View>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090909' },
+  container: {
+    flex: 1,
+    backgroundColor: '#090909',
+  },
+  cameraShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+  },
   header: {
-    height: 60,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    zIndex: 5,
+    backgroundColor: 'rgba(9, 9, 9, 0.24)',
   },
   iconButton: {
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
   },
   title: {
     flex: 1,
@@ -224,55 +259,68 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSpacer: { width: 44 },
-  cameraContainer: { flex: 1, overflow: 'hidden' },
   finderLayer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 36,
   },
   finder: {
-    aspectRatio: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
-    borderRadius: 12,
+    borderRadius: 18,
   },
   finderCorner: {
     position: 'absolute',
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderColor: '#ffffff',
   },
   finderCornerTopLeft: {
-    top: -1,
-    left: -1,
+    top: 0,
+    left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 12,
+    borderTopLeftRadius: 18,
   },
   finderCornerTopRight: {
-    top: -1,
-    right: -1,
+    top: 0,
+    right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 12,
+    borderTopRightRadius: 18,
   },
   finderCornerBottomLeft: {
-    bottom: -1,
-    left: -1,
+    bottom: 0,
+    left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 12,
+    borderBottomLeftRadius: 18,
   },
   finderCornerBottomRight: {
-    bottom: -1,
-    right: -1,
+    bottom: 0,
+    right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 12,
+    borderBottomRightRadius: 18,
+  },
+  scanLine: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    top: '50%',
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  helperText: {
+    color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    marginTop: 24,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   centered: {
     flex: 1,
@@ -302,10 +350,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
     right: 24,
-    bottom: 36,
+    bottom: 40,
     minHeight: 48,
-    borderRadius: 8,
-    backgroundColor: 'rgba(127, 29, 29, 0.94)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(20, 20, 19, 0.86)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
