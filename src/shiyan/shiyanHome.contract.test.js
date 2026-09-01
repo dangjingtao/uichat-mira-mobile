@@ -1,10 +1,8 @@
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 
-const source = readFileSync(
-  resolve(process.cwd(), 'src/shiyan/ShiyanRecordingScreens.tsx'),
-  'utf8',
-);
+const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
+const source = readSource('src/shiyan/ShiyanRecordingScreens.tsx');
 const homeSource = source.slice(
   source.indexOf('export function ShiyanHomeScreen()'),
   source.indexOf('export function ShiyanSceneSelectScreen()'),
@@ -29,5 +27,19 @@ describe('MOB-030 Shiyan home interaction contract', () => {
     expect(homeSource).toContain('result.records.slice(0, 3)');
     expect(homeSource).toContain("navigation.navigate('ShiyanHistory')");
     expect(homeSource).not.toContain("navigation.navigate('ShiyanLocalDrafts')");
+  });
+
+  it('keeps delivered canonical URLs accessible through the existing task-detail route', () => {
+    const appSource = readSource('App.tsx');
+    const deliveryDetailSource = readSource(
+      'src/shiyan/ShiyanTaskDetailWithDeliveryScreen.tsx',
+    );
+
+    expect(appSource).toContain(
+      '<Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailWithDeliveryScreen} />',
+    );
+    expect(deliveryDetailSource).toContain('hasCanonicalGithubDeliveryEvidence(delivery)');
+    expect(deliveryDetailSource).toContain('await Linking.openURL(delivery.fileUrl!);');
+    expect(deliveryDetailSource).toContain('打开 GitHub');
   });
 });
