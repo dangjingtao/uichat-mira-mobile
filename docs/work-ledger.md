@@ -1,6 +1,6 @@
 # Mobile 工作台账
 
-更新时间：2026-08-29（Asia/Shanghai）
+更新时间：2026-09-01（Asia/Shanghai）
 
 本台账是 Mira Mobile 当前施工、验收与跨仓依赖的统一事实来源。任务状态以这里为准；详细范围以对应任务卡为准；`docs/shiyan/` 是拾言产品与跨仓合同唯一真相。
 
@@ -42,6 +42,11 @@
 - MOB-022：核心能力已进入 Cloud `dev`，最终接线未完成。DestinationAdapter、GitHub adapter、Delivery Record、幂等 / 并发恢复与 canonical evidence 已随 Cloud PR #5 合入；`mira-shiyan` 内容约定已落地。当前 Cloud `dev/src/api/index.ts` 只挂了 MOB-019 handler，尚未把 MOB-020 / MOB-022 public route 接入；因此 Final Draft -> GitHub Delivery POST、`GET /deliveries` 公网读取及真实 GitHub smoke 仍待 MOB-020 合入后收口。
 - MOB-023：待启动的最终集成验收卡。已完成任务卡阅读与边界确认；只有 MOB-020 合入 Cloud `dev`、MOB-021 合入 Mobile `dev`、MOB-022 完成 Final Draft / public API 接线后才进入正式验收施工。40 分钟真机会议、真实 Provider / Secret、真实 GitHub URL 是 MOB-023 的验收内容，不作为修改上游代码合同的理由。
 - MOB-029：待实施。拾言主页右上角成为 Cloud 配置 canonical 入口；确认页录音摘要改为可播放 / seek 的小播放器，场景改为当前值回显 + cross-platform Action Sheet；不改变 CaptureTask / Scene snapshot / Draft / Delivery 合同。
+- MOB-030：待实施。拾言首页收成一个主 CTA，并用 presentation projection 统一展示 LocalCapture / CaptureTask；不合并底层事实模型。
+- MOB-031：待实施。基于既有播放器与场景 Sheet 收轻确认页，明确唯一主提交动作并保留本地恢复 / 稍后处理能力。
+- MOB-032：待实施。TaskDetail 改为结果优先；整理稿 / Transcript / AI candidate / Final Draft 的内部合同保持不变。
+- MOB-033：待实施。处理详情默认折叠，单 Stage 失败提供局部恢复；依赖 MOB-032 的结果页结构稳定后施工。
+- MOB-034：待实施。负责人 `t-zt`；在 030～033 后统一 More / Action Sheet、Share / Delivery、原音保留、文案与 Design Token。
 
 ## 任务卡总览
 
@@ -76,6 +81,11 @@
 | MOB-027 | 设置页插件入口恢复可用 | 待实施 | 从最新 `dev` 独立开卡施工 |
 | MOB-028 | 关于页版本更新检查与确认下载 | 待实施 | 从最新 `dev` 独立开卡施工 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | 待实施 | 从最新 `dev` 独立开卡施工 |
+| MOB-030 | 拾言首页与统一记录入口 | 待实施 | 可与 MOB-031 并行；从最新 `dev` 独立施工 |
+| MOB-031 | 拾言确认页主次交互收口 | 待实施 | 可与 MOB-030 并行；基于现有 MOB-029 能力收口 |
+| MOB-032 | 拾言结果优先 Review / Final Draft | 待实施 | 独立修改 TaskDetail 结果层级 |
+| MOB-033 | 拾言处理详情与单阶段失败恢复 | 待实施 | **依赖 MOB-032**；032 合入后基于最新 `dev` 施工 |
+| MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | 待实施 | **负责人 `t-zt`**；建议 030～033 后施工 |
 
 ## 2026-08-29 Dogfood Follow-up 并行规则
 
@@ -85,6 +95,16 @@ MOB-025～MOB-029 首次派卡共同基线为 Mobile `dev @ a90dfb6c2d80079fd850
 - MOB-028 在保持“确认后交系统 / 浏览器下载、不实现 native installer”的范围内可并行。
 - MOB-029 是本批唯一明确可能同时触碰 Android / iOS native audio 的卡，建议独立 worktree / branch。
 - 如果 MOB-028 或 MOB-029 施工过程中需要同时修改共享 native package registration、Podfile、MainApplication、全局 navigation / store 等共享合同，必须先报告并重新判断集成顺序；不能仅因文件暂时没冲突就认为可安全并行。
+
+## 2026-09-01 拾言 UX Follow-up 并行规则
+
+MOB-030～034 是烟测通过后的交互收口批次。共同原则：**PRD 不改；技术事实不合并；设计稿定义交互意图，视觉实现以现有 Design Token 为准。**
+
+- MOB-030 / MOB-031 可以并行；两张卡都应从施工时最新 `dev` 开独立分支。
+- MOB-032 可以与 030 / 031 并行，主要修改 TaskDetail 的内容层级。
+- MOB-033 不与 MOB-032 同时大改 TaskDetail；032 合入后重新 fetch / rebase 最新 `dev` 再施工。
+- MOB-034 最后施工，由 `t-zt` 负责低频入口、Share / Delivery、文案和 token 统一；不要在前四张卡尚未稳定时提前做视觉重排。
+- 若任一卡为了“做得更顺”需要增加搜索、录音标记、时间点引用、Mind Map、模板市场等 PRD 外功能，立即停止并回读 `docs/shiyan/PRD.md`，不得擅自扩 Scope。
 
 ## 拾言 canonical 产品规则
 
@@ -114,6 +134,22 @@ MOB-020  PR #6：待 CI / Review / merge
 
 MOB-021 已基于 MOB-020 PR #6 的冻结合同施工并合入 Mobile `dev`，因此它不需要重新等待设计；但正式集成基线仍要求 MOB-020 进入 Cloud `dev`。MOB-023 不与上游实现卡并行施工。
 
+### UX Follow-up 依赖
+
+```text
+MOB-030 ─┐
+         ├─ parallel
+MOB-031 ─┘
+
+MOB-032
+   ↓
+MOB-033
+   ↓
+MOB-034 (`t-zt`)
+```
+
+这条 UX 依赖链不覆盖上面的 MVP Cloud / E2E 依赖；它只约束 Mobile UI 的施工顺序。
+
 ## MOB-023 验收矩阵
 
 正式启动后至少取得以下证据：
@@ -133,7 +169,7 @@ MOB-021 已基于 MOB-020 PR #6 的冻结合同施工并合入 Mobile `dev`，�
 
 ## 详细任务卡
 
-`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-029 的详细范围均在 `docs/task-cards/`。
+`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-034 的详细范围均在 `docs/task-cards/`。
 
 ## 历史追溯
 
