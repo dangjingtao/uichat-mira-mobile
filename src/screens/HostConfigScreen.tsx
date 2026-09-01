@@ -85,13 +85,16 @@ export function HostConfigScreen() {
     secureStorageAvailable,
   } = useRemotePairing(pairingDescriptor);
 
-  const clearPendingPairing = useCallback(() => {
-    resetPairing();
-    setPairingDescriptor(null);
-    setPairingUriInput('');
-    setPairingLinkError(null);
-    setConnectivityHostUrl('');
-  }, [resetPairing, setConnectivityHostUrl]);
+  const clearPendingPairing = useCallback(
+    (restoreCurrentHost = true) => {
+      resetPairing();
+      setPairingDescriptor(null);
+      setPairingUriInput('');
+      setPairingLinkError(null);
+      setConnectivityHostUrl(restoreCurrentHost ? config?.hostUrl ?? '' : '');
+    },
+    [config, resetPairing, setConnectivityHostUrl],
+  );
 
   const loadPairingUri = useCallback(
     (uri: string) => {
@@ -205,7 +208,7 @@ export function HostConfigScreen() {
     if (secureStorageAvailable) await remoteMiraHostClient.disconnect();
     clearConfig();
     resetConnectivity();
-    clearPendingPairing();
+    clearPendingPairing(false);
     setConnectionStatus('disconnected');
   };
 
