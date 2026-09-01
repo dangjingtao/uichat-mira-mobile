@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -96,6 +97,7 @@ export function HostConfigScreen() {
     (uri: string) => {
       try {
         const descriptor = parsePairingUriV1(uri);
+        Keyboard.dismiss();
         setPairingDescriptor(descriptor);
         setPairingLinkError(null);
         setAuthorizationOpen(true);

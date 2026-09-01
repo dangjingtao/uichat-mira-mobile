@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
-  Modal,
+  BackHandler,
   Pressable,
   StyleSheet,
   Text,
@@ -48,156 +48,162 @@ export function PairingAuthorizationSheet({
     if (presentation.dismissible) onClose();
   };
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={() => {
+  useEffect(() => {
+    if (!visible) return;
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
         if (presentation.dismissible) onClose();
-      }}
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="关闭 Mira 授权"
-          disabled={!presentation.dismissible}
-          onPress={onClose}
-          style={styles.backdrop}
-        />
-        <SafeAreaView
-          edges={['bottom']}
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [onClose, presentation.dismissible, visible]);
+
+  if (!visible) return null;
+
+  return (
+    <View accessibilityViewIsModal style={styles.modalRoot}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="关闭 Mira 授权"
+        disabled={!presentation.dismissible}
+        onPress={onClose}
+        style={styles.backdrop}
+      />
+      <SafeAreaView
+        edges={['bottom']}
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: colors.bg.card,
+            borderColor: colors.border.default,
+          },
+        ]}
+      >
+        <View
           style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.bg.card,
-              borderColor: colors.border.default,
-            },
+            styles.handle,
+            { backgroundColor: colors.border.default },
           ]}
-        >
-          <View
-            style={[
-              styles.handle,
-              { backgroundColor: colors.border.default },
-            ]}
-          />
+        />
 
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <View
-                style={[
-                  styles.iconWrap,
-                  { backgroundColor: colors.bg.soft },
-                ]}
-              >
-                <ShieldCheck size={22} color={colors.primary} strokeWidth={1.8} />
-              </View>
-              <Text style={[styles.sheetTitle, { color: colors.text.ink }]}>
-                Mira 授权
-              </Text>
-            </View>
-
-            {presentation.dismissible ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="关闭 Mira 授权"
-                onPress={onClose}
-                style={({ pressed }) => [
-                  styles.closeButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <X size={21} color={colors.text.muted} />
-              </Pressable>
-            ) : (
-              <View style={styles.closeSpacer} />
-            )}
-          </View>
-
-          <View style={styles.content}>
-            {presentation.busy ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : null}
-            <Text
-              accessibilityLiveRegion="polite"
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <View
               style={[
-                styles.statusTitle,
-                {
-                  color: presentation.error
-                    ? colors.status.error
-                    : colors.text.ink,
-                },
+                styles.iconWrap,
+                { backgroundColor: colors.bg.soft },
               ]}
             >
-              {presentation.title}
-            </Text>
-            <Text style={[styles.message, { color: colors.text.muted }]}>
-              {presentation.message}
+              <ShieldCheck size={22} color={colors.primary} strokeWidth={1.8} />
+            </View>
+            <Text style={[styles.sheetTitle, { color: colors.text.ink }]}>
+              Mira 授权
             </Text>
           </View>
 
-          {presentation.actionLabel ? (
+          {presentation.dismissible ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={presentation.actionLabel}
-              onPress={handlePrimaryAction}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                submitReady
-                  ? {
-                      backgroundColor: pressed
-                        ? colors.primaryActive
-                        : colors.primary,
-                    }
-                  : {
-                      backgroundColor: pressed
-                        ? colors.bg.soft
-                        : colors.bg.card,
-                      borderColor: colors.border.default,
-                      borderWidth: 1,
-                    },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.primaryButtonText,
-                  {
-                    color: submitReady ? colors.onPrimary : colors.text.ink,
-                  },
-                ]}
-              >
-                {presentation.actionLabel}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {submitReady ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="取消配对申请"
+              accessibilityLabel="关闭 Mira 授权"
               onPress={onClose}
               style={({ pressed }) => [
-                styles.cancelButton,
+                styles.closeButton,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.cancelText, { color: colors.primary }]}>
-                取消
-              </Text>
+              <X size={21} color={colors.text.muted} />
             </Pressable>
+          ) : (
+            <View style={styles.closeSpacer} />
+          )}
+        </View>
+
+        <View style={styles.content}>
+          {presentation.busy ? (
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : null}
-        </SafeAreaView>
-      </View>
-    </Modal>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.statusTitle,
+              {
+                color: presentation.error
+                  ? colors.status.error
+                  : colors.text.ink,
+              },
+            ]}
+          >
+            {presentation.title}
+          </Text>
+          <Text style={[styles.message, { color: colors.text.muted }]}>
+            {presentation.message}
+          </Text>
+        </View>
+
+        {presentation.actionLabel ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={presentation.actionLabel}
+            onPress={handlePrimaryAction}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              submitReady
+                ? {
+                    backgroundColor: pressed
+                      ? colors.primaryActive
+                      : colors.primary,
+                  }
+                : {
+                    backgroundColor: pressed
+                      ? colors.bg.soft
+                      : colors.bg.card,
+                    borderColor: colors.border.default,
+                    borderWidth: 1,
+                  },
+            ]}
+          >
+            <Text
+              style={[
+                styles.primaryButtonText,
+                {
+                  color: submitReady ? colors.onPrimary : colors.text.ink,
+                },
+              ]}
+            >
+              {presentation.actionLabel}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {submitReady ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="取消配对申请"
+            onPress={onClose}
+            style={({ pressed }) => [
+              styles.cancelButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.cancelText, { color: colors.primary }]}>
+              取消
+            </Text>
+          </Pressable>
+        ) : null}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   modalRoot: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(20, 20, 19, 0.42)',
+    zIndex: 20,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
