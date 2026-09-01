@@ -37,7 +37,9 @@
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | REVIEW | Code `1035da3`; device dogfood smoke |
 | MOB-026 | 全局搜索命中消息正文 | REVIEW | Code `e628d5a`; long-session/degraded smoke |
 | MOB-027 | 设置页插件入口恢复可用 | PASS | Code `327b2e4`; device entry regression accepted by product owner on 2026-09-01 |
-| MOB-028 | 关于页版本更新检查与确认下载 | REVIEW | Code `88d54a7`; release metadata/download smoke |
+| MOB-028 | 关于页版本更新检查与确认下载 | REVIEW | Existing code `88d54a7` superseded in release-source semantics by MOB-028A/B; retain UI/interaction work, replace GitHub runtime update source |
+| MOB-028A | R2 分支发行真相与 Manifest | TODO | R2-only release truth; predev/dev/test/prod isolated; publish `latest.json` last |
+| MOB-028B | R2 分支隔离更新客户端 | TODO | Depends on MOB-028A; app reads only its own R2 channel manifest and downloads same-channel signed APK |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Code `24513fb`; dual-platform device smoke |
 | MOB-030 | 拾言首页与统一记录入口 | TODO | Start from latest `dev` |
 | MOB-031 | 拾言确认页主次交互收口 | TODO | Start from latest `dev` |
