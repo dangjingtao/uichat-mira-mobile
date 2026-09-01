@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import {
   check,
@@ -47,6 +47,7 @@ export function PairingScannerModal({
   const [scanError, setScanError] = useState<string | null>(null);
   const scanLocked = useRef(false);
   const { width: windowWidth } = useWindowDimensions();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
   const finderSize = Math.min(Math.max(windowWidth - 64, 0), 292);
 
   const ensureCameraPermission = useCallback(async () => {
@@ -109,7 +110,7 @@ export function PairingScannerModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.container}>
         {cameraState === 'granted' ? (
           <>
             <Camera
@@ -196,7 +197,15 @@ export function PairingScannerModal({
           </View>
         )}
 
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            {
+              minHeight: 60 + topInset,
+              paddingTop: topInset,
+            },
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="关闭扫码"
@@ -213,11 +222,14 @@ export function PairingScannerModal({
         </View>
 
         {scanError ? (
-          <View pointerEvents="none" style={styles.errorBanner}>
+          <View
+            pointerEvents="none"
+            style={[styles.errorBanner, { bottom: 40 + bottomInset }]}
+          >
             <Text style={styles.errorText}>{scanError}</Text>
           </View>
         ) : null}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -240,7 +252,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -358,7 +369,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
     right: 24,
-    bottom: 40,
     minHeight: 48,
     borderRadius: 12,
     backgroundColor: 'rgba(20, 20, 19, 0.86)',
