@@ -46,6 +46,7 @@
 | MOB-032 | 拾言结果优先 Review / Final Draft | TODO | Independent TaskDetail work |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | TODO | Owner `t-zt`; after MOB-030..033 |
+| MOB-035 | 远程连接状态诊断与会话错误分层 | TODO | Distinguish unpaired/auth/permission/mobile-offline/Host-unreachable/session failures; never infer Host offline without authoritative evidence |
 
 `PASS` 只表示仓库验收证据和必要的产品/机器观察均已完成。`REVIEW` 不得被解释为真实设备、Host、Cloud、Provider 或跨仓端到端已通过。
 
