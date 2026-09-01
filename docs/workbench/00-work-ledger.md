@@ -37,7 +37,7 @@
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | REVIEW | PR #83 merged as `01fd9575`; PanResponder replaced by native horizontal ScrollView; final CI + OpenCode Review green; Android real-device dogfood required before PASS |
 | MOB-026 | 全局搜索命中消息正文 | REVIEW | Code `e628d5a`; long-session/degraded smoke |
 | MOB-027 | 设置页插件入口恢复可用 | PASS | Code `327b2e4`; device entry regression accepted by product owner on 2026-09-01 |
-| MOB-028 | 关于页版本更新检查与确认下载 | REVIEW | Existing code `88d54a7` superseded in release-source semantics by MOB-028A/B; retain UI/interaction work, replace GitHub runtime update source |
+| MOB-028 | 关于页版本更新检查与确认下载 | PASS | Original About UI/interaction work completed; MOB-028A/B replaced release-source semantics with branch-isolated R2 truth + same-channel versioned signed APK runtime update path; both subcards PASS |
 | MOB-028A | R2 分支发行真相与 Manifest | PASS | PR #82 merged as `34b7eee`; dev `0.2.11-dev` manifest generated; signed APK checksum verified; R2 publish log confirmed `Published R2 release truth: dev/0.2.11` |
 | MOB-028B | R2 分支隔离更新客户端 | PASS | PR #84 squash-merged as `d8134ba`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; same-channel R2 manifest/versioned APK validation covered; product owner accepted PASS on 2026-09-02 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Product owner conditionally accepted on 2026-09-01; code `24513fb`; dual-platform device smoke pending; Audio Player visual/component debt assigned to MOB-031 |
