@@ -1,6 +1,6 @@
 # Mira Mobile Work Ledger
 
-更新时间：2026-09-01（Asia/Shanghai）
+更新时间：2026-09-02（Asia/Shanghai）
 
 这是 Mira Mobile 的唯一当前任务台账，按 Mira Forge 的台账规则维护。Mobile 任务继续使用本仓库既有的 `MOB-*` 编号；Forge 的 `Txxx` 编号只属于 Forge 自身工作台，不在 Mobile 仓库复制。
 
@@ -47,6 +47,17 @@
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | TODO | Owner `t-zt`; after MOB-030..033 |
 | MOB-035 | 远程连接状态诊断与会话错误分层 | TODO | Distinguish unpaired/auth/permission/mobile-offline/Host-unreachable/session failures; never infer Host offline without authoritative evidence |
+
+## Deferred Engineering Governance
+
+产品负责人要求先记录、暂不插入当前功能施工；等当前正在收尾的 Mobile 功能卡 / 功能批次结束后，再集中建立治理任务卡并执行。
+
+当前仅保留两份治理真相，不分配新的 `MOB-*` 编号：
+
+- [Mobile Code Health — Initial Assessment](../engineering/mobile-code-health-initial-assessment.md)：记录当前代码卫生初步判断、主要边界问题与候选整治顺序；结论是聚焦高变更边界，不做仓库级重写。
+- [Mobile E2E Acceptance Plan](../testing/mobile-e2e-acceptance-plan.md)：记录 `test` 分支触发的 GitHub Actions + Maestro 黑盒 E2E 方向、构建物复用、测试证据、邮件通知和 regression attribution 原则。
+
+启动治理批次前必须重新读取最新 `dev` 与本台账；若代码结构、CI 或当前功能优先级已变化，以启动时事实重新派卡，不机械照搬本次初判。
 
 `PASS` 只表示仓库验收证据和必要的产品/机器观察均已完成。`REVIEW` 不得被解释为真实设备、Host、Cloud、Provider 或跨仓端到端已通过。
 
