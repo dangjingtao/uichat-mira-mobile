@@ -17,9 +17,13 @@ const channelFromBranch = value => {
  *
  * Environment branches are authoritative and isolated: predev/dev/test/prod
  * each keep their own update line. An explicit MIRA_RELEASE_CHANNEL is only
- * used when branch truth is unavailable. Unknown local/feature branches keep
- * the historical dev fallback for non-publishable development builds; release
- * workflows must always run from one of the four explicit environment branches.
+ * used when branch truth is unavailable, unless a release workflow sets
+ * MIRA_RELEASE_CHANNEL_LOCKED=true for a detached checkout whose GitHub event
+ * ref is not the source branch (for example workflow_run).
+ *
+ * Unknown local/feature branches keep the historical dev fallback for
+ * non-publishable development builds; release workflows must always use one of
+ * the four explicit environment channels.
  */
 const resolveReleaseChannel = ({ env = process.env, branchName = '' } = {}) => {
   const explicit = normalizeChannel(env.MIRA_RELEASE_CHANNEL);
@@ -27,6 +31,15 @@ const resolveReleaseChannel = ({ env = process.env, branchName = '' } = {}) => {
     throw new Error(
       `Invalid MIRA_RELEASE_CHANNEL: ${explicit}. Expected one of ${RELEASE_CHANNELS.join(', ')}.`,
     );
+  }
+
+  if (env.MIRA_RELEASE_CHANNEL_LOCKED === 'true') {
+    if (!explicit) {
+      throw new Error(
+        'MIRA_RELEASE_CHANNEL_LOCKED=true requires MIRA_RELEASE_CHANNEL.',
+      );
+    }
+    return explicit;
   }
 
   const githubBranch =
