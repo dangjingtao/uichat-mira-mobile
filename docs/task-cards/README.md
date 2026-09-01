@@ -38,6 +38,7 @@
 | MOB-032 | 拾言结果优先 Review / Final Draft | **待实施** | Mobile；整理稿优先，Transcript / AI / Final Draft 合同不变 |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | **待实施** | Mobile；依赖 MOB-032 结构稳定后施工 |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | **待实施** | Mobile；负责人 `t-zt`，建议 030～033 后施工 |
+| MOB-035 | 远程连接状态诊断与会话错误分层 | **待实施** | Mobile 主责；必要时补 Desktop / Relay 权威在线信号 |
 
 ## 既有产品决策
 
@@ -162,3 +163,4 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工并合入 Mobil
 - `MOB-032-shiyan-result-first-review.md`
 - `MOB-033-shiyan-processing-recovery.md`
 - `MOB-034-shiyan-secondary-actions-token-polish.md`
+- `MOB-035-remote-connection-diagnostics.md`

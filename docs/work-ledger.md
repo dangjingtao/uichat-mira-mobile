@@ -32,6 +32,7 @@
 - MOB-026：有条件完成，代码已进入当前 `dev`（`e628d5a`）；全局搜索已覆盖消息正文且不新增 Host search route；真实长会话 / 降级状态 smoke 挂账。
 - MOB-027：完成。代码已进入当前 `dev`（`327b2e4`）；Settings「插件」行已接现有 `Plugins` route；产品负责人于 2026-09-01 确认真机入口回归通过。
 - MOB-028：有条件完成，代码已进入当前 `dev`（`88d54a7`）；已加入 release-channel-aware 更新检查与确认下载边界，Android 仍只交系统 / 浏览器下载、不做静默安装；真实 release metadata / 下载 smoke 挂账。
+- MOB-035：待实施。把会话首页、Drawer、搜索页当前被压平的「加载会话失败」拆成未配对、手机离线、凭据失效、权限不足、Host 不可达与会话服务失败；只有 Desktop / Relay 提供权威 presence / reachability 证据时才允许显示「Mira Desktop 当前离线」，普通 `NETWORK_ERROR` 不得冒充设备离线。
 
 ### 拾言 MVP
 
@@ -88,6 +89,7 @@
 | MOB-032 | 拾言结果优先 Review / Final Draft | 待实施 | 独立修改 TaskDetail 结果层级 |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | 待实施 | **依赖 MOB-032**；032 合入后基于最新 `dev` 施工 |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | 待实施 | **负责人 `t-zt`**；建议 030～033 后施工 |
+| MOB-035 | 远程连接状态诊断与会话错误分层 | 待实施 | Mobile 先保留结构化失败原因；若缺 Host 在线权威信号，再补 Desktop / Relay 最小合同 |
 
 ## 2026-08-29 Dogfood Follow-up 并行规则
 
@@ -171,7 +173,7 @@ MOB-034 (`t-zt`)
 
 ## 详细任务卡
 
-`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-034 的详细范围均在 `docs/task-cards/`。
+`docs/task-cards/README.md` 是任务卡索引；MOB-007～MOB-035 的详细范围均在 `docs/task-cards/`。
 
 ## 历史追溯
 

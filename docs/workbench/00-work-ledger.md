@@ -40,12 +40,13 @@
 | MOB-028 | 关于页版本更新检查与确认下载 | REVIEW | Existing code `88d54a7` superseded in release-source semantics by MOB-028A/B; retain UI/interaction work, replace GitHub runtime update source |
 | MOB-028A | R2 分支发行真相与 Manifest | TODO | R2-only release truth; predev/dev/test/prod isolated; publish `latest.json` last |
 | MOB-028B | R2 分支隔离更新客户端 | TODO | Depends on MOB-028A; app reads only its own R2 channel manifest and downloads same-channel signed APK |
-| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Code `24513fb`; dual-platform device smoke |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Product owner conditionally accepted on 2026-09-01; code `24513fb`; dual-platform device smoke pending; Audio Player visual/component debt assigned to MOB-031 |
 | MOB-030 | 拾言首页与统一记录入口 | TODO | Start from latest `dev` |
 | MOB-031 | 拾言确认页主次交互收口 | TODO | Start from latest `dev` |
 | MOB-032 | 拾言结果优先 Review / Final Draft | TODO | Independent TaskDetail work |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | TODO | Owner `t-zt`; after MOB-030..033 |
+| MOB-035 | 远程连接状态诊断与会话错误分层 | TODO | Distinguish unpaired/auth/permission/mobile-offline/Host-unreachable/session failures; never infer Host offline without authoritative evidence |
 
 `PASS` 只表示仓库验收证据和必要的产品/机器观察均已完成。`REVIEW` 不得被解释为真实设备、Host、Cloud、Provider 或跨仓端到端已通过。
 
