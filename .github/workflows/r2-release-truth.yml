@@ -66,6 +66,7 @@ jobs:
             source_run_id=$(gh api \
               --method GET \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}/runs" \
+              -f branch="$RELEASE_CHANNEL" \
               -f head_sha="$GITHUB_SHA" \
               -f event='push' \
               -f per_page=20 \
@@ -76,24 +77,38 @@ jobs:
               continue
             fi
 
-            status=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${source_run_id}" --jq '.status')
+            source_run=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${source_run_id}")
+            source_branch=$(printf '%s' "$source_run" | jq -r '.head_branch // empty')
+            source_sha=$(printf '%s' "$source_run" | jq -r '.head_sha // empty')
+            source_event=$(printf '%s' "$source_run" | jq -r '.event // empty')
+            source_path=$(printf '%s' "$source_run" | jq -r '.path // empty')
+
+            if [ "$source_branch" != "$RELEASE_CHANNEL" ] \
+              || [ "$source_sha" != "$GITHUB_SHA" ] \
+              || [ "$source_event" != 'push' ] \
+              || [ "$source_path" != ".github/workflows/${workflow_file}" ]; then
+              echo "Rejecting canonical CI candidate ${source_run_id}: branch=${source_branch} sha=${source_sha} event=${source_event} path=${source_path}" >&2
+              exit 1
+            fi
+
+            status=$(printf '%s' "$source_run" | jq -r '.status')
             if [ "$status" != 'completed' ]; then
               sleep 10
               continue
             fi
 
-            conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${source_run_id}" --jq '.conclusion')
+            conclusion=$(printf '%s' "$source_run" | jq -r '.conclusion')
             if [ "$conclusion" != 'success' ]; then
               echo "Canonical ${workflow_file} run ${source_run_id} concluded ${conclusion}; R2 release truth will not move." >&2
               exit 1
             fi
 
             echo "run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
-            echo "Canonical CI succeeded: ${workflow_file} run ${source_run_id}"
+            echo "Canonical CI succeeded for ${RELEASE_CHANNEL}: ${workflow_file} run ${source_run_id}"
             exit 0
           done
 
-          echo "Timed out waiting for canonical ${workflow_file} run for ${GITHUB_SHA}." >&2
+          echo "Timed out waiting for canonical ${workflow_file} run for ${RELEASE_CHANNEL}@${GITHUB_SHA}." >&2
           exit 1
 
       - name: Download signed release from canonical CI
