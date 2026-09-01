@@ -71,6 +71,12 @@ describe('MOB-028A release truth', () => {
     ).toThrow('Invalid MIRA_RELEASE_CHANNEL');
   });
 
+  it('declares predev as predev in the canonical predev workflow', () => {
+    const workflow = readSource('.github/workflows/predev-ci.yml');
+    expect(workflow).toContain('MIRA_RELEASE_CHANNEL: predev');
+    expect(workflow).not.toContain('MIRA_RELEASE_CHANNEL: dev\n');
+  });
+
   it('creates branch-qualified display versions and isolated R2 prefixes', () => {
     expect(displayVersionForChannel('0.2.11', 'predev')).toBe('0.2.11-predev');
     expect(displayVersionForChannel('0.2.11', 'dev')).toBe('0.2.11-dev');
@@ -101,15 +107,25 @@ describe('MOB-028A release truth', () => {
     });
   });
 
-  it('publishes latest.json only after versioned assets are verified', () => {
+  it('rejects different bytes for an already published branch+version', () => {
     const publisher = readSource('scripts/publish-r2-release-truth.sh');
-    const verifyIndex = publisher.indexOf('if upload_assets && verify_assets');
+    expect(publisher).toContain('verify_existing_version');
+    expect(publisher).toContain('Version collision for ${channel}/${version}');
+    expect(publisher).toContain('Bump package.json.version before publishing');
+    expect(publisher).toContain('Incomplete immutable R2 release already exists');
+  });
+
+  it('publishes latest.json only after immutable assets and latest mirrors are verified', () => {
+    const publisher = readSource('scripts/publish-r2-release-truth.sh');
+    const immutableVerifyIndex = publisher.indexOf('verify_existing_version');
+    const mirrorVerifyIndex = publisher.indexOf('if upload_latest_mirrors && verify_latest_mirrors');
     const manifestUploadIndex = publisher.indexOf('aws s3 cp "$manifest"');
 
     expect(publisher).toContain('releases/${version}');
     expect(publisher).toContain("--cache-control 'public, max-age=31536000, immutable'");
-    expect(verifyIndex).toBeGreaterThan(-1);
-    expect(manifestUploadIndex).toBeGreaterThan(verifyIndex);
+    expect(immutableVerifyIndex).toBeGreaterThan(-1);
+    expect(mirrorVerifyIndex).toBeGreaterThan(immutableVerifyIndex);
+    expect(manifestUploadIndex).toBeGreaterThan(mirrorVerifyIndex);
   });
 
   it('keeps the iOS installed marketing version aligned with package.json', () => {
