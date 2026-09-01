@@ -45,12 +45,15 @@ describe('fetchLatestRelease', () => {
   it.each(['predev', 'dev', 'test', 'prod'] as const)(
     'requests only the %s channel manifest',
     async (channel) => {
-      const fetchImpl = jest.fn(async () => jsonResponse(manifest(channel)));
+      let requestedUrl = '';
+      const fetchImpl = async (url: string) => {
+        requestedUrl = url;
+        return jsonResponse(manifest(channel));
+      };
 
       const result = await fetchLatestRelease(channel, fetchImpl);
 
-      expect(fetchImpl).toHaveBeenCalledTimes(1);
-      expect(fetchImpl.mock.calls[0][0]).toBe(manifestUrlForChannel(channel));
+      expect(requestedUrl).toBe(manifestUrlForChannel(channel));
       expect(result.displayVersion).toBe(
         channel === 'prod' ? '0.2.10' : `0.2.10-${channel}`,
       );
@@ -144,14 +147,16 @@ describe('fetchLatestRelease', () => {
   });
 
   it('does not contact GitHub Releases', async () => {
-    const fetchImpl = jest.fn(async (url: string) => {
+    let calls = 0;
+    const fetchImpl = async (url: string) => {
+      calls += 1;
       expect(url).not.toContain('api.github.com');
       expect(url).not.toContain('/releases');
       return jsonResponse(manifest('dev'));
-    });
+    };
 
     await fetchLatestRelease('dev', fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(1);
   });
 });
 
