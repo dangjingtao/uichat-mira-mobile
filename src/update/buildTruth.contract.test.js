@@ -1,15 +1,33 @@
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { resolveReleaseChannel } = require('../../scripts/resolve-release-channel');
+const {
+  createLatestManifest,
+  displayVersionForChannel,
+  r2LatestPrefixFor,
+  r2ReleasePrefixFor,
+} = require('../../scripts/create-r2-latest-manifest');
 
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
+const SHA256 = 'a'.repeat(64);
 
-describe('MOB-028 build truth', () => {
-  it('keeps dev and prod comparisons isolated by branch truth', () => {
-    expect(resolveReleaseChannel({ env: {}, branchName: 'dev' })).toBe('dev');
-    expect(resolveReleaseChannel({ env: {}, branchName: 'prod' })).toBe('prod');
+describe('MOB-028A release truth', () => {
+  it('keeps predev, dev, test and prod isolated by branch truth', () => {
+    for (const channel of ['predev', 'dev', 'test', 'prod']) {
+      expect(resolveReleaseChannel({ env: {}, branchName: channel })).toBe(channel);
+      expect(
+        resolveReleaseChannel({
+          env: {
+            MIRA_RELEASE_CHANNEL: 'dev',
+            GITHUB_REF_NAME: channel,
+          },
+          branchName: '',
+        }),
+      ).toBe(channel);
+    }
+  });
 
-    // GitHub PR base is authoritative even if a stale workflow-level env says dev.
+  it('keeps PR base truth authoritative over stale workflow env', () => {
     expect(
       resolveReleaseChannel({
         env: { MIRA_RELEASE_CHANNEL: 'dev', GITHUB_BASE_REF: 'prod' },
@@ -18,20 +36,80 @@ describe('MOB-028 build truth', () => {
     ).toBe('prod');
     expect(
       resolveReleaseChannel({
-        env: { MIRA_RELEASE_CHANNEL: 'prod', GITHUB_BASE_REF: 'dev' },
+        env: { MIRA_RELEASE_CHANNEL: 'dev', GITHUB_BASE_REF: 'test' },
         branchName: '',
       }),
-    ).toBe('dev');
+    ).toBe('test');
   });
 
-  it('defaults feature/local unknown branches to dev and rejects invalid explicit channels', () => {
-    expect(resolveReleaseChannel({ env: {}, branchName: 'feature/mob-028' })).toBe('dev');
+  it('supports a locked CI channel for detached release checkouts', () => {
+    expect(
+      resolveReleaseChannel({
+        env: {
+          MIRA_RELEASE_CHANNEL: 'test',
+          MIRA_RELEASE_CHANNEL_LOCKED: 'true',
+          GITHUB_REF_NAME: 'dev',
+        },
+        branchName: '',
+      }),
+    ).toBe('test');
+    expect(() =>
+      resolveReleaseChannel({
+        env: { MIRA_RELEASE_CHANNEL_LOCKED: 'true' },
+        branchName: '',
+      }),
+    ).toThrow('requires MIRA_RELEASE_CHANNEL');
+  });
+
+  it('keeps unknown local branches non-publishable by convention and rejects invalid explicit channels', () => {
+    expect(resolveReleaseChannel({ env: {}, branchName: 'feature/mob-028a' })).toBe('dev');
     expect(() =>
       resolveReleaseChannel({
         env: { MIRA_RELEASE_CHANNEL: 'preview' },
-        branchName: 'feature/mob-028',
+        branchName: 'feature/mob-028a',
       }),
     ).toThrow('Invalid MIRA_RELEASE_CHANNEL');
+  });
+
+  it('creates branch-qualified display versions and isolated R2 prefixes', () => {
+    expect(displayVersionForChannel('0.2.11', 'predev')).toBe('0.2.11-predev');
+    expect(displayVersionForChannel('0.2.11', 'dev')).toBe('0.2.11-dev');
+    expect(displayVersionForChannel('0.2.11', 'test')).toBe('0.2.11-test');
+    expect(displayVersionForChannel('0.2.11', 'prod')).toBe('0.2.11');
+
+    expect(r2LatestPrefixFor('test')).toBe('mira/mobile/test/latest');
+    expect(r2ReleasePrefixFor('dev', '0.2.11')).toBe(
+      'mira/mobile/dev/releases/0.2.11',
+    );
+  });
+
+  it('points latest metadata to an immutable same-channel versioned APK', () => {
+    expect(
+      createLatestManifest({
+        version: '0.2.11',
+        channel: 'dev',
+        sha256: SHA256,
+        commit: 'abc123',
+      }),
+    ).toEqual({
+      version: '0.2.11',
+      channel: 'dev',
+      displayVersion: '0.2.11-dev',
+      apk: 'releases/0.2.11/uichat-mira-mobile-release.apk',
+      sha256: SHA256,
+      commit: 'abc123',
+    });
+  });
+
+  it('publishes latest.json only after versioned assets are verified', () => {
+    const publisher = readSource('scripts/publish-r2-release-truth.sh');
+    const verifyIndex = publisher.indexOf('if upload_assets && verify_assets');
+    const manifestUploadIndex = publisher.indexOf('aws s3 cp "$manifest"');
+
+    expect(publisher).toContain('releases/${version}');
+    expect(publisher).toContain("--cache-control 'public, max-age=31536000, immutable'");
+    expect(verifyIndex).toBeGreaterThan(-1);
+    expect(manifestUploadIndex).toBeGreaterThan(verifyIndex);
   });
 
   it('keeps the iOS installed marketing version aligned with package.json', () => {
