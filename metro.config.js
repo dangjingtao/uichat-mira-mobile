@@ -26,12 +26,13 @@ const releaseChannel = resolveReleaseChannel({
   env: process.env,
   branchName: currentBranch(),
 });
+const channelModuleFilename = releaseChannel === 'test' ? 'test-channel.ts' : `${releaseChannel}.ts`;
 const channelModulePath = path.resolve(
   __dirname,
   'src',
   'update',
   'channel',
-  `${releaseChannel}.ts`,
+  channelModuleFilename,
 );
 
 /**
