@@ -31,6 +31,11 @@
 | MOB-027 | 设置页插件入口恢复可用 | **待实施** | Mobile；最小接线现有 `Plugins` route |
 | MOB-028 | 关于页版本更新检查与确认下载 | **待实施** | Mobile；release channel 隔离 + signed APK 下载 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **待实施** | Mobile；可能触碰双平台 native audio |
+| MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
+| MOB-031 | 拾言确认页主次交互收口 | **待实施** | Mobile；基于现有播放器 / Scene Sheet 收轻主路径 |
+| MOB-032 | 拾言结果优先 Review / Final Draft | **待实施** | Mobile；整理稿优先，Transcript / AI / Final Draft 合同不变 |
+| MOB-033 | 拾言处理详情与单阶段失败恢复 | **待实施** | Mobile；依赖 MOB-032 结构稳定后施工 |
+| MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | **待实施** | Mobile；负责人 `t-zt`，建议 030～033 后施工 |
 
 ## 既有产品决策
 
@@ -46,6 +51,34 @@
 - MOB-027 是明确的 Settings -> Plugins 接线回归，保持最小改动。
 - MOB-028 必须区分 dev / prod release channel；用户确认后触发系统 / 浏览器下载，不在本卡实现静默安装。
 - MOB-029 保持拾言“录音结束 -> 确认标题 / 场景 -> 提交”产品合同，仅收口确认页播放器、场景修改方式与 Cloud 配置入口。
+
+## 2026-09-01 拾言 UX Follow-up
+
+拾言真实烟测通过后进入交互收口阶段。MOB-030～034 **不改变 PRD 功能边界**，只调整信息架构、默认层级、交互入口与视觉一致性。
+
+共同原则：
+
+- PRD 是产品边界，不能因 UI 优化增删功能；
+- `TECHNICAL_DESIGN.md` 决定 LocalCapture / CaptureTask / Stage / authoritative state；
+- 设计稿只表达信息层级与交互意图，实际颜色、圆角、间距、字体、状态色等必须使用现有 Design Token；
+- 主路径保持轻量，低频能力优先使用小按钮、`···`、Bottom Sheet / Action Sheet、折叠区等渐进披露方式；
+- 不因为隐藏技术细节而削弱失败恢复、Transcript、Final Draft、Share / Delivery 等 PRD 能力。
+
+集成顺序：
+
+```text
+MOB-030 ─┐
+         ├─ 可并行
+MOB-031 ─┘
+
+MOB-032
+   ↓
+MOB-033
+   ↓
+MOB-034  (`t-zt`，最终 UI / token 收口)
+```
+
+MOB-030 / MOB-031 可并行；MOB-032 可与前两张并行，但不要与 MOB-033 同时大改 TaskDetail。MOB-033 必须基于 MOB-032 稳定后的最新 `dev`。MOB-034 最后施工，避免在旧页面结构上提前做一次必冲突的视觉重排。
 
 ## 拾言（Shiyan）MVP 规则
 
@@ -120,3 +153,8 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工并合入 Mobil
 - `MOB-027-settings-plugin-entry.md`
 - `MOB-028-app-update-check-download.md`
 - `MOB-029-shiyan-confirmation-ux.md`
+- `MOB-030-shiyan-home-unified-records.md`
+- `MOB-031-shiyan-confirmation-hierarchy.md`
+- `MOB-032-shiyan-result-first-review.md`
+- `MOB-033-shiyan-processing-recovery.md`
+- `MOB-034-shiyan-secondary-actions-token-polish.md`
