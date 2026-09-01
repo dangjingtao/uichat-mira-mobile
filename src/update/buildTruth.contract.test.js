@@ -77,6 +77,17 @@ describe('MOB-028A release truth', () => {
     expect(workflow).not.toContain('MIRA_RELEASE_CHANNEL: dev\n');
   });
 
+  it('binds canonical release artifacts to both branch and commit', () => {
+    const workflow = readSource('.github/workflows/r2-release-truth.yml');
+    expect(workflow).toContain('-f branch="$RELEASE_CHANNEL"');
+    expect(workflow).toContain('-f head_sha="$GITHUB_SHA"');
+    expect(workflow).toContain('source_branch=$(printf');
+    expect(workflow).toContain('source_sha=$(printf');
+    expect(workflow).toContain('source_path=$(printf');
+    expect(workflow).toContain('[ "$source_branch" != "$RELEASE_CHANNEL" ]');
+    expect(workflow).toContain('[ "$source_sha" != "$GITHUB_SHA" ]');
+  });
+
   it('creates branch-qualified display versions and isolated R2 prefixes', () => {
     expect(displayVersionForChannel('0.2.11', 'predev')).toBe('0.2.11-predev');
     expect(displayVersionForChannel('0.2.11', 'dev')).toBe('0.2.11-dev');
@@ -87,6 +98,14 @@ describe('MOB-028A release truth', () => {
     expect(r2ReleasePrefixFor('dev', '0.2.11')).toBe(
       'mira/mobile/dev/releases/0.2.11',
     );
+  });
+
+  it('shows the installed channel-qualified version in About', () => {
+    const about = readSource('src/screens/AboutScreen.tsx');
+    expect(about).toContain("releaseChannel === 'prod' ? version : `${version}-${releaseChannel}`");
+    expect(about).toContain("predev: '预开发'");
+    expect(about).toContain("test: '测试'");
+    expect(about).toContain('installedDisplayVersion');
   });
 
   it('points latest metadata to an immutable same-channel versioned APK', () => {
@@ -110,9 +129,19 @@ describe('MOB-028A release truth', () => {
   it('rejects different bytes for an already published branch+version', () => {
     const publisher = readSource('scripts/publish-r2-release-truth.sh');
     expect(publisher).toContain('verify_existing_version');
+    expect(publisher).toContain('remote_apk_digest=$(aws s3 cp');
+    expect(publisher).toContain('| sha256sum');
+    expect(publisher).toContain('[ "$local_digest" != "$remote_apk_digest" ]');
     expect(publisher).toContain('Version collision for ${channel}/${version}');
     expect(publisher).toContain('Bump package.json.version before publishing');
     expect(publisher).toContain('Incomplete immutable R2 release already exists');
+  });
+
+  it('fails closed when immutable R2 object state cannot be determined', () => {
+    const publisher = readSource('scripts/publish-r2-release-truth.sh');
+    expect(publisher).toContain('(404|Not Found|NoSuchKey)');
+    expect(publisher).toContain('Unable to determine R2 object state');
+    expect(publisher).toContain('if [ "$state" -ne 1 ]; then exit 1; fi');
   });
 
   it('publishes latest.json only after immutable assets and latest mirrors are verified', () => {
