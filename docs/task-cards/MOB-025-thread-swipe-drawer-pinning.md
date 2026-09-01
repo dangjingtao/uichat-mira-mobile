@@ -1,6 +1,6 @@
 # MOB-025：线程右滑操作与 Drawer 置顶分组修复
 
-状态：**DOING / PR #83 Review 中**（旧实现 `1035da3` 已被 Android 真机失败证据推翻；新实现尚未取得最终 CI + Android 真机验收）
+状态：**REVIEW**（PR #83 已合入 `dev`；最终 CI / AI Review 已通过，Android 真机 dogfood 待产品验收）
 
 负责人：`mob_025_thread_swipe_drawer_pinning`
 
@@ -21,7 +21,7 @@
 
 ## 2026-09-01 Reimplementation Evidence
 
-PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而不是继续调 `PanResponder` 参数：
+PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而不是继续调 `PanResponder` 参数，并以 squash commit `01fd9575c471b8003692b8f92f79b81440a0cfc3` 合入 `dev`：
 
 - `SessionListScreen` 删除 Session row 的 `PanResponder`、capture、`dx` / `vx` 与 `Animated.Value` 手势实现；
 - 新增 `SessionSwipeRow`，使用 React Native 原生横向 `ScrollView` 承担横向 reveal，外层 `FlatList` 继续承担纵向滚动；
@@ -30,9 +30,19 @@ PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而�
 - 保持单行打开、点击已打开行收起、纵向列表开始滚动时收起操作区；
 - 保持 MOB-007 device-local pin、Host-authoritative delete、Drawer pinned 分组与原有导航合同不变；
 - 44pt settle threshold 抽成纯函数并补单元测试；
-- 自查发现父组件 rerender 可能打断 settle 动画后，已在后续提交中改为 callback ref，并同时处理 momentum scroll end。
+- 自查发现父组件 rerender 可能打断 settle 动画后，已改为 callback ref，并同时处理 momentum scroll end；旧 head 上 Codex 指出的同一 P2 已在最终 head 前修复并关闭。
 
-PR #83 第一轮 head 的 typecheck / lint / Jest 已通过，OpenCode Review 无高置信 P0-P2 finding；最终 head 仍必须重新取得完整 CI 证据。即使 CI 全绿，本卡仍需 Android 真机 dogfood 后才可进入 PASS。
+最终 PR head `ff84ea2d89f09e78dcf16c67995a20acc7870153` 的自动证据：
+
+- `npm run typecheck`：通过；
+- `npm run lint`：通过；
+- Jest：通过；
+- Android debug APK：构建并上传成功；
+- iOS simulator app：构建并上传成功；
+- unsigned iPhone app / IPA：构建、打包校验并上传成功；
+- Mira Mobile OpenCode PR Review：`No high-confidence P0-P2 findings`。
+
+自动门禁已足够支持从 DOING 进入 REVIEW，但仍**不能替代 Android 真机手势验收**。MOB-025 在产品负责人确认真机右滑、纵向滚动、点击、置顶 / 删除与持久化行为之前不得进入 PASS。
 
 ## 背景
 
@@ -143,12 +153,12 @@ npm test -- --runInBand
 
 ## Parallel / Integration
 
-若 `dev` 在 PR Review 期间继续前进，PR #83 必须在合并前确认不落后于当前 `dev`，且不得覆盖其他 Mobile 卡的共享页面 / 台账改动。
+PR #83 已在与当时最新 `dev` 对齐后合入，没有覆盖 MOB-035 等并行台账改动。后续若真机验收再发现问题，从最新 `dev` 开新的 fix，不在已合并历史上追加未审查修复。
 
 ## Open / Unknown
 
-当前核心未知项已经从“继续怎么调 PanResponder”收敛为：**新的 native horizontal ScrollView 方案是否在 Android 真机上稳定满足右滑、纵向滚动与点击三者共存。** 这个问题只能由最终 CI + 真机 dogfood 关闭。
+当前唯一剩余未知项是：**新的 native horizontal ScrollView 方案是否在 Android 真机上稳定满足右滑、纵向滚动与点击三者共存。** 自动 CI 与平台构建不能关闭这个问题。
 
 ## Handoff
 
-PR #83 合并前：确认最终 head 的 typecheck / lint / Jest、Android debug build、iOS simulator / unsigned device build 与 AI Review；合并后状态进入 REVIEW，不进入 PASS。产品负责人完成 Android 真机验收后再决定是否 PASS。
+产品负责人在 Android 真机至少完成：右滑打开 / 收起、纵向滚动、点击进入、置顶 / 取消置顶、删除确认及一次重启后的 pin 持久化。通过后可把 MOB-025 从 REVIEW 更新为 PASS；任一核心路径失败则重新进入 DOING，并以真实复现为新修复基线。
