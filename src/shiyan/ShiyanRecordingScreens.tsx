@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,9 +18,10 @@ import {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
+  Check,
+  ChevronRight,
   Cloud,
   FileAudio,
-  History,
   Mic2,
   Pause,
   Play,
@@ -42,6 +44,11 @@ import {
   localCaptureRepository,
   type LocalCaptureMetadata,
 } from './recording/localCaptureRepository';
+import { UnifiedRecordRow } from './UnifiedRecordRow';
+import {
+  loadUnifiedRecords,
+  type UnifiedRecordPresentation,
+} from './unifiedRecords';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -77,41 +84,6 @@ function ScreenShell({
   );
 }
 
-function ActionCard({
-  icon: Icon,
-  title,
-  description,
-  onPress,
-}: {
-  icon: React.ComponentType<{ size?: number; color?: string }>;
-  title: string;
-  description: string;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: pressed ? colors.bg.soft : colors.bg.card,
-          borderColor: colors.border.default,
-        },
-      ]}
-    >
-      <View style={[styles.iconWrap, { backgroundColor: colors.bg.soft }]}>
-        <Icon size={22} color={colors.primary} />
-      </View>
-      <View style={styles.cardText}>
-        <Text style={[styles.cardTitle, { color: colors.text.ink }]}>{title}</Text>
-        <Text style={[styles.cardDescription, { color: colors.text.soft }]}>{description}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 const formatDuration = (durationMs: number) => {
   const totalSeconds = Math.floor(durationMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -130,24 +102,68 @@ const newRecordingId = () =>
 export function ShiyanHomeScreen() {
   const navigation = useNavigation<NavProp>();
   const { colors } = useTheme();
-  const [draftCount, setDraftCount] = useState(0);
+  const [selectedSceneId, setSelectedSceneId] = useState(
+    SHIYAN_BUILT_IN_SCENES[0]?.id ?? '',
+  );
+  const [customScene, setCustomScene] = useState<ShiyanSceneDefinition | null>(() =>
+    getCustomSceneDraft(),
+  );
+  const [sceneSheetOpen, setSceneSheetOpen] = useState(false);
+  const [recentRecords, setRecentRecords] = useState<readonly UnifiedRecordPresentation[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [recordsWarning, setRecordsWarning] = useState('');
+
+  const scenes = useMemo(
+    () => (customScene ? [...SHIYAN_BUILT_IN_SCENES, customScene] : [...SHIYAN_BUILT_IN_SCENES]),
+    [customScene],
+  );
+  const selectedScene =
+    scenes.find((scene) => scene.id === selectedSceneId) ?? scenes[0] ?? null;
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      localCaptureRepository
-        .listRecoverable()
-        .then((drafts) => {
-          if (active) setDraftCount(drafts.length);
+      setCustomScene(getCustomSceneDraft());
+      setRecordsLoading(true);
+      setRecordsWarning('');
+      void loadUnifiedRecords()
+        .then((result) => {
+          if (!active) return;
+          setRecentRecords(result.records.slice(0, 3));
+          setRecordsWarning(result.cloudError ? '部分 Cloud 记录暂时不可用。' : '');
         })
         .catch(() => {
-          if (active) setDraftCount(0);
+          if (!active) return;
+          setRecentRecords([]);
+          setRecordsWarning('暂时无法读取记录。');
+        })
+        .finally(() => {
+          if (active) setRecordsLoading(false);
         });
       return () => {
         active = false;
       };
     }, []),
   );
+
+  const openRecord = (record: UnifiedRecordPresentation) => {
+    if (record.taskId) {
+      navigation.navigate('ShiyanTaskDetail', {
+        taskId: record.taskId,
+        localCaptureId: record.localCaptureId,
+      });
+      return;
+    }
+    navigation.navigate('ShiyanCaptureConfirm', { captureId: record.localCaptureId });
+  };
+
+  const startRecording = () => {
+    if (!selectedScene) return;
+    navigation.navigate('ShiyanRecord', {
+      sceneId: selectedScene.id,
+      sceneName: selectedScene.name,
+    });
+  };
 
   return (
     <ScreenShell
@@ -163,31 +179,167 @@ export function ShiyanHomeScreen() {
         </Pressable>
       }
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.hero, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
-          <Mic2 size={28} color={colors.primary} />
-          <Text style={[styles.heroTitle, { color: colors.text.ink }]}>先说下来，再慢慢整理。</Text>
-          <Text style={[styles.heroText, { color: colors.text.soft }]}>录音先保存在手机本地。结束后确认标题和场景，再决定后续处理。</Text>
+      <ScrollView contentContainerStyle={styles.homeContent}>
+        <View style={styles.intro}>
+          <Text style={[styles.introTitle, { color: colors.text.ink }]}>先说下来，再慢慢整理。</Text>
         </View>
-        <ActionCard
-          icon={Mic2}
-          title="开始拾言"
-          description="选择场景后开始本地录音，不依赖 Desktop 或网络。"
-          onPress={() => navigation.navigate('ShiyanSceneSelect')}
-        />
-        <ActionCard
-          icon={FileAudio}
-          title="本地录音草稿"
-          description={draftCount > 0 ? `${draftCount} 条录音待确认或提交。` : '查看已结束但尚未提交的本地录音。'}
-          onPress={() => navigation.navigate('ShiyanLocalDrafts')}
-        />
-        <ActionCard
-          icon={History}
-          title="历史任务"
-          description="查看已经进入处理流程的拾言任务。"
-          onPress={() => navigation.navigate('ShiyanHistory')}
-        />
+
+        <View
+          style={[
+            styles.startPanel,
+            { backgroundColor: colors.bg.card, borderColor: colors.border.default },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            disabled={!selectedScene}
+            onPress={startRecording}
+            style={({ pressed }) => [
+              styles.startButton,
+              { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+            ]}
+          >
+            <Mic2 size={20} color={colors.onPrimary} />
+            <Text style={[styles.startButtonText, { color: colors.onPrimary }]}>开始拾言</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="选择当前场景"
+            onPress={() => setSceneSheetOpen(true)}
+            style={({ pressed }) => [
+              styles.currentSceneRow,
+              { backgroundColor: pressed ? colors.bg.soft : colors.bg.card },
+            ]}
+          >
+            <View style={styles.currentSceneText}>
+              <Text style={[styles.currentSceneLabel, { color: colors.text.soft }]}>当前场景</Text>
+              <Text style={[styles.currentSceneName, { color: colors.text.ink }]}>
+                {selectedScene?.name ?? '请选择场景'}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.text.soft} />
+          </Pressable>
+        </View>
+
+        <View style={styles.recordsSection}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('ShiyanHistory')}
+            style={({ pressed }) => [styles.sectionHeader, pressed && { opacity: 0.65 }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>全部记录</Text>
+            <ChevronRight size={18} color={colors.text.soft} />
+          </Pressable>
+
+          {recentRecords.length > 0 ? (
+            <View
+              style={[
+                styles.recordGroup,
+                { backgroundColor: colors.bg.card, borderColor: colors.border.default },
+              ]}
+            >
+              {recentRecords.map((record, index) => (
+                <UnifiedRecordRow
+                  key={record.id}
+                  record={record}
+                  onPress={() => openRecord(record)}
+                  showDivider={index < recentRecords.length - 1}
+                />
+              ))}
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.recordsEmpty,
+                { backgroundColor: colors.bg.card, borderColor: colors.border.default },
+              ]}
+            >
+              <Text style={[styles.recordsEmptyText, { color: colors.text.soft }]}>
+                {recordsLoading ? '正在读取记录…' : '还没有拾言记录'}
+              </Text>
+            </View>
+          )}
+
+          {recordsWarning ? (
+            <Text style={[styles.recordsWarning, { color: colors.text.soft }]}>{recordsWarning}</Text>
+          ) : null}
+        </View>
       </ScrollView>
+
+      <Modal
+        visible={sceneSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSceneSheetOpen(false)}
+      >
+        <Pressable
+          accessibilityLabel="关闭场景选择"
+          style={styles.sheetBackdrop}
+          onPress={() => setSceneSheetOpen(false)}
+        >
+          <View
+            style={[styles.sheetPanel, { backgroundColor: colors.bg.card }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.sheetTitle, { color: colors.text.ink }]}>选择场景</Text>
+            <ScrollView style={styles.sheetList} bounces={false}>
+              {scenes.map((scene) => {
+                const selected = selectedScene?.id === scene.id;
+                return (
+                  <Pressable
+                    key={scene.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setSelectedSceneId(scene.id);
+                      setSceneSheetOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.sheetRow,
+                      { backgroundColor: pressed || selected ? colors.bg.soft : colors.bg.card },
+                    ]}
+                  >
+                    <View style={styles.sceneRowLeading}>
+                      <View
+                        style={[
+                          styles.sceneRadio,
+                          { borderColor: selected ? colors.primary : colors.border.default },
+                        ]}
+                      >
+                        {selected ? (
+                          <View style={[styles.sceneRadioDot, { backgroundColor: colors.primary }]} />
+                        ) : null}
+                      </View>
+                      <Text style={{ color: colors.text.ink, fontWeight: selected ? '600' : '400' }}>
+                        {scene.name}
+                      </Text>
+                    </View>
+                    {selected ? <Check size={18} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setSceneSheetOpen(false);
+                navigation.navigate('ShiyanSceneConfig');
+              }}
+              style={styles.sceneConfigLink}
+            >
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>配置自定义场景</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSceneSheetOpen(false)}
+              style={[styles.sheetCancelButton, { borderColor: colors.border.default }]}
+            >
+              <Text style={{ color: colors.text.ink, fontWeight: '600' }}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenShell>
   );
 }
@@ -453,12 +605,23 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 48 },
-  hero: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.sm },
-  heroTitle: { fontSize: 22, fontWeight: '700' },
-  heroText: { fontSize: 14, lineHeight: 21 },
-  card: { minHeight: 88, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
-  iconWrap: { width: 44, height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
-  cardText: { flex: 1, gap: 5 },
+  homeContent: { padding: spacing.lg, gap: spacing.xl, paddingBottom: 48 },
+  intro: { gap: spacing.xs },
+  introTitle: { fontSize: 22, fontWeight: '700' },
+  startPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  startButton: { minHeight: 56, borderRadius: radius.full, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  startButtonText: { fontSize: 16, fontWeight: '600' },
+  currentSceneRow: { minHeight: 52, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  currentSceneText: { flex: 1, gap: 2 },
+  currentSceneLabel: { fontSize: 12, lineHeight: 17 },
+  currentSceneName: { fontSize: 14, fontWeight: '600' },
+  recordsSection: { gap: spacing.sm },
+  sectionHeader: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 16, fontWeight: '600' },
+  recordGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
+  recordsEmpty: { minHeight: 72, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  recordsEmptyText: { fontSize: 13 },
+  recordsWarning: { fontSize: 12, lineHeight: 18 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDescription: { fontSize: 14, lineHeight: 20 },
   sceneCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: 7 },
@@ -480,4 +643,14 @@ const styles = StyleSheet.create({
   draftCard: { minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center' },
   draftMain: { flex: 1, padding: spacing.lg, gap: spacing.xs },
   trashButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', justifyContent: 'flex-end' },
+  sheetPanel: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: spacing.lg, maxHeight: '70%' },
+  sheetTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', paddingVertical: spacing.md },
+  sheetList: { paddingHorizontal: spacing.md },
+  sheetRow: { minHeight: 50, borderRadius: radius.md, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sceneRowLeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sceneRadio: { width: 18, height: 18, borderRadius: radius.full, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  sceneRadioDot: { width: 9, height: 9, borderRadius: radius.full },
+  sceneConfigLink: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs },
+  sheetCancelButton: { minHeight: 46, borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs },
 });
