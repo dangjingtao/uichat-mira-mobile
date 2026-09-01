@@ -28,7 +28,7 @@
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | **有条件完成**：Desktop #88 / Mobile #65 已合入 | Mobile + Desktop Host；真实已配对设备新建 Thread 跨端 smoke |
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **有条件完成**：代码 `1035da3` 已入 `dev` | Mobile；真机 dogfood smoke |
 | MOB-026 | 全局搜索命中消息正文 | **有条件完成**：代码 `e628d5a` 已入 `dev` | Mobile；长会话 / 降级状态 smoke |
-| MOB-027 | 设置页插件入口恢复可用 | **有条件完成**：代码 `327b2e4` 已入 `dev` | Mobile；真机入口回归 |
+| MOB-027 | 设置页插件入口恢复可用 | **完成**：代码 `327b2e4` 已入 `dev` | Mobile；2026-09-01 产品验收通过 |
 | MOB-028 | 关于页版本更新检查与确认下载 | **有条件完成**：代码 `88d54a7` 已入 `dev` | Mobile；release metadata / 下载 smoke |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **有条件完成**：代码 `24513fb` 已入 `dev` | Mobile；双平台真机 smoke |
 | MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
