@@ -1,12 +1,12 @@
 # MOB-028B：R2 分支隔离更新客户端
 
-状态：**待实施**
+状态：**DOING**（PR #84）
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
 目标分支：`dev`
 
-前置：`MOB-028A`
+前置：`MOB-028A`（PASS）
 
 ## 背景
 
@@ -157,6 +157,21 @@ Android smoke：
 - R2 manifest 请求失败可重试；
 - 其他 channel 即使版本更高也不会触发更新。
 
+## Current Implementation
+
+PR #84：`feature/mob-028b-r2-update-client -> dev`。
+
+当前实现方向：
+
+- 客户端只请求 `assets.tomz.io/mira/mobile/<current-channel>/latest/latest.json`；
+- manifest 必须匹配当前 channel、semantic version、display version、SHA-256 与 canonical versioned APK path；
+- Android 只打开同 channel 的 R2 signed Release APK；
+- iOS 在没有已签名可安装产物时只显示更新信息；
+- GitHub Releases API 已从当前 PR 的运行时更新实现中移除；
+- 自动化已覆盖四 channel 映射、channel mismatch、版本比较、网络/HTTP/非法 manifest、跨域/跨版本/`..`/latest mirror APK 路径拒绝。
+
+第一轮 CI 暴露一处测试类型推断问题，已在 PR head 修正；最终 CI / 最新 head AI Review 仍待通过后进入 REVIEW/PASS 判断。
+
 ## Handoff
 
-施工前先确认 MOB-028A 的 manifest schema 与 R2 prefix 已落地。若 A 的 schema 尚未稳定，不得在 B 中私自建立兼容层或第二套 manifest。
+施工前已确认 MOB-028A 的 manifest schema 与 R2 prefix 已落地，B 直接消费同一合同，不建立兼容层或第二套 manifest。
