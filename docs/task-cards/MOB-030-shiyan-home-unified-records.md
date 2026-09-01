@@ -1,12 +1,12 @@
 # MOB-030：拾言首页与统一记录入口
 
-状态：**待实施**
+状态：**施工中（PR #86）**
 
 负责人：`mob_030_shiyan_home_records`
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
-施工基线：从施工时最新 `dev` 创建独立 feature 分支；本卡首次派发基于 2026-09-01 当前 `dev`。
+施工基线：`dev @ c987df8b177a6ba8537899acc63a9fdfdf9cdf61`
 
 ## 背景
 
@@ -170,6 +170,20 @@ npm test -- --runInBand
 
 None。若统一列表实现需要改变 PRD 或 TECHNICAL_DESIGN 中的数据归属，停止施工并报告，不得自行修改合同。
 
+## Current Implementation
+
+PR #86：`feature/mob-030-shiyan-home-unified-records -> dev`。
+
+当前施工已落地：
+
+- `开始拾言` 已成为首页唯一主 CTA；
+- 首页主路径直接使用当前场景进入现有录音页，不再强迫经过整页场景选择；
+- 场景轻入口复用 MOB-029 已有 Sheet 的视觉/交互语义，并继续保留原 `ShiyanSceneSelect` 路由；
+- 新增 `UnifiedRecordPresentation` projection，只读取 LocalCapture、submission pointer 和 CaptureTask summary，不修改任何存储/domain schema；
+- `ShiyanHistory` 现有路由收口为 `全部记录`，最近记录与完整列表复用同一 projection 和 Row；
+- Cloud history 失败时仍保留本地记录，并明确显示 Cloud 数据暂不可用，不伪装成空列表；
+- 新增 projection/去重/Cloud 失败测试；第一轮 Typecheck/Lint/Jest 已通过，最终 head CI / AI Review 仍待收口。
+
 ## Handoff
 
-施工前先核对当前 `dev` 与上述文件。若现有实现已经提前完成本卡某项，不重复造第二套；保留正确实现，只补缺口。
+施工前已核对当前 `dev` 与上述文件。若现有实现已经提前完成本卡某项，不重复造第二套；保留正确实现，只补缺口。
