@@ -1,6 +1,6 @@
 # MOB-030：拾言首页与统一记录入口
 
-状态：**施工中（PR #86）**
+状态：**REVIEW（PR #86 已合并，待真机 / Cloud 验收）**
 
 负责人：`mob_030_shiyan_home_records`
 
@@ -172,9 +172,9 @@ None。若统一列表实现需要改变 PRD 或 TECHNICAL_DESIGN 中的数据�
 
 ## Current Implementation
 
-PR #86：`feature/mob-030-shiyan-home-unified-records -> dev`。
+PR #86 已 squash 合并到 `dev`，merge commit：`6065260750086aa19e58adb3f5e75b491a02cc41`。
 
-当前施工已落地：
+当前实现已落地：
 
 - `开始拾言` 已成为首页唯一主 CTA；
 - 首页主路径直接使用当前场景进入现有录音页，不再强迫经过整页场景选择；
@@ -182,8 +182,8 @@ PR #86：`feature/mob-030-shiyan-home-unified-records -> dev`。
 - 新增 `UnifiedRecordPresentation` projection，只读取 LocalCapture、submission pointer 和 CaptureTask summary，不修改任何存储/domain schema；
 - `ShiyanHistory` 现有路由收口为 `全部记录`，最近记录与完整列表复用同一 projection 和 Row；
 - Cloud history 失败时仍保留本地记录，并明确显示 Cloud 数据暂不可用，不伪装成空列表；
-- 新增 projection/去重/Cloud 失败测试；第一轮 Typecheck/Lint/Jest 已通过，最终 head CI / AI Review 仍待收口。
+- projection/去重/Cloud 失败、场景当前值/切换/录音参数与 canonical delivery route 合同测试已补齐；最终 head Typecheck/Lint/Jest 全绿，最新 OpenCode Review 无 P0-P2；Android/iOS 真机与真实 Shiyan Cloud smoke 仍待人工验收。
 
 ## Handoff
 
-施工前已核对当前 `dev` 与上述文件。若现有实现已经提前完成本卡某项，不重复造第二套；保留正确实现，只补缺口。
+代码已合并进入 `dev`。后续若人工验收发现 UI、平台或真实 Cloud 交互问题，在本卡继续补证据或修复；未完成真机 / Cloud 验收前保持 REVIEW，不标 PASS。
