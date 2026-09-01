@@ -34,7 +34,7 @@
 | MOB-022 | 拾言 GitHub Destination | REVIEW | Core merged; public route wiring pending |
 | MOB-023 | 拾言 E2E 验收与加固 | TODO | Blocked by MOB-020 and MOB-022 integration baseline |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | REVIEW | Desktop #88 / Mobile #65; cross-device smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | REVIEW | Code `1035da3`; device dogfood smoke |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | DOING | Reopened 2026-09-01 after repeated Android device failure; replace fragile custom PanResponder swipe path, then require real device evidence before REVIEW |
 | MOB-026 | 全局搜索命中消息正文 | REVIEW | Code `e628d5a`; long-session/degraded smoke |
 | MOB-027 | 设置页插件入口恢复可用 | PASS | Code `327b2e4`; device entry regression accepted by product owner on 2026-09-01 |
 | MOB-028 | 关于页版本更新检查与确认下载 | REVIEW | Existing code `88d54a7` superseded in release-source semantics by MOB-028A/B; retain UI/interaction work, replace GitHub runtime update source |
