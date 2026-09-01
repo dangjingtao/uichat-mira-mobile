@@ -1,6 +1,6 @@
 # MOB-028B：R2 分支隔离更新客户端
 
-状态：**DOING**（PR #84）
+状态：**PASS**（PR #84，squash merge `d8134ba`）
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
@@ -10,7 +10,7 @@
 
 ## 背景
 
-MOB-028 当前客户端通过 GitHub Releases API 获取最新版本与 APK asset URL。最新产品决策已改为：Mira Mobile 的运行时更新链路必须走 Cloudflare R2；每个构建只比较自己分支 / channel 的版本，不跨 channel 扫描、选择或下载。
+MOB-028 原客户端通过 GitHub Releases API 获取最新版本与 APK asset URL。最新产品决策已改为：Mira Mobile 的运行时更新链路必须走 Cloudflare R2；每个构建只比较自己分支 / channel 的版本，不跨 channel 扫描、选择或下载。
 
 ## 目标
 
@@ -95,7 +95,7 @@ MVP 继续交给系统 / 浏览器下载：
 
 ## GitHub Releases
 
-MOB-028 的客户端运行时链路必须移除对 GitHub Releases API 的依赖。
+MOB-028 的客户端运行时链路已经移除对 GitHub Releases API 的依赖。
 
 GitHub Release / Tag 可以继续由 CI 生成，作为：
 
@@ -103,11 +103,11 @@ GitHub Release / Tag 可以继续由 CI 生成，作为：
 - 版本追溯；
 - 人工查看。
 
-但 About 页版本检查、最新版本判断和 Android APK 下载不得依赖 GitHub Releases API / asset URL。
+但 About 页版本检查、最新版本判断和 Android APK 下载不依赖 GitHub Releases API / asset URL。
 
 ## Scope
 
-- 重构 `src/update/appUpdate.ts` 或等价 update service，改为解析 R2 `latest.json`。
+- 重构 `src/update/appUpdate.ts`，改为解析 R2 `latest.json`。
 - 移除客户端 GitHub Releases 列表扫描与 asset URL 选择逻辑。
 - 复用 MOB-028 现有 About UI 与交互，不重复重做页面。
 - channel mapping 只消费 MOB-028A 的 build truth。
@@ -125,7 +125,7 @@ GitHub Release / Tag 可以继续由 CI 生成，作为：
 
 ## Validation
 
-自动化至少覆盖：
+自动化覆盖：
 
 1. dev 只请求 dev manifest；
 2. test / predev / prod 分别只请求自身 manifest；
@@ -139,39 +139,32 @@ GitHub Release / Tag 可以继续由 CI 生成，作为：
 10. 绝对 URL、`..`、跨 channel / 跨版本路径被拒绝；
 11. GitHub Releases API 不再出现在客户端更新请求路径中。
 
-执行：
+最终门禁：
 
 ```text
-npm run typecheck
-npm run lint
-npm test -- --runInBand
+npm run typecheck  -> PASS
+npm run lint       -> PASS
+npm test -- --runInBand -> PASS
+OpenCode PR Review -> NO_BLOCKING_FINDINGS / no P0-P2
 ```
 
-Android smoke：
+MOB-028A 已提供真实 `dev/0.2.11` R2 manifest、signed APK checksum 与发布成功证据，因此 B 的客户端合同不是只对 mock schema 验证，而是与已落地的发行真相一致。
 
-- 当前 channel 无更新无红点；
-- 当前 channel 有更高版本出现红点；
-- 点击后先确认；
-- 取消不下载；
-- 确认后打开当前 channel 的版本化 R2 signed APK；
-- R2 manifest 请求失败可重试；
-- 其他 channel 即使版本更高也不会触发更新。
+原任务卡列出的 Android 真机下载 / 取消 / 系统安装确认 smoke 未在本次 PR Review 中独立执行。产品负责人于 2026-09-02 基于当前自动化、AI Review、A 卡真实 R2 发布证据与实现范围，接受本卡为 PASS；上述真机行为继续作为版本回归 / dogfood 观察项，不再阻断 MOB-028B 状态。
 
-## Current Implementation
+## Final Implementation
 
-PR #84：`feature/mob-028b-r2-update-client -> dev`。
+PR #84 已 squash 合入 `dev`，merge commit `d8134ba0642e9b130eacea8c1b6761041add994e`。
 
-当前实现方向：
+最终实现：
 
 - 客户端只请求 `assets.tomz.io/mira/mobile/<current-channel>/latest/latest.json`；
 - manifest 必须匹配当前 channel、semantic version、display version、SHA-256 与 canonical versioned APK path；
 - Android 只打开同 channel 的 R2 signed Release APK；
 - iOS 在没有已签名可安装产物时只显示更新信息；
-- GitHub Releases API 已从当前 PR 的运行时更新实现中移除；
-- 自动化已覆盖四 channel 映射、channel mismatch、版本比较、网络/HTTP/非法 manifest、跨域/跨版本/`..`/latest mirror APK 路径拒绝。
-
-第一轮 CI 暴露一处测试类型推断问题，已在 PR head 修正；最终 CI / 最新 head AI Review 仍待通过后进入 REVIEW/PASS 判断。
+- GitHub Releases API 已从运行时更新实现中移除；
+- 自动化覆盖四 channel 映射、channel mismatch、版本比较、网络/HTTP/非法 manifest、跨域/跨版本/`..`/latest mirror APK 路径拒绝。
 
 ## Handoff
 
-施工前已确认 MOB-028A 的 manifest schema 与 R2 prefix 已落地，B 直接消费同一合同，不建立兼容层或第二套 manifest。
+MOB-028A / MOB-028B 的 R2 release truth 与 runtime client 合同均已落地。后续若修改 manifest schema、R2 prefix 或 channel truth，必须同时维护 A/B 合同与对应自动化，不允许重新引入第二套更新源。
