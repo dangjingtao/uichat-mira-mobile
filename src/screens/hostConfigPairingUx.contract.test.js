@@ -41,6 +41,12 @@ describe('MOB-036 pairing entry and authorization sheet contract', () => {
     expect(pairingHookSource).toContain('正在重新检查桌面确认状态。');
   });
 
+  it('requires a fresh pairing request after a delivered credential could not be saved', () => {
+    expect(source).toContain('const pairingDeliveredWithoutSave =');
+    expect(source).toContain('!pairingDeliveredWithoutSave &&');
+    expect(source).toContain('设备凭证已被领取，但本机没有完成保存，请关闭后重新配对。');
+  });
+
   it('keeps pairing success lightweight and returns to the session list', () => {
     expect(source).toContain('setSuccessToastVisible(true);');
     expect(source).toContain('>配对成功</Text>');
