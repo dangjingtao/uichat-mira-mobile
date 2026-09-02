@@ -29,10 +29,32 @@ describe('MOB-032 Shiyan result-first review layout contract', () => {
     expect(source).toContain('用候选继续编辑');
   });
 
+  it('uses the opened editor seed as the dirty baseline', () => {
+    expect(source).toContain(
+      "const [editorBaselineMarkdown, setEditorBaselineMarkdown] = useState('');",
+    );
+    expect(source).toContain(
+      'finalMarkdown.trim() !== editorBaselineMarkdown.trim()',
+    );
+    expect(source).toContain('setEditorBaselineMarkdown(seed.markdown);');
+    expect(source).toContain('setEditorBaselineMarkdown(saved);');
+  });
+
   it('protects dirty Final Draft edits before navigation or editor close', () => {
     expect(source).toContain("navigation.addListener('beforeRemove'");
     expect(source).toContain('放弃未保存修改？');
     expect(source).toContain('保存完成后再离开');
+  });
+
+  it('refreshes partial result artifacts while an active task is polling', () => {
+    const pollStart = source.indexOf('const timer = setInterval(() => {');
+    const pollEnd = source.indexOf('}, 5000);', pollStart);
+    const pollingSource = source.slice(pollStart, pollEnd);
+
+    expect(pollStart).toBeGreaterThan(-1);
+    expect(pollingSource).toContain('void loadTask(true);');
+    expect(pollingSource).toContain('void loadTranscript();');
+    expect(pollingSource).toContain('void loadContent();');
   });
 
   it('keeps transcript as a read-only evidence layer', () => {

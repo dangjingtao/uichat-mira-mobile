@@ -99,6 +99,7 @@ export function ShiyanTaskDetailScreen({
   const [candidate, setCandidate] = useState<ShiyanAdjustmentCandidate | null>(null);
   const [finalEditorOpen, setFinalEditorOpen] = useState(false);
   const [finalMarkdown, setFinalMarkdown] = useState('');
+  const [editorBaselineMarkdown, setEditorBaselineMarkdown] = useState('');
   const [finalBaseVersion, setFinalBaseVersion] = useState<number | null>(null);
   const [savedFinalMarkdown, setSavedFinalMarkdown] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -108,8 +109,8 @@ export function ShiyanTaskDetailScreen({
   const finalDraftDirty = useMemo(
     () =>
       finalEditorOpen &&
-      finalMarkdown.trim() !== (savedFinalMarkdown ?? '').trim(),
-    [finalEditorOpen, finalMarkdown, savedFinalMarkdown],
+      finalMarkdown.trim() !== editorBaselineMarkdown.trim(),
+    [editorBaselineMarkdown, finalEditorOpen, finalMarkdown],
   );
 
   const reviewResult = useMemo(
@@ -217,9 +218,10 @@ export function ShiyanTaskDetailScreen({
     const timer = setInterval(() => {
       void loadTask(true);
       void loadTranscript();
+      void loadContent();
     }, 5000);
     return () => clearInterval(timer);
-  }, [loadTask, loadTranscript, shouldPoll]);
+  }, [loadContent, loadTask, loadTranscript, shouldPoll]);
 
   useEffect(() => {
     if (task?.lifecycle === 'ready' || task?.lifecycle === 'completed') {
@@ -292,6 +294,7 @@ export function ShiyanTaskDetailScreen({
   const openFinalEditor = (preferCandidate = false) => {
     const seed = selectShiyanFinalEditorSeed(content, candidate, preferCandidate);
     setFinalMarkdown(seed.markdown);
+    setEditorBaselineMarkdown(seed.markdown);
     setFinalBaseVersion(seed.baseVersion);
     setFinalEditorOpen(true);
   };
@@ -307,7 +310,7 @@ export function ShiyanTaskDetailScreen({
         text: '放弃修改',
         style: 'destructive',
         onPress: () => {
-          setFinalMarkdown(savedFinalMarkdown ?? '');
+          setFinalMarkdown(editorBaselineMarkdown);
           setFinalEditorOpen(false);
         },
       },
@@ -330,6 +333,7 @@ export function ShiyanTaskDetailScreen({
       setContent(next);
       setSavedFinalMarkdown(saved);
       setFinalMarkdown(saved);
+      setEditorBaselineMarkdown(saved);
       setFinalBaseVersion(next.finalDraftBaseVersion);
       setCandidate(null);
       Alert.alert('最终稿已保存', '新的 AI 调整仍只会生成候选，不会覆盖这份内容。');
