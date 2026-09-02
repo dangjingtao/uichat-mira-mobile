@@ -22,27 +22,34 @@ describe('Shiyan confirmation UX wiring', () => {
     expect(submit).toContain('可回到拾言主页右上角配置');
   });
 
-  it('wires the local playback adapter into the confirmation page', () => {
+  it('keeps playback behind an independent reusable AudioPlayer component', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
-    expect(submit).toContain("from './playback/PlaybackAdapter'");
-    expect(submit).toContain('playbackAdapter.load(');
-    expect(submit).toContain('playbackAdapter.dispose()');
+    const player = readSource('src/shiyan/playback/AudioPlayer.tsx');
+
+    expect(submit).toContain("from './playback/AudioPlayer'");
+    expect(submit).toContain('<AudioPlayer');
+    expect(submit).not.toContain("from './playback/PlaybackAdapter'");
+    expect(player).toContain("from './PlaybackAdapter'");
+    expect(player).toContain('adapter.load(source)');
+    expect(player).toContain('adapter.dispose()');
+    expect(player).not.toContain('CaptureTask');
+    expect(player).not.toContain('ShiyanCaptureSubmitScreen');
   });
 
   it('releases playback when the confirmation route loses focus', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
-    const playerStart = submit.indexOf('function RecordingPlayerCard');
-    const screenStart = submit.indexOf('export function ShiyanCaptureSubmitScreen');
-    const playerSource = submit.slice(playerStart, screenStart);
+    const player = readSource('src/shiyan/playback/AudioPlayer.tsx');
 
-    expect(playerSource).toContain('useFocusEffect(');
-    expect(playerSource).toContain('playbackAdapter.load(filePath)');
-    expect(playerSource).toContain('playbackAdapter.dispose()');
+    expect(submit).toContain('const isFocused = useIsFocused();');
+    expect(submit).toContain('active={isFocused}');
+    expect(player).toContain('if (active)');
+    expect(player).toContain('adapter.load(source)');
+    expect(player).toContain('adapter.dispose()');
   });
 
   it('stops playback before deleting the local recording file', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
-    const disposeIndex = submit.indexOf('playbackAdapter\n            .dispose()');
+    const disposeIndex = submit.indexOf('await audioPlayerRef.current?.dispose()');
     const deleteIndex = submit.indexOf('localCaptureRepository.delete(capture.id)');
     expect(disposeIndex).toBeGreaterThan(-1);
     expect(deleteIndex).toBeGreaterThan(disposeIndex);
@@ -52,6 +59,15 @@ describe('Shiyan confirmation UX wiring', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
     expect(submit).toContain("Alert.alert(\n                '无法删除'");
     expect(submit).not.toContain(".catch(() => navigation.navigate('ShiyanLocalDrafts'))");
+  });
+
+  it('keeps a full seek surface and maps it through the playback adapter', () => {
+    const player = readSource('src/shiyan/playback/AudioPlayer.tsx');
+    expect(player).toContain('testID="audio-player-track-area"');
+    expect(player).toContain('styles.inactiveTrack');
+    expect(player).toContain('styles.playedTrack');
+    expect(player).toContain('playbackPositionFromTrackX(');
+    expect(player).toContain('adapter.seek(');
   });
 
   it('clears stale iOS playback before validating a replacement file', () => {
@@ -73,6 +89,7 @@ describe('Shiyan confirmation UX wiring', () => {
     expect(submit).toContain('setSceneSheetOpen(false)');
     expect(submit).toContain('setSceneId(scene.id);');
     expect(submit).not.toContain('styles.sceneList');
+    expect(submit).not.toContain('styles.sceneRadio');
   });
 
   it('shares one scene truth through the confirmation helpers', () => {
@@ -81,5 +98,15 @@ describe('Shiyan confirmation UX wiring', () => {
     expect(submit).toContain('selectableScenesForCapture(');
     expect(submit).toContain('confirmableSceneOrThrow(');
     expect(helpers).toContain('canonicalShiyanSceneId');
+  });
+
+  it('keeps one primary submit action and product-facing progress language', () => {
+    const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
+    expect(submit).toContain("if (!progress) return '开始整理';");
+    expect(submit).toContain("return '正在提交…';");
+    expect(submit).toContain('正在上传');
+    expect(submit).not.toContain('正在创建任务…');
+    expect(submit).not.toContain('正在同步场景…');
+    expect(submit).not.toContain('正在确认录音…');
   });
 });
