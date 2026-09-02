@@ -1,6 +1,6 @@
 # MOB-031：拾言录音确认页主次交互收口
 
-状态：**待实施**
+状态：**REVIEW**
 
 负责人：`mob_031_shiyan_confirm_hierarchy`
 
@@ -176,6 +176,17 @@ npm test -- --runInBand
 - 返回后 LocalCapture 可恢复；
 - submit 成功、upload 失败、Cloud 未配置；
 - 删除本地文件与 cloud task 语义分离。
+
+## Implementation Evidence — 2026-09-02
+
+- Mobile PR #87 已 squash 合入 `dev`，merge commit `f4fdde412896567f500004978a81ebffdb399c8a`。
+- 新增 `src/shiyan/playback/AudioPlayer.tsx`：复用既有 `PlaybackAdapter`，独立承接 load / play / pause / seek / dispose；不依赖 CaptureTask、Cloud 或确认页提交状态。
+- `ShiyanCaptureSubmitScreen` 已改为消费 `AudioPlayer`；完整 inactive track、played fill、thumb 与完整 seek touch area 分离，页面离开通过 `active={isFocused}` 释放 playback，删除前通过组件 ref 显式 dispose。
+- 确认页场景收为“当前值 + chevron”，check 只存在于现有 Sheet；主操作收为唯一 `开始整理`，内部技术 phase 对用户归纳为 `正在提交…` / `正在上传 X%`。
+- `稍后处理` 与 `删除本地录音` 已降为次级动作；删除继续二次确认，并保持本地文件与 cloud task 的语义边界。
+- 自动门禁：Typecheck、Lint、全量 Jest、Android debug build、iOS simulator build、unsigned iPhone build / IPA verify / artifact upload 全部通过。
+- 当前 head OpenCode Review：无高置信 P0-P2 finding；首轮针对旧 MOB-029 source-contract 测试的 finding 已迁移合同并解决。
+- 尚未取得 Android / iOS 真机播放器 UI / 拖拽 seek / 前后台切换 / 播放中删除等人工 smoke 证据，因此本卡保持 **REVIEW**，不得记为 PASS。
 
 ## Parallel / Integration
 
