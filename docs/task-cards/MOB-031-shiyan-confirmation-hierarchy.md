@@ -1,6 +1,6 @@
 # MOB-031：拾言录音确认页主次交互收口
 
-状态：**REVIEW**
+状态：**REVIEW · 待视觉验收**
 
 负责人：`mob_031_shiyan_confirm_hierarchy`
 
@@ -186,7 +186,7 @@ npm test -- --runInBand
 - `稍后处理` 与 `删除本地录音` 已降为次级动作；删除继续二次确认，并保持本地文件与 cloud task 的语义边界。
 - 自动门禁：Typecheck、Lint、全量 Jest、Android debug build、iOS simulator build、unsigned iPhone build / IPA verify / artifact upload 全部通过。
 - 当前 head OpenCode Review：无高置信 P0-P2 finding；首轮针对旧 MOB-029 source-contract 测试的 finding 已迁移合同并解决。
-- 尚未取得 Android / iOS 真机播放器 UI / 拖拽 seek / 前后台切换 / 播放中删除等人工 smoke 证据，因此本卡保持 **REVIEW**，不得记为 PASS。
+- **当前待视觉验收。** 尚未取得页面实际渲染的视觉确认，以及 Android / iOS 真机播放器 UI / 拖拽 seek / 前后台切换 / 播放中删除等人工 smoke 证据，因此本卡保持 **REVIEW**，不得记为 PASS。
 
 ## Parallel / Integration
 
