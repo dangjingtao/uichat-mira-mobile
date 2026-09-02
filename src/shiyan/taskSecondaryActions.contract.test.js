@@ -3,11 +3,23 @@ const { resolve } = require('node:path');
 
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
 
+const home = readSource('src/shiyan/ShiyanRecordingScreens.tsx');
 const detail = readSource('src/shiyan/ShiyanTaskDetailScreen.tsx');
 const wrapper = readSource('src/shiyan/ShiyanTaskDetailWithDeliveryScreen.tsx');
 const sheet = readSource('src/shiyan/ShiyanActionSheet.tsx');
 
 describe('MOB-034 Shiyan secondary action hierarchy', () => {
+  it('moves home low-frequency config behind one More sheet', () => {
+    expect(home).toContain('accessibilityLabel="更多操作"');
+    expect(home).toContain('<ShiyanActionSheet');
+    expect(home).toContain("label: '服务配置'");
+    expect(home).toContain("label: '配置自定义场景'");
+    expect(home).toContain("navigation.navigate('ShiyanCloudConfig')");
+    expect(home).toContain("navigation.navigate('ShiyanSceneConfig')");
+    expect(home).not.toContain('accessibilityLabel="配置拾言 Cloud"');
+    expect(home).not.toContain('部分 Cloud 记录暂时不可用');
+  });
+
   it('moves result-page low-frequency actions behind one More sheet', () => {
     expect(detail).toContain('accessibilityLabel="更多操作"');
     expect(detail).toContain('<ShiyanActionSheet');
@@ -56,6 +68,7 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
     expect(sheet).toContain('accessible={false}');
     expect(sheet).toContain('accessibilityRole="button"');
     expect(sheet).toContain('accessibilityLabel="关闭"');
+    expect(home).toContain('accessible={false}');
   });
 
   it('surfaces delivery failure after the sheet closes', () => {
@@ -64,15 +77,17 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
     expect(wrapper).toContain("Alert.alert('无法打开已投递文档'");
   });
 
-  it('uses the existing design tokens for the new action sheet and task screen', () => {
+  it('uses existing design tokens for sheet and backdrop visuals', () => {
     expect(detail).toContain("import { fontSize, radius, sizing, spacing } from '../theme/tokens';");
     expect(sheet).toContain("import { fontSize, radius, sizing, spacing } from '../theme/tokens';");
     expect(detail).not.toMatch(/#[0-9a-fA-F]{6}/);
     expect(sheet).not.toMatch(/#[0-9a-fA-F]{6}|rgba\(/);
     expect(sheet).toContain('backgroundColor: colors.overlay');
+    expect(home).toContain('backgroundColor: colors.overlay');
+    expect(home).not.toMatch(/rgba\(/);
   });
 
-  it('removes Cloud implementation language from retention feedback', () => {
+  it('removes Cloud implementation language from ordinary result feedback', () => {
     expect(detail).not.toContain('Cloud 已记录保留选择');
     expect(detail).not.toContain('Cloud 将按默认保留策略');
   });
