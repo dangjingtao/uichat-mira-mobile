@@ -101,16 +101,7 @@ export function SearchScreen() {
 
   useEffect(() => {
     const controller = new GlobalSearchController({
-      listSessions: async () => {
-        try {
-          const list = await miraHostClient.listSessions();
-          setSearchDiagnostic(null);
-          return list;
-        } catch (error) {
-          setSearchDiagnostic(await classifySessionLoadFailure(error));
-          throw error;
-        }
-      },
+      listSessions: () => miraHostClient.listSessions(),
       getMessages: (sessionId) => miraHostClient.getMessages(sessionId),
       onStateChange: setSearchState,
     });
@@ -122,10 +113,23 @@ export function SearchScreen() {
   }, []);
 
   useEffect(() => {
+    if (searchState.status !== 'failed' || searchState.error === undefined) {
+      return;
+    }
+    let active = true;
+    void classifySessionLoadFailure(searchState.error).then((diagnostic) => {
+      if (active) setSearchDiagnostic(diagnostic);
+    });
+    return () => {
+      active = false;
+    };
+  }, [searchState.error, searchState.query, searchState.status]);
+
+  useEffect(() => {
     const controller = searchControllerRef.current;
     if (!controller) return;
+    setSearchDiagnostic(null);
     if (!query.trim()) {
-      setSearchDiagnostic(null);
       controller.search('');
       return;
     }
@@ -167,6 +171,7 @@ export function SearchScreen() {
   const handleSearchDiagnosticAction = useCallback(
     (action: RemoteConnectionDiagnosticAction) => {
       if (action === 'retry') {
+        setSearchDiagnostic(null);
         searchControllerRef.current?.search(query);
         return;
       }
@@ -240,12 +245,16 @@ export function SearchScreen() {
               onAction={handleCollectionDiagnosticAction}
             />
           </View>
-        ) : hasQuery && searchState.status === 'failed' && searchDiagnostic ? (
+        ) : hasQuery && searchState.status === 'failed' ? (
           <View style={styles.centerState}>
-            <RemoteDiagnosticNotice
-              diagnostic={searchDiagnostic}
-              onAction={handleSearchDiagnosticAction}
-            />
+            {searchDiagnostic ? (
+              <RemoteDiagnosticNotice
+                diagnostic={searchDiagnostic}
+                onAction={handleSearchDiagnosticAction}
+              />
+            ) : (
+              <ActivityIndicator size="small" color={colors.primary} />
+            )}
           </View>
         ) : hasQuery && searchState.status === 'searching' ? (
           <View
@@ -362,20 +371,13 @@ export function SearchScreen() {
               </Pressable>
             ))}
             {searchState.status === 'degraded' ? (
-              <Text style={[styles.degradedHint, { color: colors.text.soft }]}>
-                部分会话未能完成搜索，结果可能不完整。
-              </Text>
+              <Text style={[styles.degradedHint, { color: colors.text.soft }]}>部分会话未能完成搜索，结果可能不完整。</Text>
             ) : null}
           </>
         ) : hasQuery && searchState.status === 'degraded' ? (
-          // Every message lookup failed and no title matched. This must not
-          // render as a definitive "no results" — Host availability is the
-          // unknown here, not the absence of matches.
           <View style={styles.centerState}>
             <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索未能完成</Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}>
-              部分会话消息暂时无法读取，无法确认是否存在匹配。
-            </Text>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}>部分会话消息暂时无法读取，无法确认是否存在匹配。</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="重试搜索"
@@ -395,7 +397,7 @@ export function SearchScreen() {
                 ? '暂无会话'
                 : `没有找到“${query.trim()}”`}
             </Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}>
+            <Text style={[styles.stateText, { color: colors.text.soft }]}> 
               {collectionState === 'empty'
                 ? 'Remote Host V1 当前只搜索桌面端已有会话'
                 : '换个关键词再试试'}
