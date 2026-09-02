@@ -153,10 +153,10 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     navigation.navigate('WorkspaceList');
   };
 
-  const handleOpenRemoteConnection = () => {
+  const handleOpenRemoteConnection = useCallback(() => {
     onClose();
     navigation.navigate('HostConfig');
-  };
+  }, [navigation, onClose]);
 
   const handleOpenPlugins = () => {
     onClose();
@@ -171,7 +171,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
       }
       handleOpenRemoteConnection();
     },
-    [loadSessions],
+    [handleOpenRemoteConnection, loadSessions],
   );
 
   const handleCreateChat = useCallback(async () => {
