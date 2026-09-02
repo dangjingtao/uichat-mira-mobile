@@ -72,11 +72,14 @@ const transportAttemptsFrom = (
   );
 };
 
-const hasAuthoritativeHostOfflineEvidence = (error: RemoteHostError) =>
-  error.code === 'RELAY_HOST_OFFLINE' ||
-  transportAttemptsFrom(error).some(
-    attempt => attempt.authoritativeHostOffline,
+const hasAuthoritativeHostOfflineEvidence = (error: RemoteHostError) => {
+  if (error.code === 'RELAY_HOST_OFFLINE') return true;
+  const attempts = transportAttemptsFrom(error);
+  return (
+    attempts.some(attempt => attempt.authoritativeHostOffline) &&
+    !attempts.some(attempt => attempt.hostResponded)
   );
+};
 
 const isTransportFailure = (error: RemoteHostError) =>
   transportFailureCodes.has(error.code) || error.code.startsWith('RELAY_');
