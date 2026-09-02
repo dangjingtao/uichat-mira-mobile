@@ -50,6 +50,18 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
     expect(detail).toContain('>编辑最终稿</Text>');
   });
 
+  it('keeps action-sheet items individually accessible', () => {
+    expect(sheet).toContain('accessible={false}');
+    expect(sheet).toContain('accessibilityRole="button"');
+    expect(sheet).toContain('accessibilityLabel="关闭"');
+  });
+
+  it('surfaces delivery failure after the sheet closes', () => {
+    expect(wrapper).toContain("Alert.alert('GitHub 投递未完成'");
+    expect(wrapper).toContain('最终稿仍然安全，可以再次投递。');
+    expect(wrapper).toContain("Alert.alert('无法打开已投递文档'");
+  });
+
   it('uses the existing design tokens for the new action sheet and task screen', () => {
     expect(detail).toContain("import { fontSize, radius, sizing, spacing } from '../theme/tokens';");
     expect(sheet).toContain("import { fontSize, radius, sizing, spacing } from '../theme/tokens';");
