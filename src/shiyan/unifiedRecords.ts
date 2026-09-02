@@ -8,7 +8,7 @@ import {
   type ShiyanSubmissionPointer,
 } from './submissionRepository';
 import {
-  shiyanStageUserStatus,
+  shiyanTaskStateUserStatus,
   type ShiyanUserStatusTone,
 } from './taskPresentation';
 
@@ -64,7 +64,11 @@ const taskStatus = (
     return { statusLabel: '已投递', statusTone: 'success' };
   }
 
-  const status = shiyanStageUserStatus(task.currentStage, task.stageStatus);
+  const status = shiyanTaskStateUserStatus({
+    lifecycle: task.lifecycle,
+    currentStage: task.currentStage,
+    stageStatus: task.stageStatus,
+  });
   return {
     statusLabel: status.label,
     statusTone: status.tone,
