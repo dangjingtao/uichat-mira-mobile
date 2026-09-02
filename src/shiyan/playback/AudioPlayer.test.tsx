@@ -153,7 +153,7 @@ describe('AudioPlayer', () => {
       );
     });
 
-    let trackArea = component!.root.findByProps({
+    const trackArea = component!.root.findByProps({
       testID: 'audio-player-track-area',
     });
     ReactTestRenderer.act(() => {
@@ -181,14 +181,6 @@ describe('AudioPlayer', () => {
     expect(styleOf(playedTrack).width).toBe('50%');
     expect(styleOf(thumb).left).toBe(93);
 
-    trackArea = component!.root.findByProps({
-      testID: 'audio-player-track-area',
-    });
-    await ReactTestRenderer.act(async () => {
-      trackArea.props.onResponderGrant({ nativeEvent: { locationX: 150 } });
-    });
-    expect(adapter.seekCalls[adapter.seekCalls.length - 1]).toBe(45000);
-
     ReactTestRenderer.act(() => {
       adapter.emit({
         state: 'ended',
@@ -208,7 +200,7 @@ describe('AudioPlayer', () => {
 });
 
 describe('AudioPlayer track math', () => {
-  it('maps the whole track to the whole recording', () => {
+  it('maps the whole track to the whole recording, including an unplayed seek', async () => {
     expect(playbackProgressRatio(0, 60000)).toBe(0);
     expect(playbackProgressRatio(30000, 60000)).toBe(0.5);
     expect(playbackProgressRatio(60000, 60000)).toBe(1);
@@ -218,5 +210,11 @@ describe('AudioPlayer track math', () => {
     expect(playbackThumbLeft(0, 200)).toBe(0);
     expect(playbackThumbLeft(0.5, 200)).toBe(93);
     expect(playbackThumbLeft(1, 200)).toBe(186);
+
+    const adapter = new FakePlaybackAdapter();
+    await adapter.load('/private/shiyan/a.m4a');
+    await adapter.seek(playbackPositionFromTrackX(150, 200, 60000));
+    expect(adapter.seekCalls).toEqual([45000]);
+    expect(adapter.getSnapshot().positionMs).toBe(45000);
   });
 });
