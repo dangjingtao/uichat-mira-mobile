@@ -1,12 +1,22 @@
 # MOB-034：拾言低频入口、分享 / 投递与 Design Token 收口
 
-状态：**待实施**
+状态：**REVIEW · 待真机/真实服务验证**
 
 负责人：`t-zt`
 
 执行仓库：`dangjingtao/uichat-mira-mobile`
 
 依赖：建议在 MOB-030 / MOB-031 / MOB-032 / MOB-033 合入后基于最新 `dev` 施工。
+
+## 验收记录（2026-09-02）
+
+- PR #91 已 squash merge 到 `dev`，merge commit `eb5f90a02e3362ab35ddeb3ab22eb59b7712b25b`。
+- current-head Typecheck / Lint / Jest 全绿。
+- Android debug build 成功。
+- iOS simulator、unsigned iPhone build、IPA 打包 / 校验 / 上传成功。
+- OpenCode current-head review 在 `Run read-only Mira Mobile review` 阶段 cancelled，未产出 verdict；不记录为 review pass，也不视为代码 review failure。
+- 合并前较早 Codex review 的两条 P1（Action Sheet VoiceOver 可访问性、Delivery 失败反馈）均已修复并 resolve。
+- 仍需 Android/iOS 真机验证 More Sheet、系统 Share Sheet、真实 GitHub Delivery / canonical URL、原音保留策略及 light/dark 视觉后才能 PASS。
 
 ## 背景
 
