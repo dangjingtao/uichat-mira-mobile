@@ -1,6 +1,6 @@
 # MOB-032：拾言结果优先的 Review / Final Draft 交互
 
-状态：**待实施**
+状态：**REVIEW · 待真机验证**
 
 负责人：`mob_032_shiyan_result_review`
 
@@ -174,6 +174,16 @@ npm test -- --runInBand
 - task processing with partial artifact。
 
 真机 smoke 至少验证：整理完成 -> 查看整理稿 -> 展开原文 -> AI 调整 -> 编辑并保存最终稿。
+
+## Implementation / Review Evidence
+
+- PR #88 `feat: make Shiyan review result-first` 已于 2026-09-02 squash merge 到 `dev`，merge commit：`27411813b8585a94bbf40320d3db47ab624674f1`。
+- 已落地 result-first 信息层级；Transcript / 处理详情默认折叠；Final Draft > adjustment candidate > AI Draft 的展示优先级保持独立语义。
+- 已补 Final Draft dirty-state / beforeRemove 保护、编辑器重复进入保护、active processing partial-artifact 刷新，以及保存 Final Draft 与并发 content refresh 的竞态保护。
+- current head `9d63cc92da94cded51b7a2232970c264ba0425f1` 的 Mobile CI 已成功：Typecheck、Lint、全量 Jest、Android debug、iOS simulator 与 unsigned device 构建通过；signed release job 按现有条件跳过。
+- current head OpenCode Review：`NO_BLOCKING_FINDINGS`，无高置信 P0-P2 finding；此前发现的 dirty baseline、partial artifact polling、stale refresh 与 editor re-entry 问题均已修复。
+- 产品侧交互检查仍记录两项待真机观察/后续收口点：`编辑最终稿` 与 `AI 调整` 的视觉主次需在真实渲染中确认；Final Draft 有未保存编辑时“系统分享 Markdown”仍指向已保存版本，其实际理解成本与是否需要进一步保护待真机流程确认。Delivery 已保持 dirty/saving 阻断。
+- 尚未取得 Android / iOS 真机的长文滚动、键盘遮挡、Transcript 展开、AI 调整、Final Draft 编辑/保存、分享/投递完整 smoke 证据，因此本卡保持 **REVIEW · 待真机验证**，不得记为 PASS。
 
 ## Parallel / Integration
 
