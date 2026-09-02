@@ -5,6 +5,10 @@ const source = readFileSync(
   resolve(process.cwd(), 'src/screens/HostConfigScreen.tsx'),
   'utf8',
 );
+const pairingHookSource = readFileSync(
+  resolve(process.cwd(), 'src/pairing/useRemotePairing.ts'),
+  'utf8',
+);
 
 describe('MOB-036 pairing entry and authorization sheet contract', () => {
   it('keeps the default pairing page focused on scan and paste entry', () => {
@@ -29,6 +33,12 @@ describe('MOB-036 pairing entry and authorization sheet contract', () => {
     expect(source).toContain('setAuthorizationSheetOpen(false);');
     expect(source).toContain('resetPairing();');
     expect(source).toContain('setPairingDescriptor(null);');
+  });
+
+  it('resumes an existing pending claim instead of submitting a duplicate claim', () => {
+    expect(pairingHookSource).toContain('if (state.pending) {');
+    expect(pairingHookSource).toContain('beginPolling(state.pending);');
+    expect(pairingHookSource).toContain('正在重新检查桌面确认状态。');
   });
 
   it('keeps pairing success lightweight and returns to the session list', () => {
