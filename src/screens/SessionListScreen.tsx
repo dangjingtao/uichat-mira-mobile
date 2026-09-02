@@ -27,10 +27,13 @@ import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
+import { RemoteDiagnosticNotice } from '../components/RemoteDiagnosticNotice';
 import {
-  getSessionLoadErrorMessage,
-  resolveSessionCollectionState,
-} from './sessionCollectionState';
+  classifySessionLoadFailure,
+  type RemoteConnectionDiagnostic,
+  type RemoteConnectionDiagnosticAction,
+} from '../connectivity/remoteConnectionDiagnostics';
+import { resolveSessionCollectionState } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
 import { SessionSwipeRow } from './SessionSwipeRow';
 
@@ -69,7 +72,8 @@ export function SessionListScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [canDeleteSessions, setCanDeleteSessions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDiagnostic, setLoadDiagnostic] =
+    useState<RemoteConnectionDiagnostic | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openSwipeRowId, setOpenSwipeRowId] = useState<string | null>(null);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
@@ -108,7 +112,7 @@ export function SessionListScreen() {
 
   const loadSessions = useCallback(async () => {
     setIsLoading(true);
-    setLoadError(null);
+    setLoadDiagnostic(null);
     try {
       const [list, canDelete] = await Promise.all([
         miraHostClient.listSessions(),
@@ -118,9 +122,8 @@ export function SessionListScreen() {
       setCanDeleteSessions(canDelete);
       void syncUnreadSessions(list).catch(() => undefined);
     } catch (error) {
-      setSessions([]);
       setCanDeleteSessions(false);
-      setLoadError(getSessionLoadErrorMessage(error));
+      setLoadDiagnostic(await classifySessionLoadFailure(error));
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +151,7 @@ export function SessionListScreen() {
 
   const collectionState = resolveSessionCollectionState(
     isLoading,
-    loadError,
+    loadDiagnostic?.title ?? null,
     sessions.length,
   );
 
@@ -159,6 +162,17 @@ export function SessionListScreen() {
       { paddingBottom: insets.bottom + 24 },
     ],
     [insets.bottom, sessions.length],
+  );
+
+  const handleDiagnosticAction = useCallback(
+    (action: RemoteConnectionDiagnosticAction) => {
+      if (action === 'retry') {
+        void loadSessions();
+        return;
+      }
+      navigation.navigate('HostConfig');
+    },
+    [loadSessions, navigation],
   );
 
   const openSession = (session: Session) => {
@@ -255,6 +269,15 @@ export function SessionListScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={listContentStyle}
         onScrollBeginDrag={() => setOpenSwipeRowId(null)}
+        ListHeaderComponent={
+          collectionState === 'data' && loadDiagnostic ? (
+            <RemoteDiagnosticNotice
+              diagnostic={loadDiagnostic}
+              compact
+              onAction={handleDiagnosticAction}
+            />
+          ) : null
+        }
         renderItem={({ item, index }) => (
           <>
             {index === 0 && pinnedCount > 0 ? (
@@ -296,24 +319,13 @@ export function SessionListScreen() {
             );
           }
 
-          if (collectionState === 'error') {
+          if (collectionState === 'error' && loadDiagnostic) {
             return (
               <View style={styles.emptyState}>
-                <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>加载会话失败</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>
-                  {loadError}
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="重试加载会话"
-                  onPress={() => void loadSessions()}
-                  style={({ pressed }) => [
-                    styles.retryButton,
-                    { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-                  ]}
-                >
-                  <Text style={[styles.retryButtonLabel, { color: colors.onPrimary }]}>重试</Text>
-                </Pressable>
+                <RemoteDiagnosticNotice
+                  diagnostic={loadDiagnostic}
+                  onAction={handleDiagnosticAction}
+                />
               </View>
             );
           }
@@ -418,7 +430,7 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'center',
     paddingHorizontal: spacing.section,
     paddingBottom: 80,
@@ -437,23 +449,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
+    alignSelf: 'center',
   },
   emptyTitle: {
     fontSize: fontSize.titleLg,
     fontWeight: '600',
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptySubtitle: { fontSize: fontSize.button, textAlign: 'center' },
-  retryButton: {
-    minHeight: sizing.touchTarget,
-    minWidth: 96,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryButtonLabel: { fontSize: fontSize.bodyMd, fontWeight: '600' },
   drawerBackdrop: { ...StyleSheet.absoluteFill },
   drawerPanel: {
     position: 'absolute',

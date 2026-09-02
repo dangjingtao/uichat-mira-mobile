@@ -48,6 +48,14 @@ export interface MobileDeviceIdentity {
 
 export type RemoteTransportKind = 'direct' | 'relay';
 
+export interface RemoteTransportAttemptDiagnostic {
+  transport: RemoteTransportKind;
+  code: string;
+  status?: number;
+  hostResponded: boolean;
+  authoritativeHostOffline: boolean;
+}
+
 export interface PendingPairing {
   descriptor: PairingDescriptorV1;
   transport: RemoteTransportKind;
@@ -115,6 +123,41 @@ const normalizeDeviceName = (value: string) => {
 
 const isDirectNetworkError = (error: unknown) =>
   error instanceof RemoteHostError && error.code === 'NETWORK_ERROR';
+
+const snapshotTransportAttempt = (
+  transport: RemoteTransportKind,
+  error: unknown,
+): RemoteTransportAttemptDiagnostic => {
+  if (error instanceof RemoteHostError) {
+    return {
+      transport,
+      code: error.code,
+      ...(error.status === undefined ? {} : { status: error.status }),
+      hostResponded:
+        error.status !== undefined && error.code !== 'RELAY_HOST_OFFLINE',
+      authoritativeHostOffline: error.code === 'RELAY_HOST_OFFLINE',
+    };
+  }
+  return {
+    transport,
+    code: 'UNKNOWN_REMOTE_FAILURE',
+    hostResponded: false,
+    authoritativeHostOffline: false,
+  };
+};
+
+const attachTransportAttempts = (
+  error: unknown,
+  transportAttempts: RemoteTransportAttemptDiagnostic[],
+): unknown => {
+  if (!(error instanceof RemoteHostError) || transportAttempts.length === 0) {
+    return error;
+  }
+  return new RemoteHostError(error.code, error.message, error.status, {
+    transportAttempts,
+    causeDetails: error.details,
+  });
+};
 
 export class RemoteMiraHostClient {
   private activeCredential: StoredDeviceCredential | null = null;
@@ -610,6 +653,7 @@ export class RemoteMiraHostClient {
     operation: JsonOperation<T>,
   ): Promise<{ value: T; transport: RemoteTransportKind }> {
     const order = this.transportOrder(endpoints);
+    const transportAttempts: RemoteTransportAttemptDiagnostic[] = [];
     let lastError: unknown = new RemoteHostError(
       'REMOTE_ENDPOINT_UNAVAILABLE',
       'No Mira remote endpoint is available',
@@ -627,8 +671,11 @@ export class RemoteMiraHostClient {
         return { value, transport };
       } catch (error) {
         lastError = error;
+        transportAttempts.push(snapshotTransportAttempt(transport, error));
         const hasNext = index + 1 < order.length;
-        if (!hasNext) throw error;
+        if (!hasNext) {
+          throw attachTransportAttempts(error, transportAttempts);
+        }
 
         if (transport === 'direct' && isDirectNetworkError(error)) {
           this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
@@ -637,11 +684,11 @@ export class RemoteMiraHostClient {
         if (transport === 'relay' && isRelayTransportError(error)) {
           continue;
         }
-        throw error;
+        throw attachTransportAttempts(error, transportAttempts);
       }
     }
 
-    throw lastError;
+    throw attachTransportAttempts(lastError, transportAttempts);
   }
 
   private transportOrder(endpoints: RemoteEndpoints): RemoteTransportKind[] {

@@ -40,10 +40,13 @@ import {
   getSessionVisualKindLabel,
   SessionKindIcon,
 } from './SessionKindIcon';
+import { RemoteDiagnosticNotice } from './RemoteDiagnosticNotice';
 import {
-  getSessionLoadErrorMessage,
-  resolveSessionCollectionState,
-} from '../screens/sessionCollectionState';
+  classifySessionLoadFailure,
+  type RemoteConnectionDiagnostic,
+  type RemoteConnectionDiagnosticAction,
+} from '../connectivity/remoteConnectionDiagnostics';
+import { resolveSessionCollectionState } from '../screens/sessionCollectionState';
 import { resolveSessionOpenTarget } from '../screens/sessionNavigation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -83,19 +86,19 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const syncUnreadSessions = useThreadReadStore((state) => state.syncSessions);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDiagnostic, setLoadDiagnostic] =
+    useState<RemoteConnectionDiagnostic | null>(null);
   const [creatingChat, setCreatingChat] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    setLoadError(null);
+    setLoadDiagnostic(null);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
       void syncUnreadSessions(list.slice(0, 20)).catch(() => undefined);
     } catch (error) {
-      setSessions([]);
-      setLoadError(getSessionLoadErrorMessage(error));
+      setLoadDiagnostic(await classifySessionLoadFailure(error));
     } finally {
       setLoading(false);
     }
@@ -123,7 +126,7 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
 
   const collectionState = resolveSessionCollectionState(
     loading,
-    loadError,
+    loadDiagnostic?.title ?? null,
     sessions.length,
   );
 
@@ -150,15 +153,26 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     navigation.navigate('WorkspaceList');
   };
 
-  const handleOpenRemoteConnection = () => {
+  const handleOpenRemoteConnection = useCallback(() => {
     onClose();
     navigation.navigate('HostConfig');
-  };
+  }, [navigation, onClose]);
 
   const handleOpenPlugins = () => {
     onClose();
     navigation.navigate('Plugins');
   };
+
+  const handleDiagnosticAction = useCallback(
+    (action: RemoteConnectionDiagnosticAction) => {
+      if (action === 'retry') {
+        void loadSessions();
+        return;
+      }
+      handleOpenRemoteConnection();
+    },
+    [handleOpenRemoteConnection, loadSessions],
+  );
 
   const handleCreateChat = useCallback(async () => {
     if (creatingChat) return;
@@ -323,6 +337,16 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
           })}
         </View>
 
+        {collectionState === 'data' && loadDiagnostic ? (
+          <View style={styles.diagnosticWrap}>
+            <RemoteDiagnosticNotice
+              diagnostic={loadDiagnostic}
+              compact
+              onAction={handleDiagnosticAction}
+            />
+          </View>
+        ) : null}
+
         {collectionState === 'data' ? (
           <>
             {pinnedSessions.length > 0 ? (
@@ -360,21 +384,12 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
           <Text style={[styles.emptyHint, { color: colors.text.soft }]}>暂无会话</Text>
         ) : null}
 
-        {collectionState === 'error' ? (
+        {collectionState === 'error' && loadDiagnostic ? (
           <View style={styles.errorState}>
-            <Text style={[styles.errorTitle, { color: colors.text.ink }]}>加载会话失败</Text>
-            <Text style={[styles.errorText, { color: colors.text.soft }]}>{loadError}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="重试加载会话"
-              onPress={() => void loadSessions()}
-              style={({ pressed }) => [
-                styles.retryButton,
-                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-              ]}
-            >
-              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
-            </Pressable>
+            <RemoteDiagnosticNotice
+              diagnostic={loadDiagnostic}
+              onAction={handleDiagnosticAction}
+            />
           </View>
         ) : null}
       </ScrollView>
@@ -471,6 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   categoryLabel: { fontSize: 16, fontWeight: '500' },
+  diagnosticWrap: { paddingHorizontal: spacing.lg },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -497,26 +513,9 @@ const styles = StyleSheet.create({
   separator: { height: StyleSheet.hairlineWidth, marginLeft: 46 },
   emptyHint: { textAlign: 'center', marginTop: 40, fontSize: 14 },
   errorState: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.section,
   },
-  errorTitle: { fontSize: fontSize.bodyMd, fontWeight: '600' },
-  errorText: {
-    marginTop: spacing.sm,
-    fontSize: fontSize.button,
-    textAlign: 'center',
-  },
-  retryButton: {
-    minHeight: sizing.touchTarget,
-    minWidth: 88,
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryLabel: { fontSize: fontSize.button, fontWeight: '600' },
   bottomBar: {
     minHeight: 72,
     flexDirection: 'row',
