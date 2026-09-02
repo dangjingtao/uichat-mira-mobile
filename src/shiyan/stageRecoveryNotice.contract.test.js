@@ -7,10 +7,12 @@ const source = readFileSync(
 );
 
 describe('MOB-033 local upload recovery contract', () => {
-  it('resolves a local capture from either route context or the persisted submission pointer', () => {
-    expect(source).toContain('route.params.localCaptureId');
+  it('resolves a local capture from route context and falls back to the persisted submission pointer', () => {
+    expect(source).toContain('const routeCaptureId = route.params.localCaptureId ?? null;');
+    expect(source).toContain('localCaptureRepository.get(routeCaptureId)');
     expect(source).toContain('shiyanSubmissionRepository.findByTaskId(route.params.taskId)');
-    expect(source).toContain('localCaptureRepository.get(localCaptureId)');
+    expect(source).toContain('localCaptureRepository.get(pointer.localCaptureId)');
+    expect(source).toContain('const capture = routeCapture ?? pointerCapture;');
   });
 
   it('routes a recoverable upload back through the existing confirmation submission flow', () => {
