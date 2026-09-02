@@ -2,7 +2,7 @@ const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
-const source = readSource('src/shiyan/ShiyanTaskDetailScreen.tsx');
+const source = readSource('src/shiyan/ShiyanTaskDetailContentScreen.tsx');
 
 describe('MOB-032 Shiyan result-first review layout contract', () => {
   it('puts the organized result before processing details', () => {
