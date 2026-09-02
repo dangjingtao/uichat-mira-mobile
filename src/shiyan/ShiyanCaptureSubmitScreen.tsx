@@ -170,18 +170,18 @@ export function ShiyanCaptureSubmitScreen() {
           text: '删除本地文件',
           style: 'destructive',
           onPress: () => {
-            void audioPlayerRef.current
-              ?.dispose()
-              .then(() => localCaptureRepository.delete(capture.id))
-              .then(() => navigation.navigate('ShiyanLocalDrafts'))
-              .catch((error) => {
-                Alert.alert(
-                  '无法删除',
-                  error instanceof Error
-                    ? error.message
-                    : '本地录音未能删除，请稍后重试。',
-                );
-              });
+            void (async () => {
+              await audioPlayerRef.current?.dispose();
+              await localCaptureRepository.delete(capture.id);
+              navigation.navigate('ShiyanLocalDrafts');
+            })().catch((error) => {
+              Alert.alert(
+                '无法删除',
+                error instanceof Error
+                  ? error.message
+                  : '本地录音未能删除，请稍后重试。',
+              );
+            });
           },
         },
       ],
