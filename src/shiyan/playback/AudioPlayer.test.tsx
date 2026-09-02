@@ -187,7 +187,7 @@ describe('AudioPlayer', () => {
     await ReactTestRenderer.act(async () => {
       trackArea.props.onResponderGrant({ nativeEvent: { locationX: 150 } });
     });
-    expect(adapter.seekCalls.at(-1)).toBe(45000);
+    expect(adapter.seekCalls[adapter.seekCalls.length - 1]).toBe(45000);
 
     ReactTestRenderer.act(() => {
       adapter.emit({
