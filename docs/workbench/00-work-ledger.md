@@ -42,7 +42,7 @@
 | MOB-028B | R2 分支隔离更新客户端 | PASS | PR #84 squash-merged as `d8134ba`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; same-channel R2 manifest/versioned APK validation covered; product owner accepted PASS on 2026-09-02 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | REVIEW | Product owner conditionally accepted on 2026-09-01; code `24513fb`; dual-platform device smoke pending; Audio Player visual/component debt assigned to MOB-031 |
 | MOB-030 | 拾言首页与统一记录入口 | REVIEW | PR #86 squash-merged as `6065260`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; Android/iOS real-device + real Shiyan Cloud smoke pending |
-| MOB-031 | 拾言确认页主次交互收口 | REVIEW | PR #87 squash-merged as `f4fdde4`; reusable AudioPlayer + full-track seek + single primary CTA landed; Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned device builds green; latest OpenCode review found no P0-P2; real Android/iOS playback/UI smoke pending |
+| MOB-031 | 拾言确认页主次交互收口 | REVIEW | **待视觉验收**；PR #87 squash-merged as `f4fdde4`; reusable AudioPlayer + full-track seek + single primary CTA landed; Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned device builds green; latest OpenCode review found no P0-P2; visual acceptance and real Android/iOS playback/UI smoke pending |
 | MOB-032 | 拾言结果优先 Review / Final Draft | TODO | Independent TaskDetail work |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | TODO | Depends on MOB-032 PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | TODO | Owner `t-zt`; after MOB-030..033 |
