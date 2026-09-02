@@ -116,7 +116,9 @@ export function shiyanTaskStatusText(task: ShiyanCaptureTaskView): string {
   return shiyanTaskUserStatus(task).label;
 }
 
-export function retryActionForStage(stage: ShiyanCaptureStageView): ShiyanRetryAction | null {
+export function retryActionForStage(
+  stage: ShiyanCaptureStageView,
+): ShiyanStageRecoveryAction | null {
   if (stage.status !== 'failed' || !stage.retryable) return null;
   if (stage.stage === 'transcribe') return 'transcribe';
   if (stage.stage === 'organize') return 'organize';
