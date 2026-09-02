@@ -33,6 +33,13 @@ export function ShiyanActionSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable accessibilityLabel={`关闭${title}`} style={styles.backdrop} onPress={onClose}>
         <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: colors.dark.surface, opacity: 0.28 },
+          ]}
+        />
+        <View
           style={[styles.panel, { backgroundColor: colors.bg.card }]}
           onStartShouldSetResponder={() => true}
         >
@@ -94,7 +101,6 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(20, 20, 19, 0.28)',
   },
   panel: {
     borderTopLeftRadius: radius.xl,
