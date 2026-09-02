@@ -130,7 +130,10 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       setDelivery(result.record);
       Alert.alert('已投递 GitHub', '当前最终稿已写入 GitHub。');
     } catch (error) {
-      setDeliveryError(error instanceof Error ? error.message : 'GitHub 投递失败，可以直接重试。');
+      const message =
+        error instanceof Error ? error.message : 'GitHub 投递失败，可以直接重试。';
+      setDeliveryError(message);
+      Alert.alert('GitHub 投递未完成', `${message}\n\n最终稿仍然安全，可以再次投递。`);
       await refreshDeliveryState(true);
     } finally {
       deliveryBusy.current = false;
@@ -153,6 +156,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     } catch (error) {
       if (error instanceof ShiyanClientError) {
         setDeliveryError(error.message);
+        Alert.alert('无法打开已投递文档', error.message);
         return;
       }
       Alert.alert('无法打开 GitHub', '当前投递链接暂时不可用。');
