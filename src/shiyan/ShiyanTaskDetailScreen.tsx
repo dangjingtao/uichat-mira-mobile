@@ -105,6 +105,8 @@ export function ShiyanTaskDetailScreen({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
   const allowNavigation = useRef(false);
+  const contentGeneration = useRef(0);
+  const finalSaveInFlight = useRef(false);
 
   const finalDraftDirty = useMemo(
     () =>
@@ -189,13 +191,18 @@ export function ShiyanTaskDetailScreen({
   }, [taskId]);
 
   const loadContent = useCallback(async () => {
+    if (finalSaveInFlight.current) return;
+    const generation = ++contentGeneration.current;
     try {
       const next = await getShiyanContentDataSource().getTaskContent(taskId);
+      if (generation !== contentGeneration.current || finalSaveInFlight.current) return;
       setContent(next);
       setSavedFinalMarkdown(next.finalDraftMarkdown);
       setContentUnavailable(false);
     } catch {
-      setContentUnavailable(true);
+      if (generation === contentGeneration.current && !finalSaveInFlight.current) {
+        setContentUnavailable(true);
+      }
     }
   }, [taskId]);
 
@@ -292,6 +299,7 @@ export function ShiyanTaskDetailScreen({
   };
 
   const openFinalEditor = (preferCandidate = false) => {
+    if (finalEditorOpen) return;
     const seed = selectShiyanFinalEditorSeed(content, candidate, preferCandidate);
     setFinalMarkdown(seed.markdown);
     setEditorBaselineMarkdown(seed.markdown);
@@ -323,6 +331,8 @@ export function ShiyanTaskDetailScreen({
       Alert.alert('最终稿不能为空', '请先完成内容编辑。');
       return;
     }
+    finalSaveInFlight.current = true;
+    contentGeneration.current += 1;
     setBusyAction('save-final');
     try {
       const next = await getShiyanContentDataSource().saveFinalDraft(taskId, markdown, {
@@ -336,10 +346,12 @@ export function ShiyanTaskDetailScreen({
       setEditorBaselineMarkdown(saved);
       setFinalBaseVersion(next.finalDraftBaseVersion);
       setCandidate(null);
+      setContentUnavailable(false);
       Alert.alert('最终稿已保存', '新的 AI 调整仍只会生成候选，不会覆盖这份内容。');
     } catch (error) {
       Alert.alert('无法保存最终稿', error instanceof Error ? error.message : '请稍后重试。');
     } finally {
+      finalSaveInFlight.current = false;
       setBusyAction(null);
     }
   };
@@ -458,7 +470,7 @@ export function ShiyanTaskDetailScreen({
             </View>
           )}
 
-          {reviewResult ? (
+          {reviewResult && !finalEditorOpen ? (
             <View style={styles.resultActions}>
               <Pressable
                 accessibilityRole="button"
@@ -549,13 +561,15 @@ export function ShiyanTaskDetailScreen({
               <Text style={[styles.muted, { color: colors.text.soft }]}>
                 当前最终稿没有被替换。只有你明确进入编辑并保存后才会更新。
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openFinalEditor(true)}
-                style={[styles.compactButton, { alignSelf: 'flex-start' }]}
-              >
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>用候选继续编辑</Text>
-              </Pressable>
+              {!finalEditorOpen ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => openFinalEditor(true)}
+                  style={[styles.compactButton, { alignSelf: 'flex-start' }]}
+                >
+                  <Text style={{ color: colors.primary, fontWeight: '600' }}>用候选继续编辑</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 

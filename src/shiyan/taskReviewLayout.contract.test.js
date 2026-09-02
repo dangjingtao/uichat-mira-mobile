@@ -29,15 +29,17 @@ describe('MOB-032 Shiyan result-first review layout contract', () => {
     expect(source).toContain('用候选继续编辑');
   });
 
-  it('uses the opened editor seed as the dirty baseline', () => {
+  it('uses the opened editor seed as the dirty baseline and prevents reseeding re-entry', () => {
     expect(source).toContain(
       "const [editorBaselineMarkdown, setEditorBaselineMarkdown] = useState('');",
     );
     expect(source).toContain(
       'finalMarkdown.trim() !== editorBaselineMarkdown.trim()',
     );
+    expect(source).toContain('if (finalEditorOpen) return;');
     expect(source).toContain('setEditorBaselineMarkdown(seed.markdown);');
     expect(source).toContain('setEditorBaselineMarkdown(saved);');
+    expect(source).toContain('reviewResult && !finalEditorOpen ? (');
   });
 
   it('protects dirty Final Draft edits before navigation or editor close', () => {
@@ -55,6 +57,16 @@ describe('MOB-032 Shiyan result-first review layout contract', () => {
     expect(pollingSource).toContain('void loadTask(true);');
     expect(pollingSource).toContain('void loadTranscript();');
     expect(pollingSource).toContain('void loadContent();');
+  });
+
+  it('rejects stale content responses across overlapping refresh and Final Draft save', () => {
+    expect(source).toContain('const contentGeneration = useRef(0);');
+    expect(source).toContain('const finalSaveInFlight = useRef(false);');
+    expect(source).toContain('const generation = ++contentGeneration.current;');
+    expect(source).toContain(
+      'if (generation !== contentGeneration.current || finalSaveInFlight.current) return;',
+    );
+    expect(source).toContain('contentGeneration.current += 1;');
   });
 
   it('keeps transcript as a read-only evidence layer', () => {
