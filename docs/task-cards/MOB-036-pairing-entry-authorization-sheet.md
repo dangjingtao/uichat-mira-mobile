@@ -1,6 +1,6 @@
 # MOB-036：桌面配对入口与授权 Bottom Sheet 收口
 
-状态：**TODO**
+状态：**REVIEW**
 
 分支：`dev`
 
@@ -175,3 +175,32 @@
 - 真机：扫码 → 提交 → Desktop 批准 → Toast → 首页；
 - 真机：粘贴 → Sheet → 提交；
 - Desktop 拒绝 / 请求过期至少各一次真实或可证明的集成路径。
+
+## 实施结果
+
+- PR #90 `feat: refine desktop pairing authorization flow` 已 squash 合入 `dev`。
+- Merge SHA：`40a57227d9cd1e6e9ec43edc9a03bc0ebda6465b`。
+- 默认页已收口为扫码主入口 + 粘贴兜底；有效扫码/粘贴统一进入同一个 `Mira 授权` Bottom Sheet。
+- 未提交时关闭 Sheet 会清除 descriptor 与粘贴 URI，避免 stale request 被再次误提交。
+- 已提交 claim 后不会通过关闭 UI 伪装成网络取消；poll 错误恢复优先继续既有 pending claim，不重复提交 claim。
+- `PAIRING_CLAIM_UNCERTAIN` 继续禁止自动重试；凭证已领取但本机保存失败的终态要求重新配对，不伪装成普通可重试错误。
+- 配对成功显示轻量 `配对成功` Toast 后返回 `SessionList`。
+- 未修改 Remote Pairing V1、Desktop/Host、Direct/Relay transport 或设备凭据模型。
+
+## 当前验收证据
+
+PR #90 最新 HEAD `b24d0e437d4215f4b8dd963c872985616f18fd2a`：
+
+- TypeScript / ESLint / Jest：通过；
+- Android debug build：通过；
+- iOS Simulator build：通过；
+- unsigned iPhone app build、IPA package/verify、artifact upload：通过；
+- Mira Mobile OpenCode PR Review：workflow `cancelled`，未产出评审结果；产品负责人明确授权在无 AI Review 结果时由当前人工 review 判断后合并。
+
+仍待真机/真实 Desktop 验收，因此状态保持 `REVIEW`：
+
+1. 扫码 → Sheet → 关闭；
+2. 扫码 → 提交 → Desktop 批准 → Toast → 首页；
+3. 粘贴 → Sheet → 提交；
+4. Desktop 拒绝；
+5. 请求过期。
