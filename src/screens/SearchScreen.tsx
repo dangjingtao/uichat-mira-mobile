@@ -30,10 +30,13 @@ import {
   getSessionVisualKindLabel,
   SessionKindIcon,
 } from '../components/SessionKindIcon';
+import { RemoteDiagnosticNotice } from '../components/RemoteDiagnosticNotice';
 import {
-  getSessionLoadErrorMessage,
-  resolveSessionCollectionState,
-} from './sessionCollectionState';
+  classifySessionLoadFailure,
+  type RemoteConnectionDiagnostic,
+  type RemoteConnectionDiagnosticAction,
+} from '../connectivity/remoteConnectionDiagnostics';
+import { resolveSessionCollectionState } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
 import {
   GlobalSearchController,
@@ -64,7 +67,10 @@ export function SearchScreen() {
   const [activeTab, setActiveTab] = useState<SearchTab>('all');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadDiagnostic, setLoadDiagnostic] =
+    useState<RemoteConnectionDiagnostic | null>(null);
+  const [searchDiagnostic, setSearchDiagnostic] =
+    useState<RemoteConnectionDiagnostic | null>(null);
   const [searchState, setSearchState] = useState<GlobalSearchState>({
     status: 'idle',
     query: '',
@@ -75,14 +81,13 @@ export function SearchScreen() {
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
-    setLoadError(null);
+    setLoadDiagnostic(null);
     try {
       const list = await miraHostClient.listSessions();
       setSessions(list);
       void syncUnreadSessions(list).catch(() => undefined);
     } catch (error) {
-      setSessions([]);
-      setLoadError(getSessionLoadErrorMessage(error));
+      setLoadDiagnostic(await classifySessionLoadFailure(error));
     } finally {
       setLoading(false);
     }
@@ -96,7 +101,16 @@ export function SearchScreen() {
 
   useEffect(() => {
     const controller = new GlobalSearchController({
-      listSessions: () => miraHostClient.listSessions(),
+      listSessions: async () => {
+        try {
+          const list = await miraHostClient.listSessions();
+          setSearchDiagnostic(null);
+          return list;
+        } catch (error) {
+          setSearchDiagnostic(await classifySessionLoadFailure(error));
+          throw error;
+        }
+      },
       getMessages: (sessionId) => miraHostClient.getMessages(sessionId),
       onStateChange: setSearchState,
     });
@@ -111,6 +125,7 @@ export function SearchScreen() {
     const controller = searchControllerRef.current;
     if (!controller) return;
     if (!query.trim()) {
+      setSearchDiagnostic(null);
       controller.search('');
       return;
     }
@@ -134,8 +149,30 @@ export function SearchScreen() {
   const isImplementedTab = activeTab === 'all' || activeTab === 'conversations';
   const collectionState = resolveSessionCollectionState(
     loading,
-    loadError,
+    loadDiagnostic?.title ?? null,
     sessions.length,
+  );
+
+  const handleCollectionDiagnosticAction = useCallback(
+    (action: RemoteConnectionDiagnosticAction) => {
+      if (action === 'retry') {
+        void loadSessions();
+        return;
+      }
+      navigation.navigate('HostConfig');
+    },
+    [loadSessions, navigation],
+  );
+
+  const handleSearchDiagnosticAction = useCallback(
+    (action: RemoteConnectionDiagnosticAction) => {
+      if (action === 'retry') {
+        searchControllerRef.current?.search(query);
+        return;
+      }
+      navigation.navigate('HostConfig');
+    },
+    [navigation, query],
   );
 
   return (
@@ -178,6 +215,14 @@ export function SearchScreen() {
         contentContainerStyle={styles.results}
         keyboardShouldPersistTaps="handled"
       >
+        {!hasQuery && collectionState === 'data' && loadDiagnostic ? (
+          <RemoteDiagnosticNotice
+            diagnostic={loadDiagnostic}
+            compact
+            onAction={handleCollectionDiagnosticAction}
+          />
+        ) : null}
+
         {!isImplementedTab ? (
           <Text style={[styles.placeholderText, { color: colors.text.soft }]}>该类型搜索即将支持</Text>
         ) : collectionState === 'loading' && !hasQuery ? (
@@ -188,42 +233,19 @@ export function SearchScreen() {
           >
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        ) : collectionState === 'error' && !hasQuery ? (
-          // The collection list and the search controller fetch sessions
-          // independently, so a failed initial load must not mask search
-          // results that arrived through the controller's own request.
+        ) : collectionState === 'error' && !hasQuery && loadDiagnostic ? (
           <View style={styles.centerState}>
-            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>加载会话失败</Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}>{loadError}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="重试加载会话"
-              onPress={() => void loadSessions()}
-              style={({ pressed }) => [
-                styles.retryButton,
-                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-              ]}
-            >
-              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
-            </Pressable>
+            <RemoteDiagnosticNotice
+              diagnostic={loadDiagnostic}
+              onAction={handleCollectionDiagnosticAction}
+            />
           </View>
-        ) : hasQuery && searchState.status === 'failed' ? (
+        ) : hasQuery && searchState.status === 'failed' && searchDiagnostic ? (
           <View style={styles.centerState}>
-            <Text style={[styles.stateTitle, { color: colors.text.ink }]}>搜索失败</Text>
-            <Text style={[styles.stateText, { color: colors.text.soft }]}>
-              无法连接 Mira Host 完成搜索，请重试。
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="重试搜索"
-              onPress={() => searchControllerRef.current?.search(query)}
-              style={({ pressed }) => [
-                styles.retryButton,
-                { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-              ]}
-            >
-              <Text style={[styles.retryLabel, { color: colors.onPrimary }]}>重试</Text>
-            </Pressable>
+            <RemoteDiagnosticNotice
+              diagnostic={searchDiagnostic}
+              onAction={handleSearchDiagnosticAction}
+            />
           </View>
         ) : hasQuery && searchState.status === 'searching' ? (
           <View
@@ -504,11 +526,10 @@ const styles = StyleSheet.create({
   centerState: {
     flex: 1,
     minHeight: 260,
-    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  stateTitle: { fontSize: fontSize.bodyMd, fontWeight: '600' },
+  stateTitle: { fontSize: fontSize.bodyMd, fontWeight: '600', textAlign: 'center' },
   stateText: {
     marginTop: spacing.sm,
     fontSize: fontSize.button,
@@ -522,6 +543,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
   },
   retryLabel: { fontSize: fontSize.button, fontWeight: '600' },
   composer: {
