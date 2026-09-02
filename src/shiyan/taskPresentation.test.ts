@@ -78,6 +78,40 @@ describe('Shiyan task presentation', () => {
     });
   });
 
+  it('routes retryable upload failures through the existing local submission flow', () => {
+    expect(shiyanStageRecoveryPresentation(stage({ stage: 'upload' }))).toMatchObject({
+      title: '录音上传遇到问题',
+      retryAction: 'resume-upload',
+      retryLabel: '继续上传',
+    });
+    expect(shiyanStageRecoveryPresentation(stage({ stage: 'verify-audio' }))).toMatchObject({
+      retryAction: 'resume-upload',
+      retryLabel: '继续上传',
+    });
+  });
+
+  it('does not promise retry when the failed stage is not retryable', () => {
+    expect(shiyanStageRecoveryPresentation(stage({ retryable: false }))).toMatchObject({
+      supportingText: '原始录音仍然安全；当前错误不支持直接重试，请查看处理详情。',
+      retryAction: null,
+      retryLabel: null,
+    });
+    expect(
+      shiyanStageRecoveryPresentation(stage({ stage: 'organize', retryable: false })),
+    ).toMatchObject({
+      supportingText: '原文已经保存；当前错误不支持直接重试，请查看处理详情。',
+      retryAction: null,
+      retryLabel: null,
+    });
+    expect(
+      shiyanStageRecoveryPresentation(stage({ stage: 'upload', retryable: false })),
+    ).toMatchObject({
+      supportingText: '上传没有完成；当前错误不支持直接重试，请查看处理详情。',
+      retryAction: null,
+      retryLabel: null,
+    });
+  });
+
   it('does not let ready/completed lifecycle hide a failed current stage', () => {
     expect(shiyanTaskStatusText({ ...task(stage()), lifecycle: 'ready' })).toBe('需要处理');
     expect(shiyanTaskStatusText({ ...task(stage()), lifecycle: 'completed' })).toBe('需要处理');
