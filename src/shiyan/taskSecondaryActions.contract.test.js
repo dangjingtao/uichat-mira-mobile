@@ -55,7 +55,7 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
     expect(sheet).toContain("import { fontSize, radius, sizing, spacing } from '../theme/tokens';");
     expect(detail).not.toMatch(/#[0-9a-fA-F]{6}/);
     expect(sheet).not.toMatch(/#[0-9a-fA-F]{6}|rgba\(/);
-    expect(sheet).toContain('backgroundColor: colors.dark.surface');
+    expect(sheet).toContain('backgroundColor: colors.overlay');
   });
 
   it('removes Cloud implementation language from retention feedback', () => {
