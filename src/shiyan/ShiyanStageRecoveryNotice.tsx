@@ -1,9 +1,21 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CircleAlert } from 'lucide-react-native';
+import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { radius, spacing } from '../theme/tokens';
+import { localCaptureRepository } from './recording/localCaptureRepository';
+import { shiyanSubmissionRepository } from './submissionRepository';
 import type { ShiyanStageRecoveryPresentation } from './taskPresentation';
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 export function ShiyanStageRecoveryNotice({
   recovery,
@@ -16,7 +28,66 @@ export function ShiyanStageRecoveryNotice({
   onRetry?: () => void;
   onOpenDetails: () => void;
 }) {
+  const navigation = useNavigation<NavProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'ShiyanTaskDetail'>>();
   const { colors } = useTheme();
+  const [uploadRecoveryCaptureId, setUploadRecoveryCaptureId] = useState<string | null>(null);
+  const [uploadRecoveryChecked, setUploadRecoveryChecked] = useState(false);
+  const resumeUpload = recovery.retryAction === 'resume-upload';
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!resumeUpload) {
+        setUploadRecoveryCaptureId(null);
+        setUploadRecoveryChecked(true);
+        return undefined;
+      }
+
+      let active = true;
+      setUploadRecoveryChecked(false);
+      void (async () => {
+        const pointer = route.params.localCaptureId
+          ? null
+          : await shiyanSubmissionRepository.findByTaskId(route.params.taskId);
+        const localCaptureId = route.params.localCaptureId ?? pointer?.localCaptureId ?? null;
+        const capture = localCaptureId
+          ? await localCaptureRepository.get(localCaptureId)
+          : null;
+        if (!active) return;
+        setUploadRecoveryCaptureId(capture ? capture.id : null);
+        setUploadRecoveryChecked(true);
+      })().catch(() => {
+        if (!active) return;
+        setUploadRecoveryCaptureId(null);
+        setUploadRecoveryChecked(true);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [resumeUpload, route.params.localCaptureId, route.params.taskId]),
+  );
+
+  const supportingText = resumeUpload
+    ? !uploadRecoveryChecked
+      ? '上传没有完成，正在确认本机录音是否仍可继续。'
+      : uploadRecoveryCaptureId
+        ? '本地录音仍然安全，可以回到现有提交流程继续上传。'
+        : '当前设备没有找到可继续上传的本地录音，请查看处理详情确认下一步。'
+    : recovery.supportingText;
+
+  const retryAvailable = resumeUpload
+    ? Boolean(uploadRecoveryCaptureId)
+    : Boolean(recovery.retryAction && recovery.retryLabel && onRetry);
+
+  const handleRetry = () => {
+    if (resumeUpload) {
+      if (!uploadRecoveryCaptureId) return;
+      navigation.navigate('ShiyanCaptureConfirm', { captureId: uploadRecoveryCaptureId });
+      return;
+    }
+    onRetry?.();
+  };
 
   return (
     <View
@@ -30,14 +101,14 @@ export function ShiyanStageRecoveryNotice({
         <Text style={[styles.title, { color: colors.text.ink }]}>{recovery.title}</Text>
       </View>
       <Text style={[styles.supporting, { color: colors.text.base }]}>
-        {recovery.supportingText}
+        {supportingText}
       </Text>
       <View style={styles.actions}>
-        {recovery.retryAction && recovery.retryLabel && onRetry ? (
+        {retryAvailable && recovery.retryLabel ? (
           <Pressable
             accessibilityRole="button"
             disabled={busy}
-            onPress={onRetry}
+            onPress={handleRetry}
             style={({ pressed }) => [
               styles.retryButton,
               {
