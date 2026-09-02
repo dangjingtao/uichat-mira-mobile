@@ -193,9 +193,14 @@ export function HostConfigScreen() {
   const pairingClaimUncertain =
     pairingState.phase === 'error' &&
     pairingState.message?.includes('状态不确定') === true;
+  const pairingDeliveredWithoutSave =
+    pairingState.phase === 'error' &&
+    pairingState.pending !== null &&
+    pairingState.deviceId !== null;
   const pairingCanRetry =
     pairingState.phase === 'error' &&
     !pairingClaimUncertain &&
+    !pairingDeliveredWithoutSave &&
     secureStorageAvailable;
 
   const pairingTitle = (() => {
@@ -211,6 +216,7 @@ export function HostConfigScreen() {
       case 'expired':
         return '配对请求已过期';
       case 'error':
+        return pairingDeliveredWithoutSave ? '需要重新配对' : '配对未完成';
       case 'blocked':
         return '配对未完成';
       default:
@@ -233,9 +239,13 @@ export function HostConfigScreen() {
       case 'blocked':
         return '当前构建无法安全保存设备凭据，请关闭后检查系统安全存储。';
       case 'error':
-        return pairingClaimUncertain
-          ? pairingState.message ?? '配对申请状态不确定，请先在桌面确认申请状态。'
-          : '配对未完成，请检查手机网络和 Mira Desktop 后重试。';
+        if (pairingClaimUncertain) {
+          return pairingState.message ?? '配对申请状态不确定，请先在桌面确认申请状态。';
+        }
+        if (pairingDeliveredWithoutSave) {
+          return '设备凭证已被领取，但本机没有完成保存，请关闭后重新配对。';
+        }
+        return '配对未完成，请检查手机网络和 Mira Desktop 后重试。';
       default:
         return secureStorageAvailable
           ? '提交后，请在桌面端确认此设备。'
