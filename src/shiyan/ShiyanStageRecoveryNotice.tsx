@@ -46,13 +46,17 @@ export function ShiyanStageRecoveryNotice({
       let active = true;
       setUploadRecoveryChecked(false);
       void (async () => {
-        const pointer = route.params.localCaptureId
+        const routeCaptureId = route.params.localCaptureId ?? null;
+        const routeCapture = routeCaptureId
+          ? await localCaptureRepository.get(routeCaptureId)
+          : null;
+        const pointer = routeCapture
           ? null
           : await shiyanSubmissionRepository.findByTaskId(route.params.taskId);
-        const localCaptureId = route.params.localCaptureId ?? pointer?.localCaptureId ?? null;
-        const capture = localCaptureId
-          ? await localCaptureRepository.get(localCaptureId)
+        const pointerCapture = pointer?.localCaptureId
+          ? await localCaptureRepository.get(pointer.localCaptureId)
           : null;
+        const capture = routeCapture ?? pointerCapture;
         if (!active) return;
         setUploadRecoveryCaptureId(capture ? capture.id : null);
         setUploadRecoveryChecked(true);
