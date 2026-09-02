@@ -125,7 +125,7 @@ export const classifySessionLoadFailure = async (
       {
         kind: 'permission_denied',
         title: '当前设备无权读取会话',
-        message: '设备仍保持配对，请检查桌面端授予的 Remote 权限。',
+        message: '当前设备授权范围不足，请检查桌面端授予的 Remote 权限。',
         primaryAction: {
           kind: 'connection_settings',
           label: '查看连接设置',
