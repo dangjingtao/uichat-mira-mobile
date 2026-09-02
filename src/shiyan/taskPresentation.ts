@@ -83,17 +83,32 @@ export function shiyanStageUserStatus(
   return { label: '可以查看', tone: 'muted' };
 }
 
+export function shiyanTaskStateUserStatus(input: {
+  lifecycle: ShiyanCaptureTaskView['lifecycle'];
+  currentStage: string;
+  stageStatus: ShiyanCaptureStageView['status'];
+}): ShiyanUserStatusPresentation {
+  if (input.lifecycle === 'cancelled') return { label: '已取消', tone: 'muted' };
+  if (input.stageStatus === 'failed') return { label: '需要处理', tone: 'error' };
+  if (input.lifecycle === 'completed') return { label: '已完成', tone: 'success' };
+  if (input.lifecycle === 'ready') return { label: '待你确认', tone: 'primary' };
+  return shiyanStageUserStatus(input.currentStage, input.stageStatus);
+}
+
 export function shiyanTaskUserStatus(task: ShiyanCaptureTaskView): ShiyanUserStatusPresentation {
-  if (task.lifecycle === 'cancelled') return { label: '已取消', tone: 'muted' };
-
   const stage = currentShiyanStage(task);
-  if (stage?.status === 'failed') return { label: '需要处理', tone: 'error' };
+  if (!stage) {
+    if (task.lifecycle === 'cancelled') return { label: '已取消', tone: 'muted' };
+    if (task.lifecycle === 'completed') return { label: '已完成', tone: 'success' };
+    if (task.lifecycle === 'ready') return { label: '待你确认', tone: 'primary' };
+    return { label: '处理中', tone: 'primary' };
+  }
 
-  if (task.lifecycle === 'completed') return { label: '已完成', tone: 'success' };
-  if (task.lifecycle === 'ready') return { label: '待你确认', tone: 'primary' };
-  if (!stage) return { label: '处理中', tone: 'primary' };
-
-  return shiyanStageUserStatus(stage.stage, stage.status);
+  return shiyanTaskStateUserStatus({
+    lifecycle: task.lifecycle,
+    currentStage: stage.stage,
+    stageStatus: stage.status,
+  });
 }
 
 export function shiyanTaskStatusText(task: ShiyanCaptureTaskView): string {
