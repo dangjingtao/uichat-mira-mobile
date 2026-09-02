@@ -37,6 +37,7 @@ const task = (
   title: `任务 ${id}`,
   sceneName: '会议采集',
   createdAt: '2026-09-01T00:12:00.000Z',
+  lifecycle: 'active',
   currentStage: 'organize',
   stageStatus: 'running',
   canonicalDestinationUrl: null,
@@ -72,19 +73,34 @@ describe('projectUnifiedRecords', () => {
       localCaptureId: 'local-1',
       taskId: 'task-1',
       title: '任务 task-1',
-      statusLabel: '整理中',
+      statusLabel: '正在整理',
     });
   });
 
-  it('maps processing, ready, failed-stage and delivered tasks without marking the whole record failed', () => {
+  it('reuses lifecycle-aware task presentation for processing, ready, completed and failed states', () => {
     const records = projectUnifiedRecords({
       localCaptures: [],
       submissions: [],
       tasks: [
+        task('uploading', 'local-uploading', { currentStage: 'upload', stageStatus: 'running' }),
+        task('transcribing', 'local-transcribing', {
+          currentStage: 'transcribe',
+          stageStatus: 'running',
+        }),
         task('processing', 'local-processing'),
-        task('ready', 'local-ready', { currentStage: 'review', stageStatus: 'pending' }),
+        task('ready', 'local-ready', {
+          lifecycle: 'ready',
+          currentStage: 'review',
+          stageStatus: 'pending',
+        }),
+        task('completed', 'local-completed', {
+          lifecycle: 'completed',
+          currentStage: 'review',
+          stageStatus: 'succeeded',
+        }),
         task('failed', 'local-failed', { currentStage: 'organize', stageStatus: 'failed' }),
         task('delivered', 'local-delivered', {
+          lifecycle: 'completed',
           currentStage: 'delivery',
           stageStatus: 'succeeded',
           canonicalDestinationUrl: 'https://example.com/final.md',
@@ -92,8 +108,14 @@ describe('projectUnifiedRecords', () => {
       ],
     });
 
-    expect(records.find((item) => item.taskId === 'processing')?.statusLabel).toBe('整理中');
-    expect(records.find((item) => item.taskId === 'ready')?.statusLabel).toBe('待确认');
+    expect(records.find((item) => item.taskId === 'uploading')?.statusLabel).toBe('正在上传录音');
+    expect(records.find((item) => item.taskId === 'transcribing')?.statusLabel).toBe('正在转写');
+    expect(records.find((item) => item.taskId === 'processing')?.statusLabel).toBe('正在整理');
+    expect(records.find((item) => item.taskId === 'ready')?.statusLabel).toBe('待你确认');
+    expect(records.find((item) => item.taskId === 'completed')).toMatchObject({
+      statusLabel: '已完成',
+      statusTone: 'success',
+    });
     expect(records.find((item) => item.taskId === 'failed')).toMatchObject({
       statusLabel: '需要处理',
       statusTone: 'error',

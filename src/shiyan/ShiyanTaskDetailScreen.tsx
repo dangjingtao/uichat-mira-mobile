@@ -44,6 +44,7 @@ import type {
   ShiyanTranscriptView,
 } from './client/contracts';
 import { getShiyanContentDataSource } from './content';
+import { ShiyanStageRecoveryNotice } from './ShiyanStageRecoveryNotice';
 import {
   selectShiyanFinalEditorSeed,
   selectShiyanReviewResult,
@@ -52,6 +53,7 @@ import {
   currentShiyanStage,
   retryActionForStage,
   shiyanStageLabel,
+  shiyanStageRecoveryPresentation,
   shiyanStageStatusLabel,
   shiyanTaskStatusText,
   stageFailureText,
@@ -179,7 +181,11 @@ export function ShiyanTaskDetailScreen({
       setTranscript({ status: 'ready', value: result.transcript, message: null });
     } catch (error) {
       if (error instanceof ShiyanClientError && error.code === 'transcript_not_ready') {
-        setTranscript(EMPTY_TRANSCRIPT);
+        setTranscript((previous) =>
+          previous.value
+            ? { status: 'ready', value: previous.value, message: null }
+            : EMPTY_TRANSCRIPT,
+        );
         return;
       }
       setTranscript((previous) => ({
@@ -217,6 +223,10 @@ export function ShiyanTaskDetailScreen({
   );
 
   const currentStage = useMemo(() => (task ? currentShiyanStage(task) : null), [task]);
+  const recoveryNotice = useMemo(
+    () => (currentStage ? shiyanStageRecoveryPresentation(currentStage) : null),
+    [currentStage],
+  );
   const shouldPoll =
     task?.lifecycle === 'active' && currentStage !== null && currentStage.status !== 'failed';
 
@@ -420,7 +430,15 @@ export function ShiyanTaskDetailScreen({
       ) : task ? (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.lightStatusRow}>
-            <Text style={[styles.lightStatus, { color: colors.text.base }]}>
+            <Text
+              style={[
+                styles.lightStatus,
+                {
+                  color:
+                    currentStage?.status === 'failed' ? colors.status.error : colors.text.base,
+                },
+              ]}
+            >
               {shiyanTaskStatusText(task)}
             </Text>
             <Text style={[styles.statusDot, { color: colors.text.soft }]}>·</Text>
@@ -428,6 +446,17 @@ export function ShiyanTaskDetailScreen({
               {new Date(task.createdAt).toLocaleString()}
             </Text>
           </View>
+
+          {recoveryNotice ? (
+            <ShiyanStageRecoveryNotice
+              recovery={recoveryNotice}
+              busy={busyAction === 'retry'}
+              onRetry={
+                recoveryNotice.retryAction ? () => void retryCurrentStage() : undefined
+              }
+              onOpenDetails={() => setProcessingOpen(true)}
+            />
+          ) : null}
 
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.resultTitle, { color: colors.text.ink }]}>整理稿</Text>
@@ -747,7 +776,7 @@ export function ShiyanTaskDetailScreen({
                         style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}
                       >
                         <Text style={{ color: colors.primary, fontWeight: '600' }}>
-                          {retryAction === 'transcribe' ? '重试转写' : '重试 AI 整理'}
+                          {retryAction === 'transcribe' ? '重试转写' : '重试整理'}
                         </Text>
                       </Pressable>
                     ) : null}
