@@ -272,7 +272,10 @@ export class RemoteMiraHostClient {
       this.activeCredential = verified;
       return result;
     } catch (error) {
-      if (error instanceof RemoteHostError && error.status === 401) {
+      if (
+        error instanceof RemoteHostError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         await this.credentialStore.clear();
         this.activeCredential = null;
       }
@@ -297,7 +300,10 @@ export class RemoteMiraHostClient {
       this.activeCredential = refreshed;
       return { credential: refreshed, manifest };
     } catch (error) {
-      if (error instanceof RemoteHostError && error.status === 401) {
+      if (
+        error instanceof RemoteHostError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         await this.credentialStore.clear();
         this.activeCredential = null;
       }
@@ -773,7 +779,10 @@ export class RemoteMiraHostClient {
     try {
       return await operation(credential);
     } catch (error) {
-      if (error instanceof RemoteHostError && error.status === 401) {
+      if (
+        error instanceof RemoteHostError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         this.activeCredential = null;
         await this.credentialStore.clear();
       }
