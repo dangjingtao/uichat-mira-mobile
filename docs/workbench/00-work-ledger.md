@@ -62,4 +62,4 @@
 
 `PASS` 只表示仓库验收证据和必要的产品/机器观察均已完成。`REVIEW` 不得被解释为真实设备、Host、Cloud、Provider 或跨仓端到端已通过。
 
-详细范围、历史证据和跨仓依赖仍保留在 [`../work-ledger.md`](../work-ledger.md) 与 [`../task-cards/`](../task-cards/)；这些文件不得与本台账产生相反状态。
+详细范围、历史证据和跨仓依赖保留在 [`../task-cards/`](../task-cards/) 与对应产品 / 技术设计文档中；这些资料不得与本台账产生相反状态。
