@@ -32,7 +32,7 @@ export function ShiyanActionSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
-        accessibilityLabel={`关闭${title}`}
+        accessible={false}
         style={[styles.backdrop, { backgroundColor: colors.overlay }]}
         onPress={onClose}
       >
