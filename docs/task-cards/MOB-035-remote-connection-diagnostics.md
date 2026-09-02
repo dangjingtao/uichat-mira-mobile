@@ -1,6 +1,6 @@
 # MOB-035：远程连接状态诊断与会话错误分层
 
-状态：TODO  
+状态：REVIEW  
 优先级：P1  
 主责仓库：`dangjingtao/uichat-mira-mobile`  
 可能依赖：`dangjingtao/uichat-mira` Desktop Host / Relay presence contract
@@ -82,6 +82,15 @@
 10. Desktop 返回非法 Thread payload：显示会话加载失败，并保留可诊断错误码；
 11. 首页、Drawer、搜索页对同一故障给出一致分类；
 12. 为上述分类补齐单元测试；Android 真机至少验证 1、2、4、5、7、9，iOS 保留等价 smoke 挂账或证据。
+
+## 实施证据
+
+- Mobile PR #92 已 squash merge 到 `dev`，merge commit：`0d5f2c6e6439cd8e484763980f25a6ec547007a8`；
+- 最终 head `d7069ae153e6920415acd4d8ab16ad6bf0a2dce0` 的 Mobile CI 完整通过：Typecheck、Lint、Jest、Android debug、iOS simulator、unsigned iPhone / IPA；
+- OpenCode Review 最终工作流 `completed / cancelled`，没有形成新的 verdict；此前 Codex 提出的全局搜索 message-fetch P2 已修复、补回归测试并关闭 review thread；
+- 已确认 Relay 现有 `HOST_OFFLINE` 可提供权威 Host 离线事实，因此本卡未引入新的 Desktop / Relay 协议；
+- Android 复用现有 `MiraNetworkMonitor` 读取系统网络状态；iOS 当前没有等价 native monitor，无法确认手机离线时保守归类 `host_unreachable`；
+- 仍需 Android 真机状态矩阵与 iOS 等价 smoke 后才可进入 PASS。
 
 ## 完成定义
 
