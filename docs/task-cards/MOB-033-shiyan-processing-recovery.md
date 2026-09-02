@@ -1,6 +1,6 @@
 # MOB-033：拾言处理详情与单阶段失败恢复交互
 
-状态：**待实施**
+状态：**REVIEW · 待真机验证**
 
 负责人：`mob_033_shiyan_processing_recovery`
 
@@ -183,6 +183,13 @@ npm test -- --runInBand
 - processing polling 后状态更新。
 
 真机 / 集成 smoke：至少人工模拟或使用真实 dev Cloud 验证一个 retryable stage failure；无法制造真实 Provider failure 时明确 validation gap，不得伪造。
+
+## Implementation Evidence
+
+- PR #89 已 squash-merge 到 `dev`，merge commit `680de1221316414c83eb3cb8e2e421d948427206`。
+- current-head Typecheck / Lint / Jest、Android debug、iOS simulator、unsigned iPhone / IPA 均通过。
+- 两次 latest-head OpenCode Review 均在工作流 18 分钟超时后被取消，没有产出 verdict；按产品负责人决定，本次不将“无结果”视为代码失败。
+- 仍需真实 Android/iOS 与真实 dev Cloud 验证 retryable stage failure、upload recovery、内容保留与恢复交互，完成前不得标记 PASS。
 
 ## Parallel / Integration
 
