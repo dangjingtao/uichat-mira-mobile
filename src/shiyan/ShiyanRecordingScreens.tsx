@@ -20,17 +20,20 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
-  Cloud,
   FileAudio,
   Mic2,
+  MoreHorizontal,
   Pause,
   Play,
+  Settings2,
+  SlidersHorizontal,
   Square,
   Trash2,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import { ShiyanActionSheet, type ShiyanActionSheetItem } from './ShiyanActionSheet';
 import {
   SHIYAN_BUILT_IN_SCENES,
   getCustomSceneDraft,
@@ -109,6 +112,7 @@ export function ShiyanHomeScreen() {
     getCustomSceneDraft(),
   );
   const [sceneSheetOpen, setSceneSheetOpen] = useState(false);
+  const [homeMoreOpen, setHomeMoreOpen] = useState(false);
   const [recentRecords, setRecentRecords] = useState<readonly UnifiedRecordPresentation[]>([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [recordsWarning, setRecordsWarning] = useState('');
@@ -130,7 +134,7 @@ export function ShiyanHomeScreen() {
         .then((result) => {
           if (!active) return;
           setRecentRecords(result.records.slice(0, 3));
-          setRecordsWarning(result.cloudError ? '部分 Cloud 记录暂时不可用。' : '');
+          setRecordsWarning(result.cloudError ? '部分同步记录暂时不可用。' : '');
         })
         .catch(() => {
           if (!active) return;
@@ -171,17 +175,34 @@ export function ShiyanHomeScreen() {
       ? '记录暂时不可用'
       : '还没有拾言记录';
 
+  const homeMoreItems: readonly ShiyanActionSheetItem[] = [
+    {
+      key: 'service-config',
+      label: '服务配置',
+      supportingText: '配置拾言服务连接',
+      icon: <Settings2 size={19} color={colors.text.ink} />,
+      onPress: () => navigation.navigate('ShiyanCloudConfig'),
+    },
+    {
+      key: 'scene-config',
+      label: '配置自定义场景',
+      supportingText: '调整自定义场景名称与整理结构',
+      icon: <SlidersHorizontal size={19} color={colors.text.ink} />,
+      onPress: () => navigation.navigate('ShiyanSceneConfig'),
+    },
+  ];
+
   return (
     <ScreenShell
       title="拾言"
       headerRight={
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="配置拾言 Cloud"
-          onPress={() => navigation.navigate('ShiyanCloudConfig')}
+          accessibilityLabel="更多操作"
+          onPress={() => setHomeMoreOpen(true)}
           style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.65 }]}
         >
-          <Cloud size={20} color={colors.text.ink} />
+          <MoreHorizontal size={20} color={colors.text.ink} />
         </Pressable>
       }
     >
@@ -273,6 +294,13 @@ export function ShiyanHomeScreen() {
         </View>
       </ScrollView>
 
+      <ShiyanActionSheet
+        visible={homeMoreOpen}
+        title="更多操作"
+        items={homeMoreItems}
+        onClose={() => setHomeMoreOpen(false)}
+      />
+
       <Modal
         visible={sceneSheetOpen}
         transparent
@@ -280,8 +308,8 @@ export function ShiyanHomeScreen() {
         onRequestClose={() => setSceneSheetOpen(false)}
       >
         <Pressable
-          accessibilityLabel="关闭场景选择"
-          style={styles.sheetBackdrop}
+          accessible={false}
+          style={[styles.sheetBackdrop, { backgroundColor: colors.overlay }]}
           onPress={() => setSceneSheetOpen(false)}
         >
           <View
@@ -409,7 +437,7 @@ export function ShiyanSceneSelectScreen() {
           ]}
         >
           <Mic2 size={18} color={selected ? colors.onPrimary : colors.text.soft} />
-          <Text style={[styles.primaryButtonText, { color: selected ? colors.onPrimary : colors.text.soft }]}>
+          <Text style={[styles.primaryButtonText, { color: selected ? colors.onPrimary : colors.text.soft }]}> 
             {selected ? `使用「${selected.name}」开始录音` : '先选择一个场景'}
           </Text>
         </Pressable>
@@ -499,7 +527,7 @@ export function ShiyanRecordScreen() {
       <View style={styles.recordingBody}>
         <Text style={[styles.eyebrow, { color: colors.text.soft }]}>{route.params.sceneName}</Text>
         <Text style={[styles.timer, { color: colors.text.ink }]}>{formatDuration(snapshot.durationMs)}</Text>
-        <Text style={[styles.recordingHint, { color: colors.text.soft }]}>
+        <Text style={[styles.recordingHint, { color: colors.text.soft }]}> 
           {snapshot.state === 'paused' ? '录音已暂停，文件仍保留在本机。' : active ? '正在录音，仅写入 App 私有目录。' : '点击开始后才会申请麦克风权限。'}
         </Text>
 
@@ -649,7 +677,7 @@ const styles = StyleSheet.create({
   draftCard: { minHeight: 92, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center' },
   draftMain: { flex: 1, padding: spacing.lg, gap: spacing.xs },
   trashButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.45)', justifyContent: 'flex-end' },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end' },
   sheetPanel: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, paddingBottom: spacing.lg, maxHeight: '70%' },
   sheetTitle: { fontSize: fontSize.bodyMd, fontWeight: '700', textAlign: 'center', paddingVertical: spacing.md },
   sheetList: { paddingHorizontal: spacing.md },
