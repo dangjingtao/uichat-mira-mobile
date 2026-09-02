@@ -72,15 +72,20 @@ describe('projectUnifiedRecords', () => {
       localCaptureId: 'local-1',
       taskId: 'task-1',
       title: '任务 task-1',
-      statusLabel: '整理中',
+      statusLabel: '正在整理',
     });
   });
 
-  it('maps processing, ready, failed-stage and delivered tasks without marking the whole record failed', () => {
+  it('reuses the task presentation mapping for processing, ready and failed-stage states', () => {
     const records = projectUnifiedRecords({
       localCaptures: [],
       submissions: [],
       tasks: [
+        task('uploading', 'local-uploading', { currentStage: 'upload', stageStatus: 'running' }),
+        task('transcribing', 'local-transcribing', {
+          currentStage: 'transcribe',
+          stageStatus: 'running',
+        }),
         task('processing', 'local-processing'),
         task('ready', 'local-ready', { currentStage: 'review', stageStatus: 'pending' }),
         task('failed', 'local-failed', { currentStage: 'organize', stageStatus: 'failed' }),
@@ -92,8 +97,10 @@ describe('projectUnifiedRecords', () => {
       ],
     });
 
-    expect(records.find((item) => item.taskId === 'processing')?.statusLabel).toBe('整理中');
-    expect(records.find((item) => item.taskId === 'ready')?.statusLabel).toBe('待确认');
+    expect(records.find((item) => item.taskId === 'uploading')?.statusLabel).toBe('正在上传录音');
+    expect(records.find((item) => item.taskId === 'transcribing')?.statusLabel).toBe('正在转写');
+    expect(records.find((item) => item.taskId === 'processing')?.statusLabel).toBe('正在整理');
+    expect(records.find((item) => item.taskId === 'ready')?.statusLabel).toBe('待你确认');
     expect(records.find((item) => item.taskId === 'failed')).toMatchObject({
       statusLabel: '需要处理',
       statusTone: 'error',
