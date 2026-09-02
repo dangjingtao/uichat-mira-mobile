@@ -271,6 +271,8 @@ export function HostConfigScreen() {
     setAuthorizationSheetOpen(false);
     resetPairing();
     setPairingDescriptor(null);
+    setPairingUriInput('');
+    setPairingLinkError(null);
     restoreCurrentConnectivityTarget();
   }, [pairingBusy, resetPairing, restoreCurrentConnectivityTarget]);
 
