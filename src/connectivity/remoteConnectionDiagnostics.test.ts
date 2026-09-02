@@ -82,6 +82,30 @@ describe('MOB-035 remote connection diagnostics', () => {
     expect(preservedAttempt.kind).toBe('host_offline');
   });
 
+  it('does not let earlier Relay offline evidence override a later Host response', async () => {
+    const result = await classifySessionLoadFailure(
+      new RemoteHostError('HTTP_500', 'server error', 500, {
+        transportAttempts: [
+          {
+            transport: 'relay',
+            code: 'RELAY_HOST_OFFLINE',
+            hostResponded: false,
+            authoritativeHostOffline: true,
+          },
+          {
+            transport: 'direct',
+            code: 'HTTP_500',
+            status: 500,
+            hostResponded: true,
+            authoritativeHostOffline: false,
+          },
+        ],
+      }),
+      { getNetworkState: online },
+    );
+    expect(result.kind).toBe('session_service_error');
+  });
+
   it('does not infer Host offline from ordinary transport failure', async () => {
     const result = await classifySessionLoadFailure(
       new RemoteHostError('RELAY_NETWORK_ERROR', 'relay unavailable'),
