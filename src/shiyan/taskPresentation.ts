@@ -33,6 +33,7 @@ const PROCESSING_LABELS: Record<string, string> = {
 };
 
 export type ShiyanRetryAction = 'transcribe' | 'organize';
+export type ShiyanStageRecoveryAction = ShiyanRetryAction | 'resume-upload';
 export type ShiyanUserStatusTone = 'muted' | 'primary' | 'success' | 'error';
 
 export interface ShiyanUserStatusPresentation {
@@ -43,7 +44,7 @@ export interface ShiyanUserStatusPresentation {
 export interface ShiyanStageRecoveryPresentation {
   title: string;
   supportingText: string;
-  retryAction: ShiyanRetryAction | null;
+  retryAction: ShiyanStageRecoveryAction | null;
   retryLabel: string | null;
 }
 
@@ -130,20 +131,26 @@ export function shiyanStageRecoveryPresentation(
   const retryAction = retryActionForStage(stage);
 
   if (stage.stage === 'transcribe') {
+    const canRetry = retryAction === 'transcribe';
     return {
       title: '转写遇到问题',
-      supportingText: '原始录音仍然安全，可以只重新执行转写。',
+      supportingText: canRetry
+        ? '原始录音仍然安全，可以只重新执行转写。'
+        : '原始录音仍然安全；当前错误不支持直接重试，请查看处理详情。',
       retryAction,
-      retryLabel: retryAction ? '重试转写' : null,
+      retryLabel: canRetry ? '重试转写' : null,
     };
   }
 
   if (stage.stage === 'organize') {
+    const canRetry = retryAction === 'organize';
     return {
       title: 'AI 整理遇到问题',
-      supportingText: '原文已经保存，可以只重新整理，不需要重新转写。',
+      supportingText: canRetry
+        ? '原文已经保存，可以只重新整理，不需要重新转写。'
+        : '原文已经保存；当前错误不支持直接重试，请查看处理详情。',
       retryAction,
-      retryLabel: retryAction ? '重试整理' : null,
+      retryLabel: canRetry ? '重试整理' : null,
     };
   }
 
@@ -157,11 +164,14 @@ export function shiyanStageRecoveryPresentation(
   }
 
   if (stage.stage === 'upload' || stage.stage === 'verify-audio') {
+    const canResumeUpload = stage.retryable;
     return {
       title: '录音上传遇到问题',
-      supportingText: '已保存的本地录音不会因此丢失；请查看处理详情确认下一步。',
-      retryAction: null,
-      retryLabel: null,
+      supportingText: canResumeUpload
+        ? '上传没有完成；如果本机录音仍在，可以从现有提交流程继续。'
+        : '上传没有完成；当前错误不支持直接重试，请查看处理详情。',
+      retryAction: canResumeUpload ? 'resume-upload' : null,
+      retryLabel: canResumeUpload ? '继续上传' : null,
     };
   }
 
