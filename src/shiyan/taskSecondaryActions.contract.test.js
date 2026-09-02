@@ -3,16 +3,11 @@ const { resolve } = require('node:path');
 
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
 
-const detail = readSource('src/shiyan/ShiyanTaskDetailContentScreen.tsx');
+const detail = readSource('src/shiyan/ShiyanTaskDetailScreen.tsx');
 const wrapper = readSource('src/shiyan/ShiyanTaskDetailWithDeliveryScreen.tsx');
-const bridge = readSource('src/shiyan/ShiyanTaskDetailScreen.tsx');
 const sheet = readSource('src/shiyan/ShiyanActionSheet.tsx');
 
 describe('MOB-034 Shiyan secondary action hierarchy', () => {
-  it('keeps the canonical TaskDetail route on the polished implementation', () => {
-    expect(bridge).toContain('ShiyanTaskDetailContentScreen as ShiyanTaskDetailScreen');
-  });
-
   it('moves result-page low-frequency actions behind one More sheet', () => {
     expect(detail).toContain('accessibilityLabel="更多操作"');
     expect(detail).toContain('<ShiyanActionSheet');
@@ -48,6 +43,13 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
     expect(detail).toContain('styles.primaryAction');
     expect(detail).toContain('>AI 调整</Text>');
     expect(detail).toContain('>编辑最终稿</Text>');
+  });
+
+  it('stabilizes More handlers for hook-safe memoization', () => {
+    expect(detail).toContain('const setRetention = useCallback(');
+    expect(detail).toContain('const shareFinalDraft = useCallback(async () => {');
+    expect(detail).toContain('setRetention,');
+    expect(detail).toContain('shareFinalDraft,');
   });
 
   it('keeps action-sheet items individually accessible', () => {
