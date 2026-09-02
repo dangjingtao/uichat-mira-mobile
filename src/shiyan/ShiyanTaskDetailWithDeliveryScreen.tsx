@@ -140,9 +140,6 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     setBusy(true);
     setDeliveryError('');
     try {
-      // Saving happens inside the child screen. Always reload the authoritative
-      // Final Draft immediately before delivery so a fast tap after save cannot
-      // reuse the previous confirmedAt/idempotency identity.
       const latest = await shiyanClient.getFinalDraft(taskId);
       setFinalDraft(latest.draft);
       const result = await deliverFinalDraftToGithub(taskId, latest.draft);
@@ -161,8 +158,6 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
     if (!delivery || deliveryBlocked || !hasCanonicalGithubDeliveryEvidence(delivery)) return;
     refreshGeneration.current += 1;
     try {
-      // A save can complete between renders. Re-check the authoritative Final Draft
-      // before opening a canonical URL so an older successful Delivery never wins.
       const latest = await shiyanClient.getFinalDraft(taskId);
       if (!deliveryBelongsToFinalDraft(delivery, latest.draft)) {
         setFinalDraft(latest.draft);
@@ -186,6 +181,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       deliveryBelongsToFinalDraft(delivery, finalDraft) &&
       hasCanonicalGithubDeliveryEvidence(delivery),
   );
+  const deliveryFailed = delivery?.status === 'failed';
 
   const statusCopy = deliveryBlocked
     ? editorState.saving
@@ -193,7 +189,11 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
       : '当前 Final Draft 有未保存修改，请先保存再投递。'
     : currentSucceeded
       ? '已投递当前已保存的 Final Draft，可打开真实文档。'
-      : deliveryError || 'Final Draft 已确认，可以投递到默认 GitHub 仓库。';
+      : deliveryFailed
+        ? `GitHub 投递未完成。最终稿仍然安全，可以再次投递。${deliveryError ? ` ${deliveryError}` : ''}`
+        : deliveryError
+          ? `暂时无法读取投递状态。最终稿仍然安全。 ${deliveryError}`
+          : 'Final Draft 已确认，可以投递到默认 GitHub 仓库。';
 
   return (
     <View style={styles.root}>
@@ -233,9 +233,7 @@ export function ShiyanTaskDetailWithDeliveryScreen() {
               <Text style={[styles.deliveryButtonText, { color: colors.onPrimary }]}>打开 GitHub</Text>
             ) : (
               <>
-                {delivery?.status === 'failed' ? (
-                  <RefreshCw size={15} color={colors.onPrimary} />
-                ) : null}
+                {deliveryFailed ? <RefreshCw size={15} color={colors.onPrimary} /> : null}
                 <Text style={[styles.deliveryButtonText, { color: colors.onPrimary }]}>投递 GitHub</Text>
               </>
             )}
