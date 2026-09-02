@@ -7,8 +7,12 @@ import {
   shiyanSubmissionRepository,
   type ShiyanSubmissionPointer,
 } from './submissionRepository';
+import {
+  shiyanStageUserStatus,
+  type ShiyanUserStatusTone,
+} from './taskPresentation';
 
-export type UnifiedRecordTone = 'muted' | 'primary' | 'success' | 'error';
+export type UnifiedRecordTone = ShiyanUserStatusTone;
 
 export interface UnifiedRecordPresentation {
   id: string;
@@ -59,19 +63,12 @@ const taskStatus = (
   if (task.canonicalDestinationUrl) {
     return { statusLabel: '已投递', statusTone: 'success' };
   }
-  if (task.stageStatus === 'failed') {
-    return { statusLabel: '需要处理', statusTone: 'error' };
-  }
-  if (task.currentStage === 'review' || task.currentStage === 'pending-adjustment') {
-    return { statusLabel: '待确认', statusTone: 'primary' };
-  }
-  if (task.stageStatus === 'pending' || task.stageStatus === 'running') {
-    return { statusLabel: '整理中', statusTone: 'primary' };
-  }
-  if (task.currentStage === 'delivery' && task.stageStatus === 'succeeded') {
-    return { statusLabel: '已完成', statusTone: 'success' };
-  }
-  return { statusLabel: '可以查看', statusTone: 'muted' };
+
+  const status = shiyanStageUserStatus(task.currentStage, task.stageStatus);
+  return {
+    statusLabel: status.label,
+    statusTone: status.tone,
+  };
 };
 
 export function projectUnifiedRecords(input: {
