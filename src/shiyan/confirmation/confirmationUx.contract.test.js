@@ -4,12 +4,16 @@ const { resolve } = require('node:path');
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('Shiyan confirmation UX wiring', () => {
-  it('keeps the Cloud config entry on the Shiyan home header', () => {
+  it('keeps service and custom-scene config reachable through the Shiyan home More sheet', () => {
     const home = readSource('src/shiyan/ShiyanRecordingScreens.tsx');
     const app = readSource('App.tsx');
 
+    expect(home).toContain('accessibilityLabel="更多操作"');
+    expect(home).toContain("label: '服务配置'");
+    expect(home).toContain("label: '配置自定义场景'");
     expect(home).toContain("navigation.navigate('ShiyanCloudConfig')");
-    expect(home).toContain('accessibilityLabel="配置拾言 Cloud"');
+    expect(home).toContain("navigation.navigate('ShiyanSceneConfig')");
+    expect(home).not.toContain('accessibilityLabel="配置拾言 Cloud"');
     expect(app).toContain(
       '<Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />',
     );
