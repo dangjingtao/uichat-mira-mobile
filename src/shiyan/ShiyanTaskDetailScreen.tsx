@@ -28,14 +28,18 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   FileText,
+  MoreHorizontal,
   RefreshCw,
   Share2,
   Sparkles,
+  Upload,
+  Volume2,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
-import { radius, spacing } from '../theme/tokens';
+import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { shiyanClient, ShiyanClientError } from './client/ShiyanClient';
 import type {
   ShiyanAdjustmentCandidate,
@@ -44,6 +48,7 @@ import type {
   ShiyanTranscriptView,
 } from './client/contracts';
 import { getShiyanContentDataSource } from './content';
+import { ShiyanActionSheet, type ShiyanActionSheetItem } from './ShiyanActionSheet';
 import { ShiyanStageRecoveryNotice } from './ShiyanStageRecoveryNotice';
 import {
   selectShiyanFinalEditorSeed,
@@ -64,6 +69,7 @@ type TranscriptState =
   | { status: 'not_ready'; value: null; message: null }
   | { status: 'ready'; value: ShiyanTranscriptView; message: null }
   | { status: 'error'; value: ShiyanTranscriptView | null; message: string };
+type TaskStage = ShiyanCaptureTaskView['stages'][number];
 
 export interface ShiyanFinalEditorState {
   open: boolean;
@@ -71,8 +77,20 @@ export interface ShiyanFinalEditorState {
   saving: boolean;
 }
 
+export interface ShiyanTaskDeliveryActions {
+  available: boolean;
+  busy: boolean;
+  blocked: boolean;
+  succeeded: boolean;
+  failed: boolean;
+  statusText: string;
+  onDeliver: () => void;
+  onOpenDelivery: () => void;
+}
+
 interface ShiyanTaskDetailScreenProps {
   onFinalEditorStateChange?: (state: ShiyanFinalEditorState) => void;
+  deliveryActions?: ShiyanTaskDeliveryActions;
 }
 
 const EMPTY_TRANSCRIPT: TranscriptState = {
@@ -83,6 +101,7 @@ const EMPTY_TRANSCRIPT: TranscriptState = {
 
 export function ShiyanTaskDetailScreen({
   onFinalEditorStateChange,
+  deliveryActions,
 }: ShiyanTaskDetailScreenProps = {}) {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'ShiyanTaskDetail'>>();
@@ -106,6 +125,7 @@ export function ShiyanTaskDetailScreen({
   const [savedFinalMarkdown, setSavedFinalMarkdown] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const allowNavigation = useRef(false);
   const contentGeneration = useRef(0);
   const finalSaveInFlight = useRef(false);
@@ -116,6 +136,8 @@ export function ShiyanTaskDetailScreen({
       finalMarkdown.trim() !== editorBaselineMarkdown.trim(),
     [editorBaselineMarkdown, finalEditorOpen, finalMarkdown],
   );
+  const finalDraftSaving = busyAction === 'save-final';
+  const shareBlocked = finalDraftDirty || finalDraftSaving;
 
   const reviewResult = useMemo(
     () => selectShiyanReviewResult(content, candidate),
@@ -126,17 +148,17 @@ export function ShiyanTaskDetailScreen({
     onFinalEditorStateChange?.({
       open: finalEditorOpen,
       dirty: finalDraftDirty,
-      saving: busyAction === 'save-final',
+      saving: finalDraftSaving,
     });
-  }, [busyAction, finalDraftDirty, finalEditorOpen, onFinalEditorStateChange]);
+  }, [finalDraftDirty, finalDraftSaving, finalEditorOpen, onFinalEditorStateChange]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
       if (allowNavigation.current) return;
-      if (!finalDraftDirty && busyAction !== 'save-final') return;
+      if (!finalDraftDirty && !finalDraftSaving) return;
 
       event.preventDefault();
-      if (busyAction === 'save-final') {
+      if (finalDraftSaving) {
         Alert.alert('正在保存最终稿', '保存完成后再离开，避免丢失本次修改。');
         return;
       }
@@ -153,9 +175,8 @@ export function ShiyanTaskDetailScreen({
         },
       ]);
     });
-
     return unsubscribe;
-  }, [busyAction, finalDraftDirty, navigation]);
+  }, [finalDraftDirty, finalDraftSaving, navigation]);
 
   const loadTask = useCallback(
     async (silent = false) => {
@@ -246,10 +267,9 @@ export function ShiyanTaskDetailScreen({
     }
   }, [loadContent, task?.lifecycle]);
 
-  const retryCurrentStage = async () => {
-    if (!currentStage) return;
-    const action = retryActionForStage(currentStage);
-    if (!action) return;
+  const retryStage = async (stage: TaskStage) => {
+    const action = retryActionForStage(stage);
+    if (action !== 'transcribe' && action !== 'organize') return;
     setBusyAction('retry');
     try {
       if (action === 'transcribe') {
@@ -261,7 +281,7 @@ export function ShiyanTaskDetailScreen({
       await loadTask();
     } catch (error) {
       Alert.alert(
-        action === 'transcribe' ? '无法重试转写' : '无法重试 AI 整理',
+        action === 'transcribe' ? '无法重试转写' : '无法重试整理',
         error instanceof Error ? error.message : '请稍后重试。',
       );
     } finally {
@@ -269,28 +289,31 @@ export function ShiyanTaskDetailScreen({
     }
   };
 
-  const setRetention = async (retained: boolean) => {
-    setBusyAction('retention');
-    try {
-      const result = await shiyanClient.setAudioRetention(taskId, retained);
-      setRetentionChoice(result.retained);
-      Alert.alert(
-        result.retained ? '会保留原始录音' : '使用默认清理策略',
-        result.retained
-          ? 'Cloud 已记录保留选择。'
-          : result.deleteAfter
-            ? `原始录音预计在 ${new Date(result.deleteAfter).toLocaleString()} 后清理。`
-            : 'Cloud 将按默认保留策略处理原始录音。',
-      );
-    } catch (error) {
-      Alert.alert(
-        '无法更新录音保留设置',
-        error instanceof Error ? error.message : '请稍后重试。',
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  };
+  const setRetention = useCallback(
+    async (retained: boolean) => {
+      setBusyAction('retention');
+      try {
+        const result = await shiyanClient.setAudioRetention(taskId, retained);
+        setRetentionChoice(result.retained);
+        Alert.alert(
+          result.retained ? '会保留原始录音' : '使用默认清理策略',
+          result.retained
+            ? '已记录保留选择。'
+            : result.deleteAfter
+              ? `原始录音预计在 ${new Date(result.deleteAfter).toLocaleString()} 后清理。`
+              : '将按默认保留策略处理原始录音。',
+        );
+      } catch (error) {
+        Alert.alert(
+          '无法更新录音保留设置',
+          error instanceof Error ? error.message : '请稍后重试。',
+        );
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [taskId],
+  );
 
   const adjustDraft = async () => {
     const instruction = adjustInstruction.trim();
@@ -357,7 +380,7 @@ export function ShiyanTaskDetailScreen({
       setFinalBaseVersion(next.finalDraftBaseVersion);
       setCandidate(null);
       setContentUnavailable(false);
-      Alert.alert('最终稿已保存', '新的 AI 调整仍只会生成候选，不会覆盖这份内容。');
+      Alert.alert('最终稿已保存', '新的 AI 调整只会生成候选，不会覆盖这份内容。');
     } catch (error) {
       Alert.alert('无法保存最终稿', error instanceof Error ? error.message : '请稍后重试。');
     } finally {
@@ -366,8 +389,12 @@ export function ShiyanTaskDetailScreen({
     }
   };
 
-  const shareFinalDraft = async () => {
+  const shareFinalDraft = useCallback(async () => {
     if (!savedFinalMarkdown || !task) return;
+    if (shareBlocked) {
+      Alert.alert('请先保存最终稿', '保存当前修改后再分享，避免发送旧版本。');
+      return;
+    }
     try {
       await Share.share({
         title: task.title,
@@ -376,7 +403,85 @@ export function ShiyanTaskDetailScreen({
     } catch {
       Alert.alert('分享失败', '暂时无法打开系统分享。');
     }
-  };
+  }, [savedFinalMarkdown, shareBlocked, task]);
+
+  const moreItems = useMemo<readonly ShiyanActionSheetItem[]>(() => {
+    const items: ShiyanActionSheetItem[] = [];
+    if (savedFinalMarkdown) {
+      items.push({
+        key: 'share',
+        label: '分享最终稿',
+        supportingText: shareBlocked ? '请先保存当前修改' : '使用系统分享发送当前已保存内容',
+        icon: <Share2 size={19} color={colors.text.ink} />,
+        disabled: shareBlocked,
+        onPress: () => void shareFinalDraft(),
+      });
+    }
+    if (deliveryActions?.available) {
+      if (deliveryActions.succeeded) {
+        items.push({
+          key: 'open-delivery',
+          label: '打开已投递文档',
+          supportingText: deliveryActions.statusText,
+          icon: <ExternalLink size={19} color={colors.text.ink} />,
+          disabled: deliveryActions.blocked || deliveryActions.busy,
+          onPress: deliveryActions.onOpenDelivery,
+        });
+      } else {
+        items.push({
+          key: 'deliver',
+          label: deliveryActions.failed ? '重新投递 GitHub' : '投递到 GitHub',
+          supportingText: deliveryActions.statusText,
+          icon: deliveryActions.failed ? (
+            <RefreshCw size={19} color={colors.text.ink} />
+          ) : (
+            <Upload size={19} color={colors.text.ink} />
+          ),
+          disabled: deliveryActions.blocked || deliveryActions.busy,
+          onPress: deliveryActions.onDeliver,
+        });
+      }
+    }
+    items.push(
+      {
+        key: 'retain-audio',
+        label: '保留原始录音',
+        supportingText: '覆盖默认临时清理策略',
+        icon: <Volume2 size={19} color={colors.text.ink} />,
+        disabled: busyAction === 'retention',
+        selected: retentionChoice === true,
+        onPress: () => void setRetention(true),
+      },
+      {
+        key: 'default-retention',
+        label: '使用默认清理策略',
+        supportingText: '恢复默认的临时录音保留方式',
+        icon: <Volume2 size={19} color={colors.text.soft} />,
+        disabled: busyAction === 'retention',
+        selected: retentionChoice === false,
+        onPress: () => void setRetention(false),
+      },
+      {
+        key: 'refresh',
+        label: '刷新',
+        supportingText: '重新读取任务、原文与整理稿',
+        icon: <RefreshCw size={19} color={colors.text.ink} />,
+        onPress: () => void refreshAll(),
+      },
+    );
+    return items;
+  }, [
+    busyAction,
+    colors.text.ink,
+    colors.text.soft,
+    deliveryActions,
+    refreshAll,
+    retentionChoice,
+    savedFinalMarkdown,
+    setRetention,
+    shareBlocked,
+    shareFinalDraft,
+  ]);
 
   const transcriptStatusText =
     transcript.status === 'ready'
@@ -401,11 +506,11 @@ export function ShiyanTaskDetailScreen({
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="刷新拾言任务"
-          onPress={() => void refreshAll()}
+          accessibilityLabel="更多操作"
+          onPress={() => setMoreOpen(true)}
           style={styles.headerButton}
         >
-          <RefreshCw size={19} color={colors.text.ink} />
+          <MoreHorizontal size={22} color={colors.text.ink} />
         </Pressable>
       </View>
 
@@ -424,7 +529,7 @@ export function ShiyanTaskDetailScreen({
             onPress={() => void refreshAll()}
             style={[styles.outlineButton, { borderColor: colors.border.default }]}
           >
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>重新加载</Text>
+            <Text style={[styles.buttonText, { color: colors.primary }]}>重新加载</Text>
           </Pressable>
         </View>
       ) : task ? (
@@ -433,10 +538,7 @@ export function ShiyanTaskDetailScreen({
             <Text
               style={[
                 styles.lightStatus,
-                {
-                  color:
-                    currentStage?.status === 'failed' ? colors.status.error : colors.text.base,
-                },
+                { color: currentStage?.status === 'failed' ? colors.status.error : colors.text.base },
               ]}
             >
               {shiyanTaskStatusText(task)}
@@ -452,7 +554,11 @@ export function ShiyanTaskDetailScreen({
               recovery={recoveryNotice}
               busy={busyAction === 'retry'}
               onRetry={
-                recoveryNotice.retryAction ? () => void retryCurrentStage() : undefined
+                currentStage &&
+                (recoveryNotice.retryAction === 'transcribe' ||
+                  recoveryNotice.retryAction === 'organize')
+                  ? () => void retryStage(currentStage)
+                  : undefined
               }
               onOpenDetails={() => setProcessingOpen(true)}
             />
@@ -506,7 +612,7 @@ export function ShiyanTaskDetailScreen({
                 disabled={!content?.aiDraftMarkdown || busyAction === 'adjust'}
                 onPress={() => setAdjustOpen((value) => !value)}
                 style={[
-                  styles.resultAction,
+                  styles.secondaryAction,
                   {
                     borderColor: colors.border.default,
                     opacity: content?.aiDraftMarkdown ? 1 : 0.45,
@@ -514,14 +620,17 @@ export function ShiyanTaskDetailScreen({
                 ]}
               >
                 <Sparkles size={16} color={colors.primary} />
-                <Text style={[styles.resultActionText, { color: colors.primary }]}>AI 调整</Text>
+                <Text style={[styles.buttonText, { color: colors.primary }]}>AI 调整</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => openFinalEditor(false)}
-                style={[styles.resultAction, { borderColor: colors.border.default }]}
+                style={({ pressed }) => [
+                  styles.primaryAction,
+                  { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+                ]}
               >
-                <Text style={[styles.resultActionText, { color: colors.primary }]}>编辑最终稿</Text>
+                <Text style={[styles.buttonText, { color: colors.onPrimary }]}>编辑最终稿</Text>
               </Pressable>
             </View>
           ) : null}
@@ -539,7 +648,7 @@ export function ShiyanTaskDetailScreen({
                   <Text style={[styles.stageTitle, { color: colors.text.ink }]}>调整整理稿</Text>
                 </View>
                 <Pressable accessibilityRole="button" onPress={() => setAdjustOpen(false)}>
-                  <Text style={{ color: colors.text.soft, fontWeight: '600' }}>收起</Text>
+                  <Text style={[styles.buttonText, { color: colors.text.soft }]}>收起</Text>
                 </Pressable>
               </View>
               <TextInput
@@ -562,7 +671,7 @@ export function ShiyanTaskDetailScreen({
                 disabled={!adjustInstruction.trim() || busyAction === 'adjust'}
                 onPress={() => void adjustDraft()}
                 style={({ pressed }) => [
-                  styles.outlineButton,
+                  styles.secondaryAction,
                   {
                     borderColor: colors.border.default,
                     backgroundColor: pressed ? colors.bg.soft : colors.bg.card,
@@ -571,7 +680,7 @@ export function ShiyanTaskDetailScreen({
                 ]}
               >
                 <Sparkles size={17} color={colors.primary} />
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                <Text style={[styles.buttonText, { color: colors.primary }]}>
                   {busyAction === 'adjust' ? '正在调整' : '生成候选'}
                 </Text>
               </Pressable>
@@ -594,9 +703,9 @@ export function ShiyanTaskDetailScreen({
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => openFinalEditor(true)}
-                  style={[styles.compactButton, { alignSelf: 'flex-start' }]}
+                  style={styles.compactButton}
                 >
-                  <Text style={{ color: colors.primary, fontWeight: '600' }}>用候选继续编辑</Text>
+                  <Text style={[styles.buttonText, { color: colors.primary }]}>用候选继续编辑</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -615,7 +724,7 @@ export function ShiyanTaskDetailScreen({
                   <Text style={[styles.muted, { color: colors.text.soft }]}>保存后立即成为当前最终稿</Text>
                 </View>
                 <Pressable accessibilityRole="button" onPress={closeFinalEditor} style={styles.compactButton}>
-                  <Text style={{ color: colors.text.soft, fontWeight: '600' }}>关闭</Text>
+                  <Text style={[styles.buttonText, { color: colors.text.soft }]}>关闭</Text>
                 </Pressable>
               </View>
               <TextInput
@@ -636,18 +745,18 @@ export function ShiyanTaskDetailScreen({
               />
               <Pressable
                 accessibilityRole="button"
-                disabled={busyAction === 'save-final'}
+                disabled={finalDraftSaving}
                 onPress={() => void saveFinalDraft()}
                 style={({ pressed }) => [
                   styles.primaryButton,
                   {
                     backgroundColor: pressed ? colors.primaryActive : colors.primary,
-                    opacity: busyAction === 'save-final' ? 0.6 : 1,
+                    opacity: finalDraftSaving ? 0.6 : 1,
                   },
                 ]}
               >
-                <Text style={{ color: colors.onPrimary, fontWeight: '600' }}>
-                  {busyAction === 'save-final' ? '正在保存' : '保存最终稿'}
+                <Text style={[styles.buttonText, { color: colors.onPrimary }]}>
+                  {finalDraftSaving ? '正在保存' : '保存最终稿'}
                 </Text>
               </Pressable>
             </View>
@@ -687,9 +796,9 @@ export function ShiyanTaskDetailScreen({
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => void loadTranscript()}
-                  style={[styles.smallButton, { backgroundColor: colors.bg.soft, alignSelf: 'flex-start' }]}
+                  style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}
                 >
-                  <Text style={{ color: colors.primary, fontWeight: '600' }}>重试读取</Text>
+                  <Text style={[styles.buttonText, { color: colors.primary }]}>重试读取</Text>
                 </Pressable>
               </View>
             ) : (
@@ -716,10 +825,7 @@ export function ShiyanTaskDetailScreen({
               <Text
                 style={[
                   styles.muted,
-                  {
-                    color:
-                      currentStage?.status === 'failed' ? colors.status.error : colors.text.soft,
-                  },
+                  { color: currentStage?.status === 'failed' ? colors.status.error : colors.text.soft },
                 ]}
               >
                 {shiyanTaskStatusText(task)}
@@ -738,6 +844,7 @@ export function ShiyanTaskDetailScreen({
                 const failed = stage.status === 'failed';
                 const failure = stageFailureText(stage);
                 const retryAction = retryActionForStage(stage);
+                const retryable = retryAction === 'transcribe' || retryAction === 'organize';
                 return (
                   <View
                     key={stage.stage}
@@ -768,14 +875,14 @@ export function ShiyanTaskDetailScreen({
                         </Text>
                       ) : null}
                     </View>
-                    {retryAction ? (
+                    {retryable ? (
                       <Pressable
                         accessibilityRole="button"
                         disabled={busyAction === 'retry'}
-                        onPress={() => void retryCurrentStage()}
+                        onPress={() => void retryStage(stage)}
                         style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}
                       >
-                        <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                        <Text style={[styles.buttonText, { color: colors.primary }]}>
                           {retryAction === 'transcribe' ? '重试转写' : '重试整理'}
                         </Text>
                       </Pressable>
@@ -785,61 +892,15 @@ export function ShiyanTaskDetailScreen({
               })}
             </View>
           ) : null}
-
-          {savedFinalMarkdown ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void shareFinalDraft()}
-              style={[
-                styles.outlineButton,
-                { borderColor: colors.border.default, backgroundColor: colors.bg.card },
-              ]}
-            >
-              <Share2 size={17} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>系统分享 Markdown</Text>
-            </Pressable>
-          ) : null}
-
-          <View style={styles.lowFrequencySection}>
-            <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>原始录音</Text>
-            <Text style={[styles.muted, { color: colors.text.soft }]}>
-              默认按临时录音策略清理，需要时可以明确保留。
-            </Text>
-            <View style={styles.retentionRow}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={busyAction === 'retention'}
-                onPress={() => void setRetention(true)}
-                style={[
-                  styles.outlineButton,
-                  {
-                    flex: 1,
-                    borderColor:
-                      retentionChoice === true ? colors.primary : colors.border.default,
-                  },
-                ]}
-              >
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>保留原始录音</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={busyAction === 'retention'}
-                onPress={() => void setRetention(false)}
-                style={[
-                  styles.outlineButton,
-                  {
-                    flex: 1,
-                    borderColor:
-                      retentionChoice === false ? colors.primary : colors.border.default,
-                  },
-                ]}
-              >
-                <Text style={{ color: colors.primary, fontWeight: '600' }}>默认清理</Text>
-              </Pressable>
-            </View>
-          </View>
         </ScrollView>
       ) : null}
+
+      <ShiyanActionSheet
+        visible={moreOpen}
+        title="更多操作"
+        items={moreItems}
+        onClose={() => setMoreOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -852,9 +913,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
   },
-  headerButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '600' },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
+  headerButton: {
+    width: sizing.iconButton,
+    height: sizing.iconButton,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: fontSize.titleMd,
+    fontWeight: '600',
+  },
+  content: { padding: spacing.lg, paddingBottom: spacing.section, gap: spacing.md },
   centerState: {
     flex: 1,
     alignItems: 'center',
@@ -862,22 +933,32 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.md,
   },
-  stateTitle: { fontSize: 18, fontWeight: '600' },
-  muted: { fontSize: 13, lineHeight: 19 },
-  lightStatusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
-  lightStatus: { fontSize: 13, fontWeight: '600' },
-  statusDot: { fontSize: 13 },
-  resultTitle: { fontSize: 19, fontWeight: '700' },
-  resultBadge: { borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 5 },
-  resultBadgeText: { fontSize: 12, fontWeight: '700' },
+  stateTitle: { fontSize: fontSize.titleMd, fontWeight: '600' },
+  muted: { fontSize: fontSize.caption, lineHeight: 19 },
+  buttonText: { fontSize: fontSize.button, fontWeight: '600' },
+  lightStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  lightStatus: { fontSize: fontSize.caption, fontWeight: '600' },
+  statusDot: { fontSize: fontSize.caption },
+  resultTitle: { fontSize: fontSize.titleLg, fontWeight: '700' },
+  resultBadge: {
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  resultBadgeText: { fontSize: fontSize.captionUppercase, fontWeight: '700' },
   resultCard: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.md,
   },
-  resultText: { fontSize: 15, lineHeight: 24 },
-  resultMeta: { fontSize: 12, lineHeight: 18 },
+  resultText: { fontSize: fontSize.md, lineHeight: 24 },
+  resultMeta: { fontSize: fontSize.captionUppercase, lineHeight: 18 },
   pendingResult: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.lg,
@@ -885,8 +966,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   resultActions: { flexDirection: 'row', gap: spacing.sm },
-  resultAction: {
-    minHeight: 42,
+  secondaryAction: {
+    minHeight: sizing.touchTarget,
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.full,
@@ -896,8 +977,20 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
   },
-  resultActionText: { fontSize: 13, fontWeight: '700' },
-  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  primaryAction: {
+    minHeight: sizing.touchTarget,
+    flex: 1,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  sectionTitle: { fontSize: fontSize.bodyMd, fontWeight: '700' },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   stageList: { gap: spacing.sm },
   stageRow: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -907,21 +1000,22 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignItems: 'center',
   },
-  stageMain: { flex: 1, gap: 3 },
-  stageTitle: { fontSize: 14, fontWeight: '600' },
-  failureText: { fontSize: 13, lineHeight: 19 },
+  stageMain: { flex: 1, gap: spacing.xs },
+  stageTitle: { fontSize: fontSize.button, fontWeight: '600' },
+  failureText: { fontSize: fontSize.caption, lineHeight: 19 },
   smallButton: {
     minHeight: 36,
     paddingHorizontal: spacing.md,
     borderRadius: radius.full,
     justifyContent: 'center',
+    alignSelf: 'flex-start',
   },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   compactButton: {
     minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
   readonlyBox: {
@@ -929,8 +1023,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  errorBox: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  readonlyText: { fontSize: 14, lineHeight: 22 },
+  errorBox: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  readonlyText: { fontSize: fontSize.button, lineHeight: 22 },
   candidateBox: { borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   candidateTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   inlinePanel: {
@@ -939,13 +1038,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
-  inlinePanelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  inlinePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   input: {
     minHeight: 76,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     padding: spacing.md,
-    fontSize: 14,
+    fontSize: fontSize.button,
     lineHeight: 21,
     textAlignVertical: 'top',
   },
@@ -957,14 +1060,14 @@ const styles = StyleSheet.create({
   },
   finalInput: {
     minHeight: 240,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.md,
     padding: spacing.md,
-    fontSize: 14,
+    fontSize: fontSize.button,
     lineHeight: 22,
   },
   outlineButton: {
-    minHeight: 44,
+    minHeight: sizing.touchTarget,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radius.full,
     flexDirection: 'row',
@@ -989,7 +1092,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   disclosureCopy: { flex: 1, gap: 2 },
-  disclosureTitle: { fontSize: 15, fontWeight: '600' },
-  lowFrequencySection: { gap: spacing.sm, marginTop: spacing.sm },
-  retentionRow: { flexDirection: 'row', gap: spacing.sm },
+  disclosureTitle: { fontSize: fontSize.md, fontWeight: '600' },
 });
