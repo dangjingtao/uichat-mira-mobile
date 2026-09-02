@@ -134,20 +134,23 @@ describe('RemoteMiraHostClient pairing credential retention', () => {
     });
   });
 
-  it('clears a credential explicitly rejected by the Host', async () => {
+  it('keeps a paired credential when the Host returns forbidden', async () => {
     const store = new MemoryDeviceCredentialStore();
     const transport = async <T>(request: RemoteJsonRequest<T>): Promise<T> => {
       if (request.path.endsWith('/poll')) {
         return request.parse(pollPayload);
       }
-      throw new RemoteHostError('HTTP_403', 'revoked', 403);
+      throw new RemoteHostError('HTTP_403', 'forbidden', 403);
     };
     const client = new RemoteMiraHostClient(store, transport);
 
     await expect(client.pollPairing(pending)).rejects.toMatchObject({
       status: 403,
     });
-    await expect(store.load()).resolves.toBeNull();
+    await expect(store.load()).resolves.toMatchObject({
+      credential: pollPayload.credential,
+      deviceId: 'device-1',
+    });
   });
 });
 
@@ -371,7 +374,7 @@ describe('RemoteMiraHostClient transport selection', () => {
     });
 
     const direct: JsonTransport = async _request => {
-      throw new RemoteHostError('HTTP_403', 'revoked', 403);
+      throw new RemoteHostError('HTTP_403', 'forbidden', 403);
     };
     const relayJsonMock = jest.fn();
     const relayJson: RelayJsonTransport = async (_relay, request) => {
@@ -387,7 +390,10 @@ describe('RemoteMiraHostClient transport selection', () => {
 
     await expect(client.restoreConnection()).rejects.toMatchObject({ status: 403 });
     expect(relayJsonMock).not.toHaveBeenCalled();
-    await expect(store.load()).resolves.toBeNull();
+    await expect(store.load()).resolves.toMatchObject({
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+    });
   });
 });
 
