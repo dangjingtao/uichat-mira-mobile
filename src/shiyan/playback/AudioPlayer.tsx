@@ -281,10 +281,10 @@ const styles = StyleSheet.create({
   seekArea: {
     position: 'relative',
     height: 32,
-    justifyContent: 'center',
   },
   inactiveTrack: {
     position: 'absolute',
+    top: 14,
     left: 0,
     right: 0,
     height: 4,
@@ -292,12 +292,14 @@ const styles = StyleSheet.create({
   },
   playedTrack: {
     position: 'absolute',
+    top: 14,
     left: 0,
     height: 4,
     borderRadius: radius.full,
   },
   thumb: {
     position: 'absolute',
+    top: 9,
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: radius.full,
