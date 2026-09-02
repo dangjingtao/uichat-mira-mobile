@@ -31,14 +31,11 @@ export function ShiyanActionSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable accessibilityLabel={`关闭${title}`} style={styles.backdrop} onPress={onClose}>
-        <View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: colors.dark.surface, opacity: 0.28 },
-          ]}
-        />
+      <Pressable
+        accessibilityLabel={`关闭${title}`}
+        style={[styles.backdrop, { backgroundColor: colors.overlay }]}
+        onPress={onClose}
+      >
         <View
           style={[styles.panel, { backgroundColor: colors.bg.card }]}
           onStartShouldSetResponder={() => true}
@@ -125,7 +122,7 @@ const styles = StyleSheet.create({
   },
   items: { gap: spacing.xs },
   item: {
-    minHeight: 56,
+    minHeight: sizing.touchTarget,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
@@ -134,11 +131,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   iconSlot: {
-    width: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  copy: { flex: 1, gap: 2 },
+  copy: { flex: 1, gap: spacing.xs },
   label: { fontSize: fontSize.button, fontWeight: '600' },
-  supporting: { fontSize: fontSize.caption, lineHeight: 18 },
+  supporting: { fontSize: fontSize.caption },
 });
