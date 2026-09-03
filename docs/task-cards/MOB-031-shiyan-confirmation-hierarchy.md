@@ -1,6 +1,6 @@
 # MOB-031：拾言录音确认页主次交互收口
 
-状态：**REVIEW · 待视觉验收**
+状态：**通过（PASS）**（PR #87 已合入 `dev`；产品负责人于 2026-09-03 完成视觉与真机验收：Acceptance 第 1–10 项全部通过，第 11 项 MOB-029 行为回归保护确认通过）
 
 负责人：`mob_031_shiyan_confirm_hierarchy`
 
@@ -201,3 +201,11 @@ None。若施工发现“返回自动保留”与当前 local confirmation persi
 ## Handoff
 
 先确认当前 `dev` 已有 MOB-029 的真实实现；已有正确的 playback adapter / scene 行为不重写。播放器 UI 需要从确认页中抽离成独立可复用组件，再按本卡与设计参考收口页面主次层级。
+
+## Acceptance Evidence — 2026-09-03
+
+产品负责人完成本卡视觉与真机验收，Acceptance 第 1–10 项全部通过（含唯一主 CTA、Audio Player 完整轨道 / seek 视觉、场景整行回显 + Sheet 单选、返回恢复、删除降级二次确认、提交失败反馈等项）。
+
+第 11 项回归保护（MOB-029 已有 playback / scene 行为不回归）由产品负责人确认通过：播放 / 暂停 / 拖动 / 重播、释放资源、删除停止播放、场景单选回写与 snapshot 冻结在重构后的 AudioPlayer 组件上行为不变。
+
+本卡由 REVIEW 记为 PASS。

@@ -34,7 +34,7 @@
 | MOB-028B | R2 分支隔离更新客户端 | **待实施** | Mobile；依赖 028A，只读自身 R2 channel manifest 与 signed APK |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **完成**：2026-09-03 产品验收 9 项 smoke 全部通过 | Mobile；播放器视觉 / 组件债务由 MOB-031 承接 |
 | MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
-| MOB-031 | 拾言确认页主次交互收口 | **待实施** | Mobile；基于现有播放器 / Scene Sheet 收轻主路径 |
+| MOB-031 | 拾言确认页主次交互收口 | **完成**：2026-09-03 产品视觉 / 真机验收通过（1-10 通过 + 第 11 项回归确认） | Mobile |
 | MOB-032 | 拾言结果优先 Review / Final Draft | **待实施** | Mobile；整理稿优先，Transcript / AI / Final Draft 合同不变 |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | **待实施** | Mobile；依赖 MOB-032 结构稳定后施工 |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | **待实施** | Mobile；负责人 `t-zt`，建议 030～033 后施工 |
