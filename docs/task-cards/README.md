@@ -32,7 +32,7 @@
 | MOB-028 | 关于页版本更新检查与确认下载 | **有条件完成 / 发行源方案被替换** | 保留现有 UI/交互；运行时 GitHub Releases 方案由 MOB-028A/B 替换 |
 | MOB-028A | R2 分支发行真相与 Manifest | **待实施** | Mobile CI；predev/dev/test/prod 独立，`latest.json` 最后发布 |
 | MOB-028B | R2 分支隔离更新客户端 | **待实施** | Mobile；依赖 028A，只读自身 R2 channel manifest 与 signed APK |
-| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **有条件完成**：代码 `24513fb` 已入 `dev` | Mobile；双平台真机 smoke |
+| MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **完成**：2026-09-03 产品验收 9 项 smoke 全部通过 | Mobile；播放器视觉 / 组件债务由 MOB-031 承接 |
 | MOB-030 | 拾言首页与统一记录入口 | **待实施** | Mobile；LocalCapture / CaptureTask 仅做 presentation 聚合 |
 | MOB-031 | 拾言确认页主次交互收口 | **待实施** | Mobile；基于现有播放器 / Scene Sheet 收轻主路径 |
 | MOB-032 | 拾言结果优先 Review / Final Draft | **待实施** | Mobile；整理稿优先，Transcript / AI / Final Draft 合同不变 |
