@@ -1,4 +1,4 @@
-# MOB-025：线程右滑操作与 Drawer 置顶分组修复
+# MOB-025：线程左滑操作与 Drawer 置顶分组修复
 
 状态：**REVIEW**（PR #83 已合入 `dev`；最终 CI / AI Review 已通过，Android 真机 dogfood 待产品验收）
 
@@ -26,7 +26,7 @@ PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而�
 - `SessionListScreen` 删除 Session row 的 `PanResponder`、capture、`dx` / `vx` 与 `Animated.Value` 手势实现；
 - 新增 `SessionSwipeRow`，使用 React Native 原生横向 `ScrollView` 承担横向 reveal，外层 `FlatList` 继续承担纵向滚动；
 - 未新增 native dependency，不修改 Pods / Gradle；
-- 保持产品方向为**向右滑动，露出左侧「置顶 / 删除」操作区**；
+- 保持产品方向为**向左滑动，露出右侧「置顶 / 删除」操作区**；
 - 保持单行打开、点击已打开行收起、纵向列表开始滚动时收起操作区；
 - 保持 MOB-007 device-local pin、Host-authoritative delete、Drawer pinned 分组与原有导航合同不变；
 - 44pt settle threshold 抽成纯函数并补单元测试；
@@ -42,28 +42,28 @@ PR #83（`fix/mob-025-native-swipe -> dev`）已经换掉旧手势机制，而�
 - unsigned iPhone app / IPA：构建、打包校验并上传成功；
 - Mira Mobile OpenCode PR Review：`No high-confidence P0-P2 findings`。
 
-自动门禁已足够支持从 DOING 进入 REVIEW，但仍**不能替代 Android 真机手势验收**。MOB-025 在产品负责人确认真机右滑、纵向滚动、点击、置顶 / 删除与持久化行为之前不得进入 PASS。
+自动门禁已足够支持从 DOING 进入 REVIEW，但仍**不能替代 Android 真机手势验收**。MOB-025 在产品负责人确认真机左滑、纵向滚动、点击、置顶 / 删除与持久化行为之前不得进入 PASS。
 
 ## 背景
 
 MOB-007 已完成设备本地线程置顶，现有合同继续有效：置顶状态只保存在当前设备，不同步为 Host / Desktop 的账户级事实。
 
-当前目标是把主线程列表右滑稳定性真正收口，同时保留已经成立的 Drawer 置顶分组、设备本地 pin 与 authoritative delete 语义。
+当前目标是把主线程列表左滑稳定性真正收口，同时保留已经成立的 Drawer 置顶分组、设备本地 pin 与 authoritative delete 语义。
 
 这是一张 MOB-007 之后的交互回归 / 展示收口卡，不重开 MOB-007，也不改变其本地状态合同。
 
 ## 目标
 
-1. 修复主线程列表右滑无法稳定呼出操作的问题。
+1. 修复主线程列表左滑无法稳定呼出操作的问题。
 2. 保留「置顶 / 取消置顶」「删除」能力，并把滑出操作区做成完整、精致的移动端交互，而不是两个生硬按钮。
 3. Drawer 中把置顶线程独立为「置顶」分组，排在「最近」之前。
 4. 取消置顶后线程回到普通最近列表；重启 App 后置顶状态仍按既有本地 store 恢复。
 
 ## Scope
 
-### 主线程列表右滑
+### 主线程列表左滑
 
-- 继续采用**向右滑动呼出左侧操作区**的产品方向。
+- 继续采用**向左滑动呼出右侧操作区**的产品方向。
 - 修复手势竞争 / 命中 / 阈值 / 回弹问题，使 Android 真机上可以可靠打开和关闭操作区。
 - 操作区包含：
   - 置顶线程：`取消置顶`；
@@ -140,9 +140,9 @@ npm test -- --runInBand
 
 并补足与本卡直接相关的行为测试。真机 / 模拟器 smoke 至少覆盖：
 
-1. 未置顶线程右滑 -> 显示「置顶 / 删除」；
-2. 置顶线程右滑 -> 显示「取消置顶 / 删除」；
-3. 右滑打开后可收起，不阻塞纵向滚动和点击进入；
+1. 未置顶线程左滑 -> 显示「置顶 / 删除」；
+2. 置顶线程左滑 -> 显示「取消置顶 / 删除」；
+3. 左滑打开后可收起，不阻塞纵向滚动和点击进入；
 4. 删除确认 / 取消 / 成功 / 失败状态正确；
 5. Drawer 中 pinned 独立成组并位于 Recent 上方；
 6. 较旧 pinned thread 不因 Recent 展示上限消失；
@@ -157,8 +157,8 @@ PR #83 已在与当时最新 `dev` 对齐后合入，没有覆盖 MOB-035 等并
 
 ## Open / Unknown
 
-当前唯一剩余未知项是：**新的 native horizontal ScrollView 方案是否在 Android 真机上稳定满足右滑、纵向滚动与点击三者共存。** 自动 CI 与平台构建不能关闭这个问题。
+当前唯一剩余未知项是：**新的 native horizontal ScrollView 方案是否在 Android 真机上稳定满足左滑、纵向滚动与点击三者共存。** 自动 CI 与平台构建不能关闭这个问题。
 
 ## Handoff
 
-产品负责人在 Android 真机至少完成：右滑打开 / 收起、纵向滚动、点击进入、置顶 / 取消置顶、删除确认及一次重启后的 pin 持久化。通过后可把 MOB-025 从 REVIEW 更新为 PASS；任一核心路径失败则重新进入 DOING，并以真实复现为新修复基线。
+产品负责人在 Android 真机至少完成：左滑打开 / 收起、纵向滚动、点击进入、置顶 / 取消置顶、删除确认及一次重启后的 pin 持久化。通过后可把 MOB-025 从 REVIEW 更新为 PASS；任一核心路径失败则重新进入 DOING，并以真实复现为新修复基线。

@@ -31,6 +31,7 @@ import {
 import { ShiyanCaptureSubmitScreen } from './src/shiyan/ShiyanCaptureSubmitScreen';
 import { ShiyanCloudConfigScreen } from './src/shiyan/ShiyanCloudConfigScreen';
 import { ShiyanHistoryScreen } from './src/shiyan/ShiyanHistoryScreen';
+import { ShiyanOrganizeRulesScreen } from './src/shiyan/ShiyanOrganizeRulesScreen';
 import { ShiyanTaskDetailWithDeliveryScreen } from './src/shiyan/ShiyanTaskDetailWithDeliveryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
@@ -141,6 +142,7 @@ function AppInner() {
         <Stack.Screen name="ShiyanTaskDetail" component={ShiyanTaskDetailWithDeliveryScreen} />
         <Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />
         <Stack.Screen name="ShiyanSceneConfig" component={ShiyanSceneConfigScreen} />
+        <Stack.Screen name="ShiyanOrganizeRules" component={ShiyanOrganizeRulesScreen} />
         <Stack.Screen name="ReportError" component={ReportErrorScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="License" component={LicenseScreen} />

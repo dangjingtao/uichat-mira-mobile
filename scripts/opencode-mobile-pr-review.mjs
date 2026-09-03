@@ -139,8 +139,7 @@ if (touchesNativeOrCi) {
   pushBaseContext(contexts, baseSha, 'Trusted build and release rules from base', 'docs/github-build-release.md', 24_000);
 }
 if (touchesUi) {
-  pushBaseContext(contexts, baseSha, 'Trusted design principles from base', 'docs/design-principles.md', 12_000);
-  pushBaseContext(contexts, baseSha, 'Trusted component guidance from base', 'docs/components.md', 16_000);
+  pushBaseContext(contexts, baseSha, 'Trusted mobile design system from base', 'DESIGN.md', 24_000);
 }
 
 const projectContext = contexts.map(([label, content]) => `### ${label}\n${content}`).join('\n\n');

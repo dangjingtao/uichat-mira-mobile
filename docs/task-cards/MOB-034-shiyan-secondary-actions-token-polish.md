@@ -50,8 +50,7 @@ MOB-030～033 会分别收口首页、确认页、结果页和处理恢复。最
 - `src/shiyan/ShiyanScreens.tsx`
 - `src/theme/tokens.ts`
 - `src/theme/palette.ts`
-- `docs/design-principles.md`
-- `docs/components.md`
+- `DESIGN.md`
 
 产品边界以 PRD 为准；实现边界以 TECHNICAL_DESIGN 为准；视觉以现有 Mobile Design Token 为准。设计稿只表达信息层级与交互意图，不是新的视觉真相源。
 

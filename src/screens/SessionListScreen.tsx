@@ -14,7 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Menu, MessageSquare, Settings as SettingsIcon } from 'lucide-react-native';
+import { Menu, Settings as SettingsIcon } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useHostStore } from '../store/hostStore';
@@ -27,6 +27,7 @@ import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
 import { CustomDrawer } from '../components/CustomDrawer';
+import { EmptyStateIllustration } from '../components/EmptyStateIllustration';
 import { RemoteDiagnosticNotice } from '../components/RemoteDiagnosticNotice';
 import {
   classifySessionLoadFailure,
@@ -332,20 +333,8 @@ export function SessionListScreen() {
 
           return (
             <View style={styles.emptyState}>
-              <View
-                style={[
-                  styles.emptyIllustration,
-                  {
-                    backgroundColor: colors.bg.card,
-                    borderColor: colors.border.default,
-                  },
-                ]}
-              >
-                <MessageSquare
-                  size={48}
-                  strokeWidth={1.25}
-                  color={colors.border.default}
-                />
+              <View style={styles.emptyIllustration}>
+                <EmptyStateIllustration size={168} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
               <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>Remote Host V1 当前只展示桌面端已有会话</Text>
@@ -442,10 +431,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyIllustration: {
-    width: 112,
-    height: 112,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,

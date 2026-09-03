@@ -98,6 +98,7 @@ function MessageHistorySkeleton({
   colors: ReturnType<typeof useTheme>['colors'];
 }) {
   const opacity = useRef(new Animated.Value(0.55)).current;
+  const { height } = useWindowDimensions();
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -122,64 +123,61 @@ function MessageHistorySkeleton({
 
   return (
     <View
-      style={styles.historySkeleton}
+      style={[
+        styles.historySkeleton,
+        { minHeight: Math.max(460, height * 0.62) },
+      ]}
       accessibilityLabel="正在加载聊天记录"
       accessibilityRole="progressbar"
     >
       <Animated.View
         style={[
-          styles.skeletonBubble,
-          styles.skeletonAssistant,
+          styles.skeletonHeader,
           { backgroundColor: colors.bg.bubble, opacity },
         ]}
       >
-        <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.border.default, width: '78%' },
-          ]}
-        />
-        <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.border.default, width: '54%' },
-          ]}
-        />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '38%' }]} />
+        <View style={[styles.skeletonLine, styles.skeletonTitleLine, { backgroundColor: colors.border.default, width: '72%' }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '52%' }]} />
       </Animated.View>
       <Animated.View
         style={[
-          styles.skeletonBubble,
-          styles.skeletonUser,
+          styles.skeletonSection,
           { backgroundColor: colors.bg.soft, opacity },
         ]}
       >
-        <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.border.default, width: '64%' },
-          ]}
-        />
+        <View style={styles.skeletonSectionHeader}>
+          <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '30%' }]} />
+          <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '16%' }]} />
+        </View>
+        <View style={styles.skeletonRow}>
+          <View style={[styles.skeletonIcon, { backgroundColor: colors.border.default }]} />
+          <View style={styles.skeletonRowContent}>
+            <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '68%' }]} />
+            <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '88%' }]} />
+          </View>
+        </View>
+        <View style={styles.skeletonRow}>
+          <View style={[styles.skeletonIcon, { backgroundColor: colors.border.default }]} />
+          <View style={styles.skeletonRowContent}>
+            <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '54%' }]} />
+            <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '76%' }]} />
+          </View>
+        </View>
       </Animated.View>
       <Animated.View
         style={[
-          styles.skeletonBubble,
-          styles.skeletonAssistant,
+          styles.skeletonBody,
           { backgroundColor: colors.bg.bubble, opacity },
         ]}
       >
-        <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.border.default, width: '68%' },
-          ]}
-        />
-        <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.border.default, width: '42%' },
-          ]}
-        />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.border.default, width: '34%' }]} />
+        <View style={[styles.skeletonLine, styles.skeletonTitleLine, { backgroundColor: colors.border.default, width: '58%' }]} />
+        <View style={[styles.skeletonParagraphLine, { backgroundColor: colors.border.default, width: '100%' }]} />
+        <View style={[styles.skeletonParagraphLine, { backgroundColor: colors.border.default, width: '92%' }]} />
+        <View style={[styles.skeletonParagraphLine, { backgroundColor: colors.border.default, width: '67%' }]} />
       </Animated.View>
+      <View style={[styles.skeletonSpacer, { minHeight: Math.max(0, height * 0.12) }]} />
     </View>
   );
 }
@@ -795,11 +793,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   historySkeleton: {
-    flex: 1,
-    minHeight: 300,
-    justifyContent: 'flex-end',
-    gap: spacing.lg,
-    paddingBottom: spacing.lg,
+    justifyContent: 'flex-start',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
   },
   historyErrorState: {
     flex: 1,
@@ -824,17 +821,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   historyRetryText: { fontSize: fontSize.button, fontWeight: '600' },
-  skeletonBubble: {
-    minHeight: 52,
-    borderRadius: 16,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    justifyContent: 'center',
+  skeletonHeader: {
+    minHeight: 112,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     gap: spacing.sm,
   },
-  skeletonAssistant: { width: '76%', alignSelf: 'flex-start' },
-  skeletonUser: { width: '58%', alignSelf: 'flex-end' },
+  skeletonSection: {
+    minHeight: 176,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  skeletonSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  skeletonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+  },
+  skeletonRowContent: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  skeletonBody: {
+    minHeight: 150,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  skeletonSpacer: { flex: 1 },
   skeletonLine: { height: 10, borderRadius: radius.full },
+  skeletonTitleLine: { height: 16 },
+  skeletonParagraphLine: { height: 12, borderRadius: radius.full },
   messageRow: { marginBottom: spacing.lg, flexDirection: 'row' },
   messageRowLeft: { justifyContent: 'flex-start' },
   messageRowRight: { justifyContent: 'flex-end' },

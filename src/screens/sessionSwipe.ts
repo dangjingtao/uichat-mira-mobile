@@ -11,8 +11,8 @@ export function resolveSessionSwipeOpen(
   const offset = Math.max(0, Math.min(actionsWidth, contentOffsetX));
 
   if (currentOpen) {
-    return offset < threshold;
+    return offset > actionsWidth - threshold;
   }
 
-  return actionsWidth - offset >= threshold;
+  return offset >= threshold;
 }

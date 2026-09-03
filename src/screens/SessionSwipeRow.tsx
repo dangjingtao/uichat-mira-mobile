@@ -16,8 +16,9 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, spacing } from '../theme/tokens';
 import { resolveSessionSwipeOpen } from './sessionSwipe';
 
-const SWIPE_ACTION_WIDTH = 72;
-const SWIPE_ACTION_GAP = 8;
+const SWIPE_ACTION_WIDTH = 64;
+const SWIPE_ACTION_GAP = spacing.xs;
+const SWIPE_ACTION_INSET = spacing.xs;
 
 interface SessionSwipeRowProps {
   item: Session;
@@ -52,8 +53,11 @@ export function SessionSwipeRow({
   const isOpenRef = useRef(false);
   const onSwipeStateChangeRef = useRef(onSwipeStateChange);
   const [rowWidth, setRowWidth] = useState(0);
+  const actionCount = canDelete ? 2 : 1;
   const actionsWidth =
-    (SWIPE_ACTION_WIDTH + SWIPE_ACTION_GAP) * (canDelete ? 2 : 1);
+    SWIPE_ACTION_INSET +
+    SWIPE_ACTION_WIDTH * actionCount +
+    SWIPE_ACTION_GAP * Math.max(0, actionCount - 1);
   const belongsToWorkspace =
     typeof item.workspaceId === 'string' && item.workspaceId.trim().length > 0;
   const preview = belongsToWorkspace
@@ -73,7 +77,7 @@ export function SessionSwipeRow({
       const changed = isOpenRef.current !== open;
       isOpenRef.current = open;
       scrollRef.current?.scrollTo({
-        x: open ? 0 : actionsWidth,
+        x: open ? actionsWidth : 0,
         y: 0,
         animated,
       });
@@ -145,49 +149,12 @@ export function SessionSwipeRow({
         overScrollMode="never"
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
-        contentOffset={{ x: actionsWidth, y: 0 }}
+        contentOffset={{ x: 0, y: 0 }}
         onScrollEndDrag={handleScrollSettled}
         onMomentumScrollEnd={handleScrollSettled}
         style={styles.swipeScroller}
         contentContainerStyle={styles.swipeContent}
       >
-        <View
-          accessibilityElementsHidden={!isOpen}
-          importantForAccessibility={isOpen ? 'auto' : 'no-hide-descendants'}
-          style={[styles.swipeActions, { width: actionsWidth }]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
-            accessibilityState={{ selected: isPinned }}
-            onPress={handleTogglePin}
-            style={({ pressed }) => [
-              styles.swipeAction,
-              { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-            ]}
-          >
-            <Pin size={18} color={colors.onPrimary} strokeWidth={2} />
-            <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>
-              {isPinned ? '取消置顶' : '置顶'}
-            </Text>
-          </Pressable>
-          {canDelete ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`删除：${item.title}`}
-              onPress={handleDelete}
-              style={({ pressed }) => [
-                styles.swipeAction,
-                { backgroundColor: colors.status.error },
-                pressed && { opacity: 0.82 },
-              ]}
-            >
-              <Trash2 size={18} color={colors.onPrimary} strokeWidth={2} />
-              <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
         <View
           style={[
             styles.sessionItem,
@@ -259,6 +226,43 @@ export function SessionSwipeRow({
             </View>
           </Pressable>
         </View>
+
+        <View
+          accessibilityElementsHidden={!isOpen}
+          importantForAccessibility={isOpen ? 'auto' : 'no-hide-descendants'}
+          style={[styles.swipeActions, { width: actionsWidth }]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isPinned ? `取消置顶：${item.title}` : `置顶：${item.title}`}
+            accessibilityState={{ selected: isPinned }}
+            onPress={handleTogglePin}
+            style={({ pressed }) => [
+              styles.swipeAction,
+              { backgroundColor: pressed ? colors.primaryActive : colors.primary },
+            ]}
+          >
+            <Pin size={16} color={colors.onPrimary} strokeWidth={2} />
+            <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>
+              {isPinned ? '取消置顶' : '置顶'}
+            </Text>
+          </Pressable>
+          {canDelete ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`删除：${item.title}`}
+              onPress={handleDelete}
+              style={({ pressed }) => [
+                styles.swipeAction,
+                { backgroundColor: colors.status.error },
+                pressed && { opacity: 0.82 },
+              ]}
+            >
+              <Trash2 size={16} color={colors.onPrimary} strokeWidth={2} />
+              <Text style={[styles.swipeActionLabel, { color: colors.onPrimary }]}>删除</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
@@ -288,8 +292,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'flex-start',
-    paddingVertical: 6,
-    paddingLeft: SWIPE_ACTION_GAP,
+    paddingVertical: spacing.sm,
+    paddingLeft: SWIPE_ACTION_INSET,
     gap: SWIPE_ACTION_GAP,
   },
   swipeAction: {
