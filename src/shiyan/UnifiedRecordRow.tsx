@@ -41,18 +41,16 @@ export function UnifiedRecordRow({
       ]}
     >
       <View style={styles.main}>
-        <View style={styles.titleRow}>
-          <Text numberOfLines={1} style={[styles.title, { color: colors.text.ink }]}>
-            {record.title}
-          </Text>
-          <Text style={[styles.status, { color: statusColor[record.statusTone] }]}>
-            {record.statusLabel}
-          </Text>
-        </View>
+        <Text numberOfLines={1} style={[styles.title, { color: colors.text.ink }]}>
+          {record.title}
+        </Text>
         <Text numberOfLines={1} style={[styles.meta, { color: colors.text.soft }]}>
           {record.sceneName} · {formatRecordTime(record.createdAt)}
         </Text>
       </View>
+      <Text style={[styles.status, { color: statusColor[record.statusTone] }]}>
+        {record.statusLabel}
+      </Text>
       <ChevronRight size={18} color={colors.text.soft} />
     </Pressable>
   );
@@ -68,8 +66,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   main: { flex: 1, gap: spacing.xs },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { flex: 1, fontSize: fontSize.md, fontWeight: '600' },
-  status: { fontSize: fontSize.xs, fontWeight: '600' },
+  title: { fontSize: fontSize.md, fontWeight: '600' },
+  status: { flexShrink: 0, fontSize: fontSize.xs, fontWeight: '600' },
   meta: { fontSize: fontSize.xs, lineHeight: 18 },
 });
