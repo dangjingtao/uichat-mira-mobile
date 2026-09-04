@@ -1,6 +1,6 @@
 # MOB-036：桌面配对入口与授权 Bottom Sheet 收口
 
-状态：**REVIEW**
+状态：**PASS（2026-09-04 真机五路径验收通过）**
 
 分支：`dev`
 
@@ -197,10 +197,14 @@ PR #90 最新 HEAD `b24d0e437d4215f4b8dd963c872985616f18fd2a`：
 - unsigned iPhone app build、IPA package/verify、artifact upload：通过；
 - Mira Mobile OpenCode PR Review：workflow `cancelled`，未产出评审结果；产品负责人明确授权在无 AI Review 结果时由当前人工 review 判断后合并。
 
-仍待真机/真实 Desktop 验收，因此状态保持 `REVIEW`：
+## Acceptance Evidence — 2026-09-04
 
-1. 扫码 → Sheet → 关闭；
-2. 扫码 → 提交 → Desktop 批准 → Toast → 首页；
-3. 粘贴 → Sheet → 提交；
-4. Desktop 拒绝；
-5. 请求过期。
+真机五路径验收在真实 Mira Desktop + 真实 Android/iOS 设备上覆盖完成，本卡标 PASS：
+
+1. 扫码 → Sheet → 关闭 ✅（未提交关闭清 descriptor，回干净默认页）
+2. 扫码 → 提交 → Desktop 批准 → Toast `配对成功` → 首页 ✅
+3. 粘贴 → Sheet → 提交 ✅（与扫码复用同一授权流）
+4. Desktop 拒绝 ✅
+5. 请求过期 ✅
+
+MOB-009 同批次升 PASS；两卡的真机 5 路径互为佐证：MOB-036 验入口与 Sheet 行为，MOB-009 验兜底粘贴与协议一致性。

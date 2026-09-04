@@ -1,6 +1,6 @@
 # MOB-032：拾言结果优先的 Review / Final Draft 交互
 
-状态：**REVIEW · 待真机验证**
+状态：**PASS（2026-09-04 真机验收通过）**
 
 负责人：`mob_032_shiyan_result_review`
 
@@ -198,3 +198,19 @@ None。若需要改变 PRD 的 Draft / Final Draft 行为才能实现界面，�
 ## Handoff
 
 先读当前代码确认已经存在的 content / candidate / final editor 能力；本卡目标是重排信息层级，不是重写内容系统。
+
+## Acceptance Evidence — 2026-09-04
+
+真机验收（Android/iOS）全部通过，本卡标 PASS：
+
+1. ready/completed 打开详情先看到整理内容，Stage 流水线折叠 ✅
+2. 有 Final Draft 时默认展示 Final Draft，AI candidate 不覆盖 ✅
+3. 无 Final Draft 时正确展示 AI Draft / candidate 语义 ✅
+4. AI 调整仍为候选，人工最终稿保护不回归 ✅
+5. Final Draft 编辑、dirty-state、保存语义不回归 ✅
+6. Transcript 默认轻入口，可完整展开且只读 ✅
+7. Transcript 读取失败不影响已有 Draft / Final Draft 展示 ✅
+8. processing 状态下不伪造结果，已有产物优先显示 ✅
+9. 文案用户化，无 `AI Draft version` / `Cloud lifecycle` 等实现名词 ✅
+
+> 注：验收中发现一个独立 bug（拾言列表页显示「待你确认」，点进去却是「已确认最终稿」），另立 issue #95 跟踪（Cloud 侧修复 PR mira-shiyan-cloud#8 待合并）。本卡验收要点通过，不受该 bug 阻塞。
