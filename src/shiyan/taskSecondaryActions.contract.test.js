@@ -9,13 +9,14 @@ const wrapper = readSource('src/shiyan/ShiyanTaskDetailWithDeliveryScreen.tsx');
 const sheet = readSource('src/shiyan/ShiyanActionSheet.tsx');
 
 describe('MOB-034 Shiyan secondary action hierarchy', () => {
-  it('moves home low-frequency config behind one More sheet', () => {
-    expect(home).toContain('accessibilityLabel="更多操作"');
-    expect(home).toContain('<ShiyanActionSheet');
-    expect(home).toContain("label: '服务配置'");
-    expect(home).toContain("label: '配置自定义场景'");
+  it('keeps home config in shortcuts without a duplicate More sheet', () => {
+    expect(home).toContain("title: '服务配置'");
+    expect(home).toContain("title: '自定义场景'");
     expect(home).toContain("navigation.navigate('ShiyanCloudConfig')");
     expect(home).toContain("navigation.navigate('ShiyanSceneConfig')");
+    expect(home).not.toContain('accessibilityLabel="更多操作"');
+    expect(home).not.toContain('MoreHorizontal');
+    expect(home).not.toContain('<ShiyanActionSheet');
     expect(home).not.toContain('accessibilityLabel="配置拾言 Cloud"');
     expect(home).not.toContain('部分 Cloud 记录暂时不可用');
   });

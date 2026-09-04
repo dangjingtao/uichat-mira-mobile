@@ -283,7 +283,7 @@ export function ShiyanCaptureSubmitScreen() {
             >
               <Text style={[styles.errorTitle, { color: colors.status.error }]}>这次提交没有完成</Text>
               <Text style={[styles.muted, { color: colors.text.base }]}>{errorText}</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试；若提示 Cloud 未配置，可回到拾言主页右上角配置。</Text>
+              <Text style={[styles.muted, { color: colors.text.soft }]}>录音仍在本机，不需要重新录制。可以在网络恢复后直接重试；若提示 Cloud 未配置，可回到拾言主页的「服务配置」。</Text>
             </View>
           ) : null}
 

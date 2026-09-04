@@ -26,12 +26,10 @@ import {
   Layers,
   Lock,
   Mic2,
-  MoreHorizontal,
   Pause,
   Play,
   ScrollText,
   Settings2,
-  SlidersHorizontal,
   Sparkles,
   Square,
   Trash2,
@@ -39,7 +37,6 @@ import {
 import type { RootStackParamList } from '../types/navigation';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
-import { ShiyanActionSheet, type ShiyanActionSheetItem } from './ShiyanActionSheet';
 import {
   SHIYAN_BUILT_IN_SCENES,
   getCustomSceneDraft,
@@ -113,7 +110,6 @@ export function ShiyanHomeScreen() {
     getCustomSceneDraft(),
   );
   const [sceneSheetOpen, setSceneSheetOpen] = useState(false);
-  const [homeMoreOpen, setHomeMoreOpen] = useState(false);
 
   const scenes = useMemo(
     () => (customScene ? [...SHIYAN_BUILT_IN_SCENES, customScene] : [...SHIYAN_BUILT_IN_SCENES]),
@@ -135,23 +131,6 @@ export function ShiyanHomeScreen() {
       sceneName: selectedScene.name,
     });
   };
-
-  const homeMoreItems: readonly ShiyanActionSheetItem[] = [
-    {
-      key: 'service-config',
-      label: '服务配置',
-      supportingText: '配置拾言服务连接',
-      icon: <Settings2 size={19} color={colors.text.ink} />,
-      onPress: () => navigation.navigate('ShiyanCloudConfig'),
-    },
-    {
-      key: 'scene-config',
-      label: '配置自定义场景',
-      supportingText: '调整自定义场景名称与整理结构',
-      icon: <SlidersHorizontal size={19} color={colors.text.ink} />,
-      onPress: () => navigation.navigate('ShiyanSceneConfig'),
-    },
-  ];
 
   const shortcuts: readonly {
     key: string;
@@ -191,19 +170,7 @@ export function ShiyanHomeScreen() {
   ];
 
   return (
-    <ScreenShell
-      title="拾言"
-      headerRight={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="更多操作"
-          onPress={() => setHomeMoreOpen(true)}
-          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.65 }]}
-        >
-          <MoreHorizontal size={20} color={colors.text.ink} />
-        </Pressable>
-      }
-    >
+    <ScreenShell title="拾言">
       <ScrollView contentContainerStyle={styles.homeContent}>
         <View style={styles.hero}>
           <View style={styles.heroText}>
@@ -322,13 +289,6 @@ export function ShiyanHomeScreen() {
           </Text>
         </View>
       </ScrollView>
-
-      <ShiyanActionSheet
-        visible={homeMoreOpen}
-        title="更多操作"
-        items={homeMoreItems}
-        onClose={() => setHomeMoreOpen(false)}
-      />
 
       <Modal
         visible={sceneSheetOpen}

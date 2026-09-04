@@ -4,15 +4,16 @@ const { resolve } = require('node:path');
 const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('Shiyan confirmation UX wiring', () => {
-  it('keeps service and custom-scene config reachable through the Shiyan home More sheet', () => {
+  it('keeps service and custom-scene config reachable without a Shiyan home More button', () => {
     const home = readSource('src/shiyan/ShiyanRecordingScreens.tsx');
     const app = readSource('App.tsx');
 
-    expect(home).toContain('accessibilityLabel="更多操作"');
-    expect(home).toContain("label: '服务配置'");
-    expect(home).toContain("label: '配置自定义场景'");
+    expect(home).toContain("title: '服务配置'");
+    expect(home).toContain("title: '自定义场景'");
     expect(home).toContain("navigation.navigate('ShiyanCloudConfig')");
     expect(home).toContain("navigation.navigate('ShiyanSceneConfig')");
+    expect(home).not.toContain('accessibilityLabel="更多操作"');
+    expect(home).not.toContain('MoreHorizontal');
     expect(home).not.toContain('accessibilityLabel="配置拾言 Cloud"');
     expect(app).toContain(
       '<Stack.Screen name="ShiyanCloudConfig" component={ShiyanCloudConfigScreen} />',
@@ -23,7 +24,7 @@ describe('Shiyan confirmation UX wiring', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
     expect(submit).not.toContain('Settings2');
     expect(submit).not.toContain('可点右上角设置');
-    expect(submit).toContain('可回到拾言主页右上角配置');
+    expect(submit).toContain('可回到拾言主页的「服务配置」');
   });
 
   it('keeps playback behind an independent reusable AudioPlayer component', () => {
