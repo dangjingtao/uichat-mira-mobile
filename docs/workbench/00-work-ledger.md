@@ -1,6 +1,6 @@
 # Mira Mobile Work Ledger
 
-更新时间：2026-09-03（Asia/Shanghai）
+更新时间：2026-09-04（Asia/Shanghai）
 
 这是 Mira Mobile 的唯一当前任务台账，按 Mira Forge 的台账规则维护。Mobile 任务继续使用本仓库既有的 `MOB-*` 编号；Forge 的 `Txxx` 编号只属于 Forge 自身工作台，不在 Mobile 仓库复制。
 
@@ -18,7 +18,7 @@
 | MOB-006 | 真实线程状态与验收 | REVIEW | Platform/device acceptance |
 | MOB-007 | 本机线程置顶 | PASS | Device-local pin tests |
 | MOB-008 | 本机未读状态 | PASS | Device-local unread tests |
-| MOB-009 | 简化桌面配对页 | REVIEW | Real five-path device acceptance |
+| MOB-009 | 简化桌面配对页 | PASS | PR #27 squash-merged as `7fae641`; 真机五路径于 2026-09-04 在真实 Mira Desktop + 真实 Android/iOS 设备上全部通过（路径 1/3/5 由 MOB-036 同批次真机 smoke 顺验覆盖，路径 2/4 由本次独立真机跑验证）；从「有条件完成」升级为「完全完成」 |
 | MOB-010 | Desktop Remote 合同收口 | REVIEW | Desktop pairing integration |
 | MOB-011 | 0.2.0 会话交互回归修复 | REVIEW | 0.2.1 device regression |
 | MOB-012 | Agent 手机审批闭环 | REVIEW | PR #57; Desktop + Android/iOS integration |
@@ -41,13 +41,13 @@
 | MOB-028A | R2 分支发行真相与 Manifest | PASS | PR #82 merged as `34b7eee`; dev `0.2.11-dev` manifest generated; signed APK checksum verified; R2 publish log confirmed `Published R2 release truth: dev/0.2.11` |
 | MOB-028B | R2 分支隔离更新客户端 | PASS | PR #84 squash-merged as `d8134ba`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; same-channel R2 manifest/versioned APK validation covered; product owner accepted PASS on 2026-09-02 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | PASS | Product owner conditionally accepted on 2026-09-01; code `24513fb`; product owner confirmed all 9 card validation smoke items passed on 2026-09-03; Audio Player visual/component debt moved to MOB-031 |
-| MOB-030 | 拾言首页与统一记录入口 | REVIEW | PR #86 squash-merged as `6065260`; Typecheck/Lint/Jest green; latest OpenCode review found no P0-P2; Android/iOS real-device + real Shiyan Cloud smoke pending |
+| MOB-030 | 拾言首页与统一记录入口 | PASS | PR #86 squash-merged as `6065260`; product owner completed real-device acceptance on 2026-09-04: all 8 acceptance items (唯一主 CTA / 场景 Sheet / 全部记录聚合 / 去重 / 生命周期导航 / Stage 失败非整体失败 / 无网保留本地 / 单一 Design Token) passed |
 | MOB-031 | 拾言确认页主次交互收口 | PASS | PR #87 squash-merged as `f4fdde4`; reusable AudioPlayer + full-track seek + single primary CTA landed; CI and OpenCode review green; product owner completed visual/real-device acceptance on 2026-09-03: acceptance items 1-10 all passed and item 11 MOB-029 playback/scene regression guard confirmed |
-| MOB-032 | 拾言结果优先 Review / Final Draft | REVIEW | **待真机验证**；PR #88 squash-merged as `2741181`; current-head Mobile CI success and latest OpenCode review found no P0-P2; verify Android/iOS result-first hierarchy, long-text/keyboard scrolling, Transcript expansion, AI adjustment, Final Draft dirty/save flow, and share/delivery semantics before PASS |
+| MOB-032 | 拾言结果优先 Review / Final Draft | PASS | PR #88 squash-merged as `2741181`; product owner completed real-device acceptance on 2026-09-04: all 9 acceptance items (result-first 层级 / 展示优先级 / AI candidate 语义 / 人工稿保护 / Final Draft dirty-state 与保存 / Transcript 只读与失败保护 / processing 不伪造 / 文案用户化) passed; 验收中发现列表与详情状态不一致的独立 bug 另立 issue #95 跟踪（Cloud 修复 PR mira-shiyan-cloud#8 待合并），不影响本卡验收要点 |
 | MOB-033 | 拾言处理详情与单阶段失败恢复 | REVIEW | **待真机验证**；PR #89 squash-merged as `680de12`; Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned device builds all green; two latest OpenCode review attempts timed out without verdict; real Android/iOS + real dev Cloud retry/upload-recovery smoke required before PASS |
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | REVIEW | **待真机/真实服务验证**；PR #91 squash-merged as `eb5f90a`; current-head Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned iPhone/IPA build all green; OpenCode review was cancelled without verdict; verify Android/iOS More Sheet + system Share Sheet, real GitHub Delivery/canonical URL, retention changes, and light/dark UI before PASS |
 | MOB-035 | 远程连接状态诊断与会话错误分层 | REVIEW | **待真机验证**；PR #92 squash-merged as `0d5f2c6e`; final-head Mobile CI fully green; OpenCode review cancelled without verdict after prior Codex P2 was fixed and resolved; Android state matrix + iOS equivalent smoke required before PASS |
-| MOB-036 | 桌面配对入口与授权 Bottom Sheet 收口 | REVIEW | PR #90 squash-merged as `40a57227`; Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned device build green; AI Review workflow cancelled without result; real scan/paste/approve/reject/expiry device acceptance pending |
+| MOB-036 | 桌面配对入口与授权 Bottom Sheet 收口 | PASS | PR #90 squash-merged as `40a57227`; product owner completed real-device acceptance on 2026-09-04: all 5 acceptance paths (扫码→Sheet→关闭 / 扫码→提交→批准→Toast→首页 / 粘贴→Sheet→提交 / Desktop 拒绝 / 请求过期) passed; 与 MOB-009 同批次升 PASS，两卡真机 5 路径互为佐证 |
 
 ## Deferred Engineering Governance
 
