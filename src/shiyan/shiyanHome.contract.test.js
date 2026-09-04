@@ -22,10 +22,10 @@ describe('MOB-030 Shiyan home interaction contract', () => {
     expect(homeSource).not.toContain('确定');
   });
 
-  it('uses the unified records path instead of separate local-draft and Cloud-history home actions', () => {
-    expect(homeSource).toContain('loadUnifiedRecords()');
-    expect(homeSource).toContain('result.records.slice(0, 3)');
+  it('keeps records behind the all-records shortcut without loading a recent section on home', () => {
     expect(homeSource).toContain("navigation.navigate('ShiyanHistory')");
+    expect(homeSource).not.toContain('loadUnifiedRecords()');
+    expect(homeSource).not.toContain('最近记录');
     expect(homeSource).not.toContain("navigation.navigate('ShiyanLocalDrafts')");
   });
 

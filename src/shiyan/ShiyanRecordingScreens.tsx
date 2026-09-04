@@ -53,11 +53,6 @@ import {
   localCaptureRepository,
   type LocalCaptureMetadata,
 } from './recording/localCaptureRepository';
-import { UnifiedRecordRow } from './UnifiedRecordRow';
-import {
-  loadUnifiedRecords,
-  type UnifiedRecordPresentation,
-} from './unifiedRecords';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -119,9 +114,6 @@ export function ShiyanHomeScreen() {
   );
   const [sceneSheetOpen, setSceneSheetOpen] = useState(false);
   const [homeMoreOpen, setHomeMoreOpen] = useState(false);
-  const [recentRecords, setRecentRecords] = useState<readonly UnifiedRecordPresentation[]>([]);
-  const [recordsLoading, setRecordsLoading] = useState(true);
-  const [recordsWarning, setRecordsWarning] = useState('');
 
   const scenes = useMemo(
     () => (customScene ? [...SHIYAN_BUILT_IN_SCENES, customScene] : [...SHIYAN_BUILT_IN_SCENES]),
@@ -132,40 +124,9 @@ export function ShiyanHomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
       setCustomScene(getCustomSceneDraft());
-      setRecordsLoading(true);
-      setRecordsWarning('');
-      void loadUnifiedRecords()
-        .then((result) => {
-          if (!active) return;
-          setRecentRecords(result.records.slice(0, 3));
-          setRecordsWarning(result.cloudError ? '部分同步记录暂时不可用。' : '');
-        })
-        .catch(() => {
-          if (!active) return;
-          setRecentRecords([]);
-          setRecordsWarning('暂时无法读取记录。');
-        })
-        .finally(() => {
-          if (active) setRecordsLoading(false);
-        });
-      return () => {
-        active = false;
-      };
     }, []),
   );
-
-  const openRecord = (record: UnifiedRecordPresentation) => {
-    if (record.taskId) {
-      navigation.navigate('ShiyanTaskDetail', {
-        taskId: record.taskId,
-        localCaptureId: record.localCaptureId,
-      });
-      return;
-    }
-    navigation.navigate('ShiyanCaptureConfirm', { captureId: record.localCaptureId });
-  };
 
   const startRecording = () => {
     if (!selectedScene) return;
@@ -174,12 +135,6 @@ export function ShiyanHomeScreen() {
       sceneName: selectedScene.name,
     });
   };
-
-  const recordsEmptyText = recordsLoading
-    ? '正在读取记录…'
-    : recordsWarning
-      ? '记录暂时不可用'
-      : '还没有拾言记录';
 
   const homeMoreItems: readonly ShiyanActionSheetItem[] = [
     {
@@ -358,43 +313,6 @@ export function ShiyanHomeScreen() {
               </Pressable>
             ))}
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>最近记录</Text>
-
-          {recentRecords.length > 0 ? (
-            <View
-              style={[
-                styles.recordGroup,
-                { backgroundColor: colors.bg.card, borderColor: colors.border.default },
-              ]}
-            >
-              {recentRecords.map((record, index) => (
-                <UnifiedRecordRow
-                  key={record.id}
-                  record={record}
-                  onPress={() => openRecord(record)}
-                  showDivider={index < recentRecords.length - 1}
-                />
-              ))}
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.recordsEmpty,
-                { backgroundColor: colors.bg.card, borderColor: colors.border.default },
-              ]}
-            >
-              <Text style={[styles.recordsEmptyText, { color: colors.text.soft }]}>
-                {recordsEmptyText}
-              </Text>
-            </View>
-          )}
-
-          {recordsWarning ? (
-            <Text style={[styles.recordsWarning, { color: colors.text.soft }]}>{recordsWarning}</Text>
-          ) : null}
         </View>
 
         <View style={styles.privacyNote}>
@@ -846,17 +764,6 @@ const styles = StyleSheet.create({
   shortcutText: { flex: 1, gap: 2 },
   shortcutTitle: { fontSize: fontSize.button, fontWeight: '600' },
   shortcutCaption: { fontSize: fontSize.xs, lineHeight: 16 },
-  recordGroup: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
-  recordsEmpty: {
-    minHeight: sizing.touchTarget,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  recordsEmptyText: { fontSize: fontSize.caption },
-  recordsWarning: { fontSize: fontSize.xs, lineHeight: 18 },
   privacyNote: {
     flexDirection: 'row',
     alignItems: 'center',
