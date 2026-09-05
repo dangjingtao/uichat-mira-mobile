@@ -10,7 +10,7 @@
 |---|---|---|---|
 | MOB-007 | 本机线程置顶 | **完成** | Mobile |
 | MOB-008 | 本机未读状态 | **完成** | Mobile |
-| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | **有条件完成** | Mobile；真机五路径待验收 |
+| MOB-009 | 简化桌面配对页与 Mira 链接兜底 | **完成** | Mobile；2026-09-04 真机五路径人工验收通过 |
 | MOB-010 | Desktop Remote 合同接入收口 | **有条件完成** | Mobile；真实 Desktop 配对联调待验收 |
 | MOB-011 | 0.2.0 会话交互回归修复 | **有条件完成** | Mobile + Host；0.2.1 真机回归待验收 |
 | MOB-012 | Agent 手机审批闭环 | **有条件完成**：PR #57 已合入 | Mobile；真实 Desktop + Android / iOS 联调挂账 |
@@ -26,7 +26,7 @@
 | MOB-022 | 拾言 GitHub Destination | **核心已合入，最终接线待完成** | `mira-shiyan-cloud` + `mira-shiyan`；待 MOB-020 合入后接 Final Draft / public routes + real GitHub smoke |
 | MOB-023 | 拾言 MVP 端到端验收与加固 | **待启动** | 三仓；等 MOB-020 / 022 达到可联调基线 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | **有条件完成**：Desktop #88 / Mobile #65 已合入 | Mobile + Desktop Host；真实已配对设备新建 Thread 跨端 smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **待实施** | Mobile；修复真机右滑并收口置顶分组 |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | **完成** | Mobile；2026-09-05 Android 真机 dogfood 验收通过（8 项全过） |
 | MOB-026 | 全局搜索命中消息正文 | **待实施** | Mobile；不新增虚构 Host search route |
 | MOB-027 | 设置页插件入口恢复可用 | **待实施** | Mobile；最小接线现有 `Plugins` route |
 | MOB-028 | 关于页版本更新检查与确认下载 | **待实施** | Mobile；release channel 隔离 + signed APK 下载 |
