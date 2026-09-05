@@ -1,6 +1,6 @@
 # MOB-025：线程左滑操作与 Drawer 置顶分组修复
 
-状态：**REVIEW**（PR #83 已合入 `dev`；最终 CI / AI Review 已通过，Android 真机 dogfood 待产品验收）
+状态：**PASS**（2026-09-05 Android 真机 dogfood 验收通过；PR #83 已合入 `dev`，最终 CI / AI Review 已通过）
 
 负责人：`mob_025_thread_swipe_drawer_pinning`
 
@@ -162,3 +162,18 @@ PR #83 已在与当时最新 `dev` 对齐后合入，没有覆盖 MOB-035 等并
 ## Handoff
 
 产品负责人在 Android 真机至少完成：左滑打开 / 收起、纵向滚动、点击进入、置顶 / 取消置顶、删除确认及一次重启后的 pin 持久化。通过后可把 MOB-025 从 REVIEW 更新为 PASS；任一核心路径失败则重新进入 DOING，并以真实复现为新修复基线。
+
+## Acceptance Evidence — 2026-09-05
+
+Android 真机 dogfood 验收全部通过，本卡标 PASS：
+
+1. 未置顶线程左滑 -> 显示「置顶 / 删除」 ✅
+2. 置顶线程左滑 -> 显示「取消置顶 / 删除」 ✅
+3. 左滑打开后可收起，不阻塞纵向滚动和点击进入 ✅
+4. 删除确认 / 取消 / 成功 / 失败状态正确（失败时会话保留并给出真实错误） ✅
+5. Drawer 中 pinned 独立成组并位于 Recent 上方 ✅
+6. 较旧 pinned thread 不因 Recent 展示上限消失 ✅
+7. 取消置顶后回到 Recent ✅
+8. App 重启后 pin 状态仍正确 ✅
+
+Handoff 中要求的唯一未知项（native horizontal ScrollView 三者共存）已在真机上验证：左滑、纵向滚动与点击可稳定共存。
