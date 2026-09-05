@@ -34,7 +34,7 @@
 | MOB-022 | 拾言 GitHub Destination | REVIEW | Core merged; public route wiring pending |
 | MOB-023 | 拾言 E2E 验收与加固 | TODO | Blocked by MOB-020 and MOB-022 integration baseline |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | REVIEW | Desktop #88 / Mobile #65; cross-device smoke |
-| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | REVIEW | PR #83 merged as `01fd9575`; PanResponder replaced by native horizontal ScrollView; final CI + OpenCode Review green; Android real-device dogfood required before PASS |
+| MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | PASS | PR #83 merged as `01fd9575`; PanResponder replaced by native horizontal ScrollView; final CI + OpenCode Review green; product owner completed Android real-device dogfood on 2026-09-05: all 8 acceptance items (左滑呼出置顶/删除 / 已置顶左滑取消置顶 / 收起不阻塞滚动与点击 / 删除确认取消成功失败 / Drawer 置顶独立分组在 Recent 上方 / 较旧置顶不被上限裁掉 / 取消置顶回 Recent / 重启 pin 持久化) passed |
 | MOB-026 | 全局搜索命中消息正文 | REVIEW | Code `e628d5a`; long-session/degraded smoke |
 | MOB-027 | 设置页插件入口恢复可用 | PASS | Code `327b2e4`; device entry regression accepted by product owner on 2026-09-01 |
 | MOB-028 | 关于页版本更新检查与确认下载 | PASS | Original About UI/interaction work completed; MOB-028A/B replaced release-source semantics with branch-isolated R2 truth + same-channel versioned signed APK runtime update path; both subcards PASS |
