@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar } from 'react-native';
+import { AppState, StatusBar, type AppStateStatus } from 'react-native';
 import {
   NavigationContainer,
   type LinkingOptions,
@@ -63,6 +63,37 @@ function StatusBarThemed() {
 function AppInner() {
   const [bootstrapChecked, setBootstrapChecked] = useState(false);
   const [hasDeviceCredential, setHasDeviceCredential] = useState(false);
+
+  useEffect(() => {
+    let previousState: AppStateStatus = AppState.currentState;
+    let resumeGeneration = 0;
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active' && previousState !== 'active') {
+        remoteMiraHostClient.refreshRelayConnection();
+        if (useHostStore.getState().connectionStatus === 'connected') {
+          const generation = ++resumeGeneration;
+          useHostStore.getState().setConnectionStatus('reconnecting');
+          void remoteMiraHostClient
+            .restoreConnection()
+            .then(restored => {
+              if (generation !== resumeGeneration) return;
+              useHostStore
+                .getState()
+                .setConnectionStatus(restored ? 'connected' : 'disconnected');
+            })
+            .catch(() => {
+              if (generation !== resumeGeneration) return;
+              useHostStore.getState().setConnectionStatus('reconnecting');
+            });
+        }
+      }
+      previousState = nextState;
+    });
+    return () => {
+      resumeGeneration += 1;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

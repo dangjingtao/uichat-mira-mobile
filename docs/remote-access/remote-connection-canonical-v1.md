@@ -125,6 +125,17 @@ Mobile 判断某项远程能力可用时，必须同时满足：
 MOB-024 增加当前能力：
 
 ```text
+## Current Connection Reliability Truth (2026-09-05)
+
+- Relay idle connections have reproduced a 3-4 hour disconnect pattern. Treat
+  this as a transport keepalive and app lifecycle defect, not a pairing defect.
+- Desktop keeps its host WebSocket alive with native WebSocket control pings;
+  the Relay V1 business frame contract is unchanged.
+- Mobile must drop stale Relay sockets when the app returns to the foreground.
+  The next request is then allowed to create a fresh Relay connection.
+- Background JavaScript timers are not a reliable keepalive mechanism. Active
+  requests and streams fail fast on close and are not silently replayed.
+
 POST /threads -> messages:write
 ```
 

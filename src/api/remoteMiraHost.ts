@@ -318,6 +318,11 @@ export class RemoteMiraHostClient {
     await this.credentialStore.clear();
   }
 
+  /** Drop stale Relay sockets after the app returns from the background. */
+  refreshRelayConnection() {
+    closeRelayConnections();
+  }
+
   async getManifest(): Promise<RemoteManifest> {
     const credential = await this.requireCredential();
     return this.getManifestWithCredential(credential);
