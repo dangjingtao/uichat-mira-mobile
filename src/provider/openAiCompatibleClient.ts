@@ -116,6 +116,16 @@ const normalizeBaseUrl = (value: string): string => {
   return parsed.toString().replace(/\/+$/u, '');
 };
 
+const resolveChatCompletionsUrl = (value: string): string => {
+  const normalized = normalizeBaseUrl(value);
+  const parsed = new URL(normalized);
+  const pathname = parsed.pathname.replace(/\/+$/u, '');
+  const endpointPath = /(?:^|\/)v1$/u.test(pathname)
+    ? `${pathname}/chat/completions`
+    : `${pathname}/v1/chat/completions`;
+  return `${parsed.protocol}//${parsed.host}${endpointPath}`;
+};
+
 const parseSseFrames = (buffer: string): { frames: string[]; remainder: string } => {
   const frames: string[] = [];
   let remainder = buffer;
@@ -137,24 +147,33 @@ interface PendingToolCall {
 type PendingToolCalls = Map<number, PendingToolCall>;
 
 const flushToolCalls = (pending: PendingToolCalls): RuntimeEvent[] => {
-  const events = Array.from(pending.values()).map((call) => ({
-    type: 'tool-call' as const,
-    callId: call.id,
-    name: call.name,
-    arguments: call.arguments,
-  }));
+  const events = Array.from(pending.entries())
+    .sort(([left], [right]) => left - right)
+    .map(([, call]) => ({
+      type: 'tool-call' as const,
+      callId: call.id,
+      name: call.name,
+      arguments: call.arguments,
+    }));
   pending.clear();
   return events;
 };
 
-const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): RuntimeEvent[] => {
+interface ParsedProviderFrame {
+  events: RuntimeEvent[];
+  done: boolean;
+}
+
+const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedProviderFrame => {
   const data = frame
     .split(/\r?\n/u)
     .filter((line) => line.startsWith('data:'))
     .map((line) => line.slice(5).replace(/^ /u, ''))
     .join('\n');
-  if (!data) return [];
-  if (data === '[DONE]') return [...flushToolCalls(pendingToolCalls), { type: 'finish', reason: null }];
+  if (!data) return { events: [], done: false };
+  if (data === '[DONE]') {
+    return { events: flushToolCalls(pendingToolCalls), done: true };
+  }
 
   let value: unknown;
   try {
@@ -166,51 +185,63 @@ const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): RuntimeE
     throw new RemoteHostError('INVALID_PROVIDER_EVENT', 'Provider SSE event must be an object');
   }
   const choice = (value as Record<string, unknown>).choices;
-  if (!Array.isArray(choice) || !choice[0] || typeof choice[0] !== 'object') return [];
+  if (!Array.isArray(choice) || !choice[0] || typeof choice[0] !== 'object') {
+    return { events: [], done: false };
+  }
   const item = choice[0] as Record<string, unknown>;
-  const delta = item.delta;
-  if (!delta || typeof delta !== 'object' || Array.isArray(delta)) {
-    return typeof item.finish_reason === 'string'
-      ? [{ type: 'finish', reason: item.finish_reason }]
-      : [];
-  }
-  const deltaRecord = delta as Record<string, unknown>;
   const events: RuntimeEvent[] = [];
-  if (typeof deltaRecord.content === 'string' && deltaRecord.content.length > 0) {
-    events.push({ type: 'text-delta', delta: deltaRecord.content });
-  }
-  if (Array.isArray(deltaRecord.tool_calls)) {
-    for (const [index, call] of deltaRecord.tool_calls.entries()) {
-      if (!call || typeof call !== 'object' || Array.isArray(call)) continue;
-      const record = call as Record<string, unknown>;
-      const fn = record.function;
-      if (!fn || typeof fn !== 'object' || Array.isArray(fn)) continue;
-      const functionRecord = fn as Record<string, unknown>;
-      const previous = pendingToolCalls.get(index) ?? { id: '', name: '', arguments: '' };
-      pendingToolCalls.set(index, {
-        id: typeof record.id === 'string' ? record.id : previous.id,
-        name: typeof functionRecord.name === 'string' ? functionRecord.name : previous.name,
-        arguments:
-          previous.arguments +
-          (typeof functionRecord.arguments === 'string' ? functionRecord.arguments : ''),
-      });
+  const delta = item.delta;
+  if (delta && typeof delta === 'object' && !Array.isArray(delta)) {
+    const deltaRecord = delta as Record<string, unknown>;
+    if (typeof deltaRecord.content === 'string' && deltaRecord.content.length > 0) {
+      events.push({ type: 'text-delta', delta: deltaRecord.content });
+    }
+    if (Array.isArray(deltaRecord.tool_calls)) {
+      for (const [fallbackIndex, call] of deltaRecord.tool_calls.entries()) {
+        if (!call || typeof call !== 'object' || Array.isArray(call)) continue;
+        const record = call as Record<string, unknown>;
+        const protocolIndex = record.index;
+        const index =
+          typeof protocolIndex === 'number' && Number.isInteger(protocolIndex) && protocolIndex >= 0
+            ? protocolIndex
+            : fallbackIndex;
+        const fn = record.function;
+        const functionRecord =
+          fn && typeof fn === 'object' && !Array.isArray(fn)
+            ? fn as Record<string, unknown>
+            : null;
+        if (typeof record.id !== 'string' && !functionRecord) continue;
+        const previous = pendingToolCalls.get(index) ?? { id: '', name: '', arguments: '' };
+        pendingToolCalls.set(index, {
+          id: typeof record.id === 'string' ? record.id : previous.id,
+          name:
+            functionRecord && typeof functionRecord.name === 'string'
+              ? functionRecord.name
+              : previous.name,
+          arguments:
+            previous.arguments +
+            (functionRecord && typeof functionRecord.arguments === 'string'
+              ? functionRecord.arguments
+              : ''),
+        });
+      }
     }
   }
   if (typeof item.finish_reason === 'string') {
     events.push(...flushToolCalls(pendingToolCalls));
     events.push({ type: 'finish', reason: item.finish_reason });
   }
-  return events;
+  return { events, done: false };
 };
 
 export class OpenAiCompatibleClient {
-  private readonly baseUrl: string;
+  private readonly chatCompletionsUrl: string;
   private readonly xhrFactory: () => XMLHttpRequest;
   private readonly requestTimeoutMs: number;
   private activeAbort: AbortController | null = null;
 
   constructor(private readonly options: OpenAiCompatibleClientOptions) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl);
+    this.chatCompletionsUrl = resolveChatCompletionsUrl(options.baseUrl);
     this.xhrFactory = options.xhrFactory ?? (() => new XMLHttpRequest());
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60_000;
   }
@@ -258,6 +289,7 @@ export class OpenAiCompatibleClient {
     let processedLength = 0;
     let buffer = '';
     let settled = false;
+    let receivedFinishReason = false;
     const pendingToolCalls: PendingToolCalls = new Map();
 
     const fail = (error: unknown) => {
@@ -272,9 +304,16 @@ export class OpenAiCompatibleClient {
       try {
         buffer += (xhr.responseText ?? '').slice(processedLength);
         const trailing = parseSseFrames(buffer);
-        trailing.frames.forEach((frame) =>
-          parseFrame(frame, pendingToolCalls).forEach((event) => queue.push(event)),
-        );
+        for (const frame of trailing.frames) {
+          const parsed = parseFrame(frame, pendingToolCalls);
+          parsed.events.forEach((event) => {
+            if (event.type === 'finish' && event.reason !== null) receivedFinishReason = true;
+            queue.push(event);
+          });
+          if (parsed.done && !receivedFinishReason) {
+            queue.push({ type: 'finish', reason: null });
+          }
+        }
         queue.close();
         cleanup();
       } catch (error) {
@@ -291,9 +330,13 @@ export class OpenAiCompatibleClient {
       const parsed = parseSseFrames(buffer);
       buffer = parsed.remainder;
       for (const frame of parsed.frames) {
-        const events = parseFrame(frame, pendingToolCalls);
-        events.forEach((event) => queue.push(event));
-        if (events.some((event) => event.type === 'finish' && event.reason === null)) {
+        const providerFrame = parseFrame(frame, pendingToolCalls);
+        providerFrame.events.forEach((event) => {
+          if (event.type === 'finish' && event.reason !== null) receivedFinishReason = true;
+          queue.push(event);
+        });
+        if (providerFrame.done) {
+          if (!receivedFinishReason) queue.push({ type: 'finish', reason: null });
           settled = true;
           xhr.abort();
           queue.close();
@@ -306,7 +349,7 @@ export class OpenAiCompatibleClient {
     controller.signal.addEventListener('abort', () => {
       if (!settled) xhr.abort();
     });
-    xhr.open('POST', `${this.baseUrl}/v1/chat/completions`, true);
+    xhr.open('POST', this.chatCompletionsUrl, true);
     xhr.timeout = this.requestTimeoutMs;
     xhr.setRequestHeader('Accept', 'text/event-stream');
     xhr.setRequestHeader('Content-Type', 'application/json');
