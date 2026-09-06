@@ -15,7 +15,8 @@ export class RuntimeRegistry {
   }
 
   runtimeForSession(sessionId: string, source?: SessionSource): ConversationRuntime {
-    return source === 'local-provider' || sessionId.startsWith('local-') ? this.local : this.remote;
+    if (source) return source === 'local-provider' ? this.local : this.remote;
+    return sessionId.startsWith('local-') ? this.local : this.remote;
   }
 
   runtimeForSource(source: SessionSource): ConversationRuntime {

@@ -45,9 +45,10 @@ describe('RuntimeRegistry', () => {
 
     await registry.deleteSession('local-1', 'local-provider');
     await registry.deleteSession('remote-1', 'remote-host');
+    await registry.deleteSession('local-looking-remote', 'remote-host');
 
     expect(localDeletes).toEqual(['local-1']);
-    expect(remoteDeletes).toEqual(['remote-1']);
+    expect(remoteDeletes).toEqual(['remote-1', 'local-looking-remote']);
   });
 
   it('keeps the available source when the other source fails', async () => {

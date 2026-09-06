@@ -1,4 +1,11 @@
 import { MemoryLocalKeyValueStore } from '../storage/localKeyValueStore';
+
+class DelayedLocalKeyValueStore extends MemoryLocalKeyValueStore {
+  async set(key: string, value: string) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    await super.set(key, value);
+  }
+}
 import { LocalSessionRepository } from './localSessionRepository';
 
 describe('LocalSessionRepository', () => {
@@ -51,6 +58,21 @@ describe('LocalSessionRepository', () => {
     await expect(repository.delete('missing')).rejects.toThrow('not found');
     await expect(repository.list()).resolves.toMatchObject([
       { id: session.id, title: 'Keep me' },
+    ]);
+  });
+
+  it('serializes delete with concurrent create so neither update is lost', async () => {
+    const repository = new LocalSessionRepository(new DelayedLocalKeyValueStore());
+    const obsolete = await repository.create('provider-a', 'Delete me');
+
+    const [, created] = await Promise.all([
+      repository.delete(obsolete.id),
+      repository.create('provider-a', 'Keep me'),
+    ]);
+
+    await expect(repository.get(obsolete.id)).rejects.toThrow('not found');
+    await expect(repository.list('provider-a')).resolves.toMatchObject([
+      { id: created.id, title: 'Keep me' },
     ]);
   });
 
