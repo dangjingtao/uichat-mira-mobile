@@ -120,10 +120,10 @@ const resolveChatCompletionsUrl = (value: string): string => {
   const normalized = normalizeBaseUrl(value);
   const parsed = new URL(normalized);
   const pathname = parsed.pathname.replace(/\/+$/u, '');
-  parsed.pathname = /(?:^|\/)v1$/u.test(pathname)
+  const endpointPath = /(?:^|\/)v1$/u.test(pathname)
     ? `${pathname}/chat/completions`
     : `${pathname}/v1/chat/completions`;
-  return parsed.toString();
+  return `${parsed.protocol}//${parsed.host}${endpointPath}`;
 };
 
 const parseSseFrames = (buffer: string): { frames: string[]; remainder: string } => {
