@@ -1,6 +1,6 @@
 # Mira Mobile Work Ledger
 
-更新时间：2026-09-06（Asia/Shanghai）
+更新时间：2026-09-07（Asia/Shanghai）
 
 这是 Mira Mobile 的唯一当前任务台账，按 Mira Forge 的台账规则维护。Mobile 任务继续使用本仓库既有的 `MOB-*` 编号；Forge 的 `Txxx` 编号只属于 Forge 自身工作台，不在 Mobile 仓库复制。
 
@@ -56,7 +56,7 @@
 | MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | TODO | 2026-09-06 已派卡；依赖 MOB-041，当前仅有协议无关运行时和测试替身 |
 | MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
-| MOB-045 | Local Provider 会话生命周期闭环 | TODO | 2026-09-06 已派卡；补本地会话删除、设备本地 pin/read 清理及 Provider 删除解锁 |
+| MOB-045 | Local Provider 会话生命周期闭环 | REVIEW | PR #99 squash-merged as `1062e0c2`；单会话本地删除、RuntimeRegistry Local/Remote 路由、设备本地 pin/read 清理及 Provider 删除解锁已落地；CodeRabbit 两项数据完整性/路由问题已修复并确认；Typecheck/Lint/Jest + Android debug build 通过；Android/iOS 真机删除与 Provider 解锁验收挂 MOB-044 |
 | MOB-046 | OpenAI-compatible URL / SSE / Tool Call 兼容性修复 | TODO | 2026-09-06 已派卡；修复 Base URL 重复 /v1、[DONE] 覆盖 finish_reason、多 tool-call index 聚合 |
 | MOB-047 | Provider API Key 配置 UX 与凭据状态安全修复 | TODO | 2026-09-06 已派卡；移除 ******** sentinel，分离 hasStoredKey 与新 Key 输入，补显式清除 |
 | MOB-048 | 双链路提交窄范围代码卫生收尾 | TODO | 2026-09-06 已派卡；必须等待 MOB-045/046/047 合入后基于最新 dev 执行，不启动 broad architecture refactor |

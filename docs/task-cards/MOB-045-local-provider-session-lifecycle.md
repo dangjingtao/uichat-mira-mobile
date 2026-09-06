@@ -1,6 +1,6 @@
 # MOB-045：Local Provider 会话生命周期闭环
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**REVIEW**（2026-09-07 PR #99 已合入 `dev`；自动化与 AI Review 收口，真机验收挂 MOB-044）
 
 范围：Mira Mobile
 
@@ -92,3 +92,15 @@ None。
 ## Handoff
 
 施工前先核对 Must Read 与当前 HEAD；若当前代码已变化导致上述事实不成立，先报告冲突，不要按旧卡强行覆盖。
+
+
+## Implementation Evidence
+
+- PR #99 squash-merged into `dev` as `1062e0c2`.
+- `LocalSessionRepository` 支持按 `sessionId` 删除单个本地会话；未知会话删除失败且不改写存量数据。
+- `RuntimeRegistry.deleteSession` 按显式 `SessionSource` 路由 Local / Remote；仅在 source 缺失时使用 `local-` 前缀兜底，避免远程会话误路由。
+- Local Provider 删除确认明确“仅删除当前设备上的本地对话，不影响 Mira Host”；Remote Host 原删除合同与文案保持不变。
+- 删除成功后清理本机 pin / unread；删除失败保留会话并展示错误。删除最后一个本地会话后，既有 Provider 删除保护自然解除。
+- CodeRabbit 首轮提出两项有效问题并已在 `e0a99c0` 修复：本地仓储复合写竞争、显式 source 被 ID 前缀覆盖。两项均获 CodeRabbit 后续确认，review thread 已 resolved。
+- 最终 head `e0a99c0`：Typecheck、Lint、全量 Jest 通过；Android debug build 通过。
+- Android / iOS 真机删除交互、Provider 删除解锁与跨页面刷新继续由 MOB-044 汇总验收，因此本卡保持 `REVIEW`，不提前标记 `PASS`。

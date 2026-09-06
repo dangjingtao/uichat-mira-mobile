@@ -39,7 +39,7 @@
 | MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | **待开始** | Mobile；工具调用、暂停、取消、超时和失败状态接入聊天 UI |
 | MOB-043 | Host / Pi 持久运行时适配 | **待开始** | Mobile + Host/Pi；长任务、后台继续、审批暂停与恢复 |
 | MOB-044 | 双入口真机验收与发布加固 | **待开始** | Android/iOS；真实 Provider、Host、凭据、网络和发布矩阵 |
-| MOB-045 | Local Provider 会话生命周期闭环 | **待开始** | Mobile；补本地会话删除、pin/read 清理与 Provider 删除解锁 |
+| MOB-045 | Local Provider 会话生命周期闭环 | **待验收** | Mobile；PR #99 已合入 `dev`，本地会话删除、pin/read 清理、Provider 删除解锁及 Review 修复已完成；真机验收挂 MOB-044 |
 | MOB-046 | OpenAI-compatible URL / SSE / Tool Call 兼容性修复 | **待开始** | Mobile；修 Base URL、finish/[DONE]、多 tool-call index |
 | MOB-047 | Provider API Key 配置 UX 与凭据状态安全修复 | **待开始** | Mobile；移除掩码 sentinel，补 preserve/replace/clear |
 | MOB-048 | 双链路提交窄范围代码卫生收尾 | **待开始** | Mobile；等待 045–047 后执行，不启动 broad refactor |
