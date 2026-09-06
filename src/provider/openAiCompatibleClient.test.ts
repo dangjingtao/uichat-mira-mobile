@@ -1,6 +1,14 @@
 import type { RuntimeEvent } from '../runtime/conversationRuntime';
 import { OpenAiCompatibleClient } from './openAiCompatibleClient';
 
+const SSE_SEPARATOR = String.fromCharCode(10, 10);
+type SseFrame = Record<string, unknown> | '[DONE]';
+
+const sse = (...frames: SseFrame[]) =>
+  frames
+    .map((frame) => `data: ${frame === '[DONE]' ? frame : JSON.stringify(frame)}${SSE_SEPARATOR}`)
+    .join('');
+
 class FakeXhr {
   status = 200;
   responseText = '';
@@ -15,20 +23,23 @@ class FakeXhr {
   aborted = false;
   readonly headers: Record<string, string> = {};
 
-  constructor(private readonly fixture = 'data: [DONE]\\n\\n') {}
+  constructor(private readonly fixture = sse('[DONE]')) {}
 
   open(_method: string, url: string) {
     this.requestUrl = url;
   }
+
   setRequestHeader(name: string, value: string) {
     this.headers[name] = value;
   }
+
   send(body: string) {
     this.requestBody = body;
     this.responseText = this.fixture;
     this.onprogress?.();
     this.onload?.();
   }
+
   abort() {
     this.aborted = true;
     this.onabort?.();
@@ -72,9 +83,11 @@ describe('OpenAiCompatibleClient', () => {
 
   it('preserves finish_reason when [DONE] closes a normal text stream', async () => {
     const xhr = new FakeXhr(
-      'data: {"choices":[{"delta":{"content":"hello"}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\\n\\n' +
-      'data: [DONE]\\n\\n',
+      sse(
+        { choices: [{ delta: { content: 'hello' } }] },
+        { choices: [{ delta: {}, finish_reason: 'stop' }] },
+        '[DONE]',
+      ),
     );
     const client = createClient(xhr);
 
@@ -102,9 +115,21 @@ describe('OpenAiCompatibleClient', () => {
 
   it('preserves tool_calls finish semantics through [DONE]', async () => {
     const xhr = new FakeXhr(
-      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"search","arguments":"{}"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\\n\\n' +
-      'data: [DONE]\\n\\n',
+      sse(
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                id: 'call-1',
+                function: { name: 'search', arguments: '{}' },
+              }],
+            },
+          }],
+        },
+        { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+        '[DONE]',
+      ),
     );
 
     const stream = await createClient(xhr).streamChat({
@@ -120,12 +145,52 @@ describe('OpenAiCompatibleClient', () => {
 
   it('aggregates interleaved tool call fragments by protocol index', async () => {
     const xhr = new FakeXhr(
-      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-0","function":{"name":"search","arguments":"{\\"q\\":"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call-1","function":{"name":"weather","arguments":"{\\"city\\":"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"mira\\"}"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"\\"Sydney\\"}"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\\n\\n' +
-      'data: [DONE]\\n\\n',
+      sse(
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                id: 'call-0',
+                function: { name: 'search', arguments: '{"q":' },
+              }],
+            },
+          }],
+        },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 1,
+                id: 'call-1',
+                function: { name: 'weather', arguments: '{"city":' },
+              }],
+            },
+          }],
+        },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                function: { arguments: '"mira"}' },
+              }],
+            },
+          }],
+        },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 1,
+                function: { arguments: '"Sydney"}' },
+              }],
+            },
+          }],
+        },
+        { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+        '[DONE]',
+      ),
     );
 
     const stream = await createClient(xhr).streamChat({
@@ -142,9 +207,20 @@ describe('OpenAiCompatibleClient', () => {
 
   it('falls back to the fragment array position when tool call index is omitted', async () => {
     const xhr = new FakeXhr(
-      'data: {"choices":[{"delta":{"tool_calls":[{"id":"call-1","function":{"name":"search","arguments":"{}"}}]}}]}\\n\\n' +
-      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\\n\\n' +
-      'data: [DONE]\\n\\n',
+      sse(
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                id: 'call-1',
+                function: { name: 'search', arguments: '{}' },
+              }],
+            },
+          }],
+        },
+        { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+        '[DONE]',
+      ),
     );
 
     const stream = await createClient(xhr).streamChat({
