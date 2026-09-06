@@ -212,12 +212,18 @@ export function SessionListScreen() {
 
   const deleteSession = async (session: Session) => {
     try {
-      await miraHostClient.deleteSession(session.id);
+      await runtimeRegistry.deleteSession(session.id, session.source);
       setSessions((current) => current.filter((item) => item.id !== session.id));
-      await Promise.allSettled([
+      const cleanupResults = await Promise.allSettled([
         unpinThread(session.id),
         clearThreadRead(session.id),
       ]);
+      if (cleanupResults.some((result) => result.status === 'rejected')) {
+        Alert.alert(
+          '会话已删除',
+          '会话已删除，但本机置顶或未读状态清理未完成，请重新打开应用后检查。',
+        );
+      }
     } catch (error) {
       const message =
         error instanceof Error && error.message
@@ -228,7 +234,10 @@ export function SessionListScreen() {
   };
 
   const confirmDelete = (session: Session) => {
-    Alert.alert('删除会话', `确定删除“${session.title}”吗？此操作会同步删除桌面端线程。`, [
+    const message = session.source === 'local-provider'
+      ? `确定删除“${session.title}”吗？仅删除当前设备上的本地对话，不影响 Mira Host。`
+      : `确定删除“${session.title}”吗？此操作会同步删除桌面端线程。`;
+    Alert.alert('删除会话', message, [
       { text: '取消', style: 'cancel' },
       {
         text: '删除',
@@ -292,7 +301,7 @@ export function SessionListScreen() {
               colors={colors}
               isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
               isUnread={selectThreadUnread(progressByThreadId, item.id)}
-              canDelete={canDeleteSessions && item.source !== 'local-provider'}
+              canDelete={item.source === 'local-provider' || canDeleteSessions}
               isOpen={openSwipeRowId === item.id}
               onSwipeStateChange={(open) =>
                 setOpenSwipeRowId(open ? item.id : (current) =>

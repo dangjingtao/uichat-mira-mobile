@@ -10,6 +10,10 @@ export class RemoteHostRuntime implements ConversationRuntime {
     return miraHostClient.listSessions();
   }
 
+  deleteSession(sessionId: string): Promise<void> {
+    return miraHostClient.deleteSession(sessionId);
+  }
+
   getMessages(sessionId: string): Promise<ChatMessage[]> {
     return miraHostClient.getMessages(sessionId);
   }

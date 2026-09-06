@@ -1,4 +1,11 @@
 import { MemoryLocalKeyValueStore } from '../storage/localKeyValueStore';
+
+class DelayedLocalKeyValueStore extends MemoryLocalKeyValueStore {
+  async set(key: string, value: string) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    await super.set(key, value);
+  }
+}
 import { LocalSessionRepository } from './localSessionRepository';
 
 describe('LocalSessionRepository', () => {
@@ -25,6 +32,48 @@ describe('LocalSessionRepository', () => {
 
     await expect(repository.list('provider-a')).resolves.toHaveLength(1);
     await expect(repository.getMessages('missing')).rejects.toThrow('not found');
+  });
+
+  it('deletes only the requested local session', async () => {
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const first = await repository.create('provider-a', 'A1');
+    const second = await repository.create('provider-a', 'A2');
+    const otherProvider = await repository.create('provider-b', 'B1');
+
+    await repository.delete(first.id);
+
+    await expect(repository.get(first.id)).rejects.toThrow('not found');
+    await expect(repository.list('provider-a')).resolves.toMatchObject([
+      { id: second.id, title: 'A2' },
+    ]);
+    await expect(repository.list('provider-b')).resolves.toMatchObject([
+      { id: otherProvider.id, title: 'B1' },
+    ]);
+  });
+
+  it('rejects deleting an unknown session without changing stored sessions', async () => {
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const session = await repository.create('provider-a', 'Keep me');
+
+    await expect(repository.delete('missing')).rejects.toThrow('not found');
+    await expect(repository.list()).resolves.toMatchObject([
+      { id: session.id, title: 'Keep me' },
+    ]);
+  });
+
+  it('serializes delete with concurrent create so neither update is lost', async () => {
+    const repository = new LocalSessionRepository(new DelayedLocalKeyValueStore());
+    const obsolete = await repository.create('provider-a', 'Delete me');
+
+    const [, created] = await Promise.all([
+      repository.delete(obsolete.id),
+      repository.create('provider-a', 'Keep me'),
+    ]);
+
+    await expect(repository.get(obsolete.id)).rejects.toThrow('not found');
+    await expect(repository.list('provider-a')).resolves.toMatchObject([
+      { id: created.id, title: 'Keep me' },
+    ]);
   });
 
   it('does not append the same message id twice during a retry', async () => {
