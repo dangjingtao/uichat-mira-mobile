@@ -56,6 +56,10 @@
 | MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | TODO | 2026-09-06 已派卡；依赖 MOB-041，当前仅有协议无关运行时和测试替身 |
 | MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
+| MOB-045 | Local Provider 会话生命周期闭环 | TODO | 2026-09-06 已派卡；补本地会话删除、设备本地 pin/read 清理及 Provider 删除解锁 |
+| MOB-046 | OpenAI-compatible URL / SSE / Tool Call 兼容性修复 | TODO | 2026-09-06 已派卡；修复 Base URL 重复 /v1、[DONE] 覆盖 finish_reason、多 tool-call index 聚合 |
+| MOB-047 | Provider API Key 配置 UX 与凭据状态安全修复 | TODO | 2026-09-06 已派卡；移除 ******** sentinel，分离 hasStoredKey 与新 Key 输入，补显式清除 |
+| MOB-048 | 双链路提交窄范围代码卫生收尾 | TODO | 2026-09-06 已派卡；必须等待 MOB-045/046/047 合入后基于最新 dev 执行，不启动 broad architecture refactor |
 
 ## Deferred Engineering Governance
 
@@ -69,14 +73,14 @@
 
 后续正式任务卡已派出：MOB-041 负责 Tool Gateway / MCP 协议与凭据合同，MOB-042 负责本地 Agent Loop UI，MOB-043 负责 Host / Pi 持久运行时适配，MOB-044 负责 Android / iOS 真机验收与发布加固。未确认的协议项继续保持为阻塞前置，不在移动端猜测实现。
 
-产品负责人要求先记录、暂不插入当前功能施工；等当前正在收尾的 Mobile 功能卡 / 功能批次结束后，再集中建立治理任务卡并执行。
+2026-09-06 维护者在双链路基础提交 `7bc3556` 代码审查后，明确授权立即派出一张**窄范围**卫生卡 MOB-048，用于清理本次提交及直接相邻代码中的死代码、token 违例与明显边界残留。该决定不等于启动此前候选的 Conversation orchestration / Host gateway / App composition broad refactor；后者继续 deferred。
 
-当前仅保留两份治理真相，不分配新的 `MOB-*` 编号：
+当前治理真相：
 
 - [Mobile Code Health — Initial Assessment](../engineering/mobile-code-health-initial-assessment.md)：记录当前代码卫生初步判断、主要边界问题与候选整治顺序；结论是聚焦高变更边界，不做仓库级重写。
 - [Mobile E2E Acceptance Plan](../testing/mobile-e2e-acceptance-plan.md)：记录 `test` 分支触发的 GitHub Actions + Maestro 黑盒 E2E 方向、构建物复用、测试证据、邮件通知和 regression attribution 原则。
 
-启动治理批次前必须重新读取最新 `dev` 与本台账；若代码结构、CI 或当前功能优先级已变化，以启动时事实重新派卡，不机械照搬本次初判。
+MOB-048 必须等待 MOB-045/046/047 合入后重新读取最新 `dev` 与本台账再施工。未来若启动更大的治理批次，仍必须重新读取当时事实，不机械照搬 2026-09-02 初判。
 
 `PASS` 只表示仓库验收证据和必要的产品/机器观察均已完成。`REVIEW` 不得被解释为真实设备、Host、Cloud、Provider 或跨仓端到端已通过。
 

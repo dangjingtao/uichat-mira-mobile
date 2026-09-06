@@ -1,10 +1,16 @@
 # Mira Mobile Code Health — Initial Assessment
 
-Status: **Documented / Deferred**
+Status: **Targeted hygiene activated / Broad refactor deferred**
 
 Date: 2026-09-02
 
-This document records an initial engineering judgment only. It does **not** authorize an immediate refactor and does not replace current task cards.
+This document records an initial engineering judgment and does not replace current task cards.
+
+## Maintainer update — 2026-09-06
+
+After review of the dual-entry Local Provider foundation commit `7bc3556`, the maintainer explicitly authorized MOB-048 as a **narrow post-submission hygiene pass**. MOB-048 is limited to code introduced or directly disturbed by the dual-entry batch: dead code, obvious token violations, stale imports/branches, and test-quality cleanup after MOB-045/046/047 land.
+
+This does **not** activate the broader Conversation orchestration, Host gateway, or App/navigation refactor proposals below. Those remain deferred and require separate future cards.
 
 ## Why this exists
 
@@ -90,7 +96,7 @@ Provisional cleanup order:
 3. **Host gateway boundary cleanup** — separate screen compatibility concerns, domain/session orchestration, transport selection and protocol parsing more clearly; no protocol behavior change as a cleanup goal.
 4. **App/navigation composition cleanup** — reduce global control knowledge in `App.tsx` only after the higher-value boundaries are stable.
 
-These are candidate work packages, **not assigned MOB cards yet**.
+These broad packages remain candidate work packages and are **not assigned MOB cards yet**. MOB-048 is intentionally smaller and must not be used as authorization to begin them.
 
 ## Guardrails for the future cleanup batch
 
@@ -102,10 +108,10 @@ These are candidate work packages, **not assigned MOB cards yet**.
 - Each cleanup card must identify the runtime path before modifying it.
 - Each cleanup card must add or preserve executable acceptance evidence, including E2E where the behavior is user-visible.
 
-## Deferred execution condition
+## Execution condition
 
-Do not start this cleanup while the current Mobile functional/review batch is still being actively closed.
+The former blanket deferral is superseded only for MOB-048 by the maintainer decision on 2026-09-06.
 
-At the time of this note the canonical ledger has no `DOING` card; several cards remain in `REVIEW`, including MOB-025, and new functional work such as MOB-028A/B and MOB-030..035 remains queued. The product owner explicitly requested that code hygiene work be **concentrated after the current active feature card/batch finishes**, rather than interleaved now.
+MOB-045, MOB-046 and MOB-047 may proceed from the shared `7bc3556` base. MOB-048 must **not** run in parallel with them: it starts only after those correctness fixes are integrated into `dev`, then re-reads the latest code and limits itself to the dual-entry touched surface.
 
-When that point is reached, re-read the latest `dev`, update this assessment if the structure has changed, then create a small dedicated governance batch (target: 3–4 cards, not a repository-wide rewrite).
+Any broader cleanup batch still requires a new maintainer decision, fresh review of `dev`, and separate task cards. No repository-wide rewrite is authorized.
