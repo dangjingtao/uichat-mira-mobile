@@ -53,9 +53,12 @@ describe('MOB-034 Shiyan secondary action hierarchy', () => {
 
   it('keeps Final Draft editing primary and AI adjustment secondary', () => {
     expect(detail).toContain('styles.secondaryAction');
-    expect(detail).toContain('styles.primaryAction');
-    expect(detail).toContain('>AI 调整</Text>');
-    expect(detail).toContain('>编辑最终稿</Text>');
+    expect(detail).toContain('styles.primaryButton');
+    expect(detail).toContain("key: 'manual-edit'");
+    expect(detail).toContain("label: '手动编辑'");
+    expect(detail).toContain("key: 'ai-adjust'");
+    expect(detail).toContain("label: 'AI 调整'");
+    expect(detail).toContain('title="选择编辑方式"');
   });
 
   it('stabilizes More handlers for hook-safe memoization', () => {

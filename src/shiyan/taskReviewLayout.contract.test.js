@@ -5,17 +5,18 @@ const readSource = path => readFileSync(resolve(process.cwd(), path), 'utf8');
 const source = readSource('src/shiyan/ShiyanTaskDetailScreen.tsx');
 
 describe('MOB-032 Shiyan result-first review layout contract', () => {
-  it('puts the organized result before processing details', () => {
-    const resultIndex = source.indexOf('>整理稿</Text>');
-    const processingIndex = source.indexOf('>处理详情</Text>');
+  it('exposes the organized-result tab and processing summary as separate surfaces', () => {
+    const resultIndex = source.indexOf("'整理稿'");
+    const processingIndex = source.indexOf('>处理进度</Text>');
 
     expect(resultIndex).toBeGreaterThan(-1);
-    expect(processingIndex).toBeGreaterThan(resultIndex);
+    expect(processingIndex).toBeGreaterThan(-1);
+    expect(source).toContain("contentTab === 'organized'");
   });
 
-  it('keeps transcript and processing details collapsed by default', () => {
+  it('keeps the review-result tab selected and processing details collapsed by default', () => {
     expect(source).toContain(
-      "const [transcriptOpen, setTranscriptOpen] = useState(false);",
+      "const [contentTab, setContentTab] = useState<'organized' | 'transcript'>('organized');",
     );
     expect(source).toContain(
       "const [processingOpen, setProcessingOpen] = useState(false);",

@@ -50,6 +50,12 @@ import type {
 import { getShiyanContentDataSource } from './content';
 import { ShiyanActionSheet, type ShiyanActionSheetItem } from './ShiyanActionSheet';
 import { ShiyanStageRecoveryNotice } from './ShiyanStageRecoveryNotice';
+import { AudioPlayer } from './playback/AudioPlayer';
+import {
+  localCaptureRepository,
+  type LocalCaptureMetadata,
+} from './recording/localCaptureRepository';
+import { shiyanSceneNameForId } from './scenes';
 import {
   selectShiyanFinalEditorSeed,
   selectShiyanReviewResult,
@@ -111,7 +117,7 @@ export function ShiyanTaskDetailScreen({
   const [taskError, setTaskError] = useState('');
   const [loading, setLoading] = useState(true);
   const [transcript, setTranscript] = useState<TranscriptState>(EMPTY_TRANSCRIPT);
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [contentTab, setContentTab] = useState<'organized' | 'transcript'>('organized');
   const [processingOpen, setProcessingOpen] = useState(false);
   const [content, setContent] = useState<ShiyanTaskContentView | null>(null);
   const [contentUnavailable, setContentUnavailable] = useState(false);
@@ -126,6 +132,8 @@ export function ShiyanTaskDetailScreen({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [retentionChoice, setRetentionChoice] = useState<boolean | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [editActionsOpen, setEditActionsOpen] = useState(false);
+  const [localCapture, setLocalCapture] = useState<LocalCaptureMetadata | null>(null);
   const allowNavigation = useRef(false);
   const contentGeneration = useRef(0);
   const finalSaveInFlight = useRef(false);
@@ -233,9 +241,13 @@ export function ShiyanTaskDetailScreen({
     }
   }, [taskId]);
 
+  const loadLocalCapture = useCallback(async () => {
+    setLocalCapture(await localCaptureRepository.get(taskId));
+  }, [taskId]);
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadTask(), loadTranscript(), loadContent()]);
-  }, [loadContent, loadTask, loadTranscript]);
+    await Promise.all([loadTask(), loadTranscript(), loadContent(), loadLocalCapture()]);
+  }, [loadContent, loadLocalCapture, loadTask, loadTranscript]);
 
   useFocusEffect(
     useCallback(() => {
@@ -331,14 +343,14 @@ export function ShiyanTaskDetailScreen({
     }
   };
 
-  const openFinalEditor = (preferCandidate = false) => {
+  const openFinalEditor = useCallback((preferCandidate = false) => {
     if (finalEditorOpen) return;
     const seed = selectShiyanFinalEditorSeed(content, candidate, preferCandidate);
     setFinalMarkdown(seed.markdown);
     setEditorBaselineMarkdown(seed.markdown);
     setFinalBaseVersion(seed.baseVersion);
     setFinalEditorOpen(true);
-  };
+  }, [candidate, content, finalEditorOpen]);
 
   const closeFinalEditor = () => {
     if (!finalDraftDirty) {
@@ -462,6 +474,13 @@ export function ShiyanTaskDetailScreen({
         onPress: () => void setRetention(false),
       },
       {
+        key: 'processing-details',
+        label: '处理详情',
+        supportingText: '查看各处理阶段、失败原因和重试入口',
+        icon: <FileText size={19} color={colors.text.ink} />,
+        onPress: () => setProcessingOpen(true),
+      },
+      {
         key: 'refresh',
         label: '刷新',
         supportingText: '重新读取任务、原文与整理稿',
@@ -483,12 +502,33 @@ export function ShiyanTaskDetailScreen({
     shareFinalDraft,
   ]);
 
-  const transcriptStatusText =
-    transcript.status === 'ready'
-      ? '已生成 · 只读'
-      : transcript.status === 'error'
-        ? '读取失败'
-        : '尚未生成';
+  const editItems = useMemo<readonly ShiyanActionSheetItem[]>(
+    () => [
+      {
+        key: 'manual-edit',
+        label: '手动编辑',
+        supportingText: '进入现有最终稿编辑并在保存后更新正文',
+        icon: <FileText size={19} color={colors.text.ink} />,
+        onPress: () => openFinalEditor(false),
+      },
+      {
+        key: 'ai-adjust',
+        label: 'AI 调整',
+        supportingText: '生成候选内容，不会自动覆盖最终稿',
+        icon: <Sparkles size={19} color={colors.primary} />,
+        disabled: !content?.aiDraftMarkdown || busyAction === 'adjust',
+        onPress: () => setAdjustOpen(true),
+      },
+    ],
+    [busyAction, colors.primary, colors.text.ink, content?.aiDraftMarkdown, openFinalEditor],
+  );
+
+  const sceneName = task
+    ? localCapture?.sceneName ?? shiyanSceneNameForId(task.sceneId) ?? task.sceneId
+    : '';
+  const processingComplete = task
+    ? task.stages.every((stage) => stage.status === 'succeeded' || stage.status === 'skipped')
+    : false;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg.canvas }]}>
@@ -549,6 +589,66 @@ export function ShiyanTaskDetailScreen({
             </Text>
           </View>
 
+          {localCapture?.filePath ? (
+            <AudioPlayer
+              source={localCapture.filePath}
+              fallbackDurationMs={localCapture.durationMs}
+              detailText="原始录音"
+            />
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setProcessingOpen((value) => !value)}
+            style={[styles.processingSummary, { borderColor: colors.border.default }]}
+          >
+            <View style={styles.processingCopy}>
+              <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>处理进度</Text>
+              <Text style={[styles.muted, { color: processingComplete ? colors.text.soft : colors.primary }]}>
+                {processingComplete ? '这条记录已经完成处理' : shiyanTaskStatusText(task)}
+              </Text>
+            </View>
+            {processingOpen ? <ChevronUp size={18} color={colors.text.soft} /> : <ChevronDown size={18} color={colors.text.soft} />}
+          </Pressable>
+
+          {processingOpen ? (
+            <View style={styles.stepper}>
+              {task.stages.map((stage, index) => {
+                const failed = stage.status === 'failed';
+                const completed = stage.status === 'succeeded' || stage.status === 'skipped';
+                const current = stage.status === 'running';
+                const retryAction = retryActionForStage(stage);
+                return (
+                  <View key={stage.stage} style={styles.stepItem}>
+                    <View style={styles.stepRail}>
+                      <View style={[styles.stepDot, { backgroundColor: failed ? colors.status.error : completed ? colors.primary : current ? colors.primary : colors.border.default }]} />
+                      {index < task.stages.length - 1 ? <View style={[styles.stepLine, { backgroundColor: completed ? colors.primary : colors.border.default }]} /> : null}
+                    </View>
+                    <View style={styles.stepBody}>
+                      <Text style={[styles.stageTitle, { color: failed ? colors.status.error : colors.text.ink }]}>{shiyanStageLabel(stage.stage)}</Text>
+                      <Text style={[styles.muted, { color: failed ? colors.status.error : current ? colors.primary : colors.text.soft }]}>
+                        {shiyanStageStatusLabel(stage.status)}{stage.retryCount > 0 ? ` · 已重试 ${stage.retryCount} 次` : ''}
+                      </Text>
+                      {failed && stageFailureText(stage) ? <Text style={[styles.failureText, { color: colors.status.error }]}>{stageFailureText(stage)}</Text> : null}
+                      {retryAction === 'transcribe' || retryAction === 'organize' ? (
+                        <Pressable accessibilityRole="button" disabled={busyAction === 'retry'} onPress={() => void retryStage(stage)} style={styles.compactButton}>
+                          <Text style={[styles.buttonText, { color: colors.primary }]}>{retryAction === 'transcribe' ? '重试转写' : '重试整理'}</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+
+          <View style={[styles.sceneRow, { borderColor: colors.border.default }]}>
+            <Text style={[styles.muted, { color: colors.text.soft }]}>分类</Text>
+            <View style={styles.sceneValue}>
+              <Text style={[styles.buttonText, { color: colors.text.ink }]}>{sceneName}</Text>
+            </View>
+          </View>
+
           {recoveryNotice ? (
             <ShiyanStageRecoveryNotice
               recovery={recoveryNotice}
@@ -564,18 +664,15 @@ export function ShiyanTaskDetailScreen({
             />
           ) : null}
 
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.resultTitle, { color: colors.text.ink }]}>整理稿</Text>
-            {reviewResult ? (
-              <View style={[styles.resultBadge, { backgroundColor: colors.bg.soft }]}>
-                <Text style={[styles.resultBadgeText, { color: colors.primary }]}>
-                  {reviewResult.label}
-                </Text>
-              </View>
-            ) : null}
+          <View style={styles.tabBar}>
+            {(['organized', 'transcript'] as const).map((tab) => (
+              <Pressable key={tab} onPress={() => setContentTab(tab)} style={[styles.tab, contentTab === tab && { borderBottomColor: colors.primary }]}>
+                <Text style={[styles.tabText, { color: contentTab === tab ? colors.primary : colors.text.soft }]}>{tab === 'organized' ? '整理稿' : '原文'}</Text>
+              </Pressable>
+            ))}
           </View>
 
-          {reviewResult ? (
+          {contentTab === 'organized' && reviewResult ? (
             <View
               style={[
                 styles.resultCard,
@@ -589,7 +686,7 @@ export function ShiyanTaskDetailScreen({
                 {reviewResult.supportingText}
               </Text>
             </View>
-          ) : (
+          ) : contentTab === 'organized' ? (
             <View
               style={[
                 styles.pendingResult,
@@ -603,37 +700,9 @@ export function ShiyanTaskDetailScreen({
                   : '处理完成后会在这里显示整理结果。'}
               </Text>
             </View>
-          )}
-
-          {reviewResult && !finalEditorOpen ? (
-            <View style={styles.resultActions}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={!content?.aiDraftMarkdown || busyAction === 'adjust'}
-                onPress={() => setAdjustOpen((value) => !value)}
-                style={[
-                  styles.secondaryAction,
-                  {
-                    borderColor: colors.border.default,
-                    opacity: content?.aiDraftMarkdown ? 1 : 0.45,
-                  },
-                ]}
-              >
-                <Sparkles size={16} color={colors.primary} />
-                <Text style={[styles.buttonText, { color: colors.primary }]}>AI 调整</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openFinalEditor(false)}
-                style={({ pressed }) => [
-                  styles.primaryAction,
-                  { backgroundColor: pressed ? colors.primaryActive : colors.primary },
-                ]}
-              >
-                <Text style={[styles.buttonText, { color: colors.onPrimary }]}>编辑最终稿</Text>
-              </Pressable>
-            </View>
           ) : null}
+
+          {contentTab === 'organized' && reviewResult && !finalEditorOpen ? null : null}
 
           {adjustOpen ? (
             <View
@@ -762,23 +831,7 @@ export function ShiyanTaskDetailScreen({
             </View>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setTranscriptOpen((value) => !value)}
-            style={[styles.disclosureRow, { borderColor: colors.border.default }]}
-          >
-            <View style={styles.disclosureCopy}>
-              <Text style={[styles.disclosureTitle, { color: colors.text.ink }]}>原文</Text>
-              <Text style={[styles.muted, { color: colors.text.soft }]}>{transcriptStatusText}</Text>
-            </View>
-            {transcriptOpen ? (
-              <ChevronUp size={18} color={colors.text.soft} />
-            ) : (
-              <ChevronDown size={18} color={colors.text.soft} />
-            )}
-          </Pressable>
-
-          {transcriptOpen ? (
+          {contentTab === 'transcript' ? (
             transcript.status === 'error' ? (
               <View
                 style={[
@@ -815,82 +868,10 @@ export function ShiyanTaskDetailScreen({
             )
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setProcessingOpen((value) => !value)}
-            style={[styles.disclosureRow, { borderColor: colors.border.default }]}
-          >
-            <View style={styles.disclosureCopy}>
-              <Text style={[styles.disclosureTitle, { color: colors.text.ink }]}>处理详情</Text>
-              <Text
-                style={[
-                  styles.muted,
-                  { color: currentStage?.status === 'failed' ? colors.status.error : colors.text.soft },
-                ]}
-              >
-                {shiyanTaskStatusText(task)}
-              </Text>
-            </View>
-            {processingOpen ? (
-              <ChevronUp size={18} color={colors.text.soft} />
-            ) : (
-              <ChevronDown size={18} color={colors.text.soft} />
-            )}
-          </Pressable>
-
-          {processingOpen ? (
-            <View style={styles.stageList}>
-              {task.stages.map((stage) => {
-                const failed = stage.status === 'failed';
-                const failure = stageFailureText(stage);
-                const retryAction = retryActionForStage(stage);
-                const retryable = retryAction === 'transcribe' || retryAction === 'organize';
-                return (
-                  <View
-                    key={stage.stage}
-                    style={[
-                      styles.stageRow,
-                      {
-                        borderColor: failed ? colors.status.error : colors.border.default,
-                        backgroundColor: colors.bg.card,
-                      },
-                    ]}
-                  >
-                    <View style={styles.stageMain}>
-                      <Text style={[styles.stageTitle, { color: colors.text.ink }]}>
-                        {shiyanStageLabel(stage.stage)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.muted,
-                          { color: failed ? colors.status.error : colors.text.soft },
-                        ]}
-                      >
-                        {shiyanStageStatusLabel(stage.status)}
-                        {stage.retryCount > 0 ? ` · 已重试 ${stage.retryCount} 次` : ''}
-                      </Text>
-                      {failure ? (
-                        <Text style={[styles.failureText, { color: colors.status.error }]}>
-                          {failure}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {retryable ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={busyAction === 'retry'}
-                        onPress={() => void retryStage(stage)}
-                        style={[styles.smallButton, { backgroundColor: colors.bg.soft }]}
-                      >
-                        <Text style={[styles.buttonText, { color: colors.primary }]}>
-                          {retryAction === 'transcribe' ? '重试转写' : '重试整理'}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
+          {reviewResult && !finalEditorOpen ? (
+            <Pressable accessibilityRole="button" onPress={() => setEditActionsOpen(true)} style={styles.editEntry}>
+              <Text style={[styles.buttonText, { color: colors.primary }]}>编辑</Text>
+            </Pressable>
           ) : null}
         </ScrollView>
       ) : null}
@@ -900,6 +881,12 @@ export function ShiyanTaskDetailScreen({
         title="更多操作"
         items={moreItems}
         onClose={() => setMoreOpen(false)}
+      />
+      <ShiyanActionSheet
+        visible={editActionsOpen}
+        title="选择编辑方式"
+        items={editItems}
+        onClose={() => setEditActionsOpen(false)}
       />
     </SafeAreaView>
   );
@@ -943,6 +930,33 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   lightStatus: { fontSize: fontSize.caption, fontWeight: '600' },
+  processingSummary: {
+    minHeight: 64,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  processingCopy: { flex: 1, gap: 2 },
+  stepper: { gap: spacing.sm },
+  stepItem: { flexDirection: 'row', minHeight: 58 },
+  stepRail: { width: 24, alignItems: 'center' },
+  stepDot: { width: 10, height: 10, borderRadius: radius.full, marginTop: 4 },
+  stepLine: { width: 2, flex: 1, marginVertical: 3 },
+  stepBody: { flex: 1, gap: 2, paddingBottom: spacing.sm },
+  sceneRow: {
+    minHeight: 52,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sceneValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabText: { fontSize: fontSize.button, fontWeight: '600' },
+  editEntry: { alignSelf: 'flex-end', paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   statusDot: { fontSize: fontSize.caption },
   resultTitle: { fontSize: fontSize.titleLg, fontWeight: '700' },
   resultBadge: {

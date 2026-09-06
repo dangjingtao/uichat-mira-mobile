@@ -1,6 +1,7 @@
 import { RemoteHostError } from '../api/remoteHttp';
 import {
   getChatHistoryErrorMessage,
+  getChatSendErrorMessage,
   readCanonicalSessionTitle,
 } from './chatSessionState';
 
@@ -45,5 +46,32 @@ describe('chatSessionState', () => {
     expect(
       getChatHistoryErrorMessage(new RemoteHostError('NETWORK_ERROR', 'offline')),
     ).toContain('网络');
+  });
+
+  it('maps local Provider send failures to actionable messages', () => {
+    expect(
+      getChatSendErrorMessage(
+        new RemoteHostError('PROVIDER_TIMEOUT', 'timeout'),
+        'local-provider',
+      ),
+    ).toContain('超时');
+    expect(
+      getChatSendErrorMessage(
+        new RemoteHostError('PROVIDER_REQUEST_FAILED', 'unauthorized', 401),
+        'local-provider',
+      ),
+    ).toContain('API Key');
+    expect(
+      getChatSendErrorMessage(
+        new RemoteHostError('NETWORK_ERROR', 'offline'),
+        'local-provider',
+      ),
+    ).toContain('Provider');
+    expect(
+      getChatSendErrorMessage(
+        new RemoteHostError('PROVIDER_REQUEST_FAILED', 'rate limited', 429),
+        'local-provider',
+      ),
+    ).toContain('频繁');
   });
 });

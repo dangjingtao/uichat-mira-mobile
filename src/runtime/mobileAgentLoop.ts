@@ -1,0 +1,124 @@
+import type { OpenAiCompatibleMessage, OpenAiCompatibleTool } from '../provider/openAiCompatibleClient';
+import type { RuntimeEvent } from './conversationRuntime';
+import type { ToolGatewayClient, ToolManifest } from '../tools/toolGatewayClient';
+import { limitToolResult, validateToolCall } from '../tools/toolPolicy';
+
+export interface MobileAgentLoopOptions {
+  maxToolRounds?: number;
+  overallTimeoutMs?: number;
+  maxToolResultBytes?: number;
+  shouldPause?: () => boolean;
+  signal?: AbortSignal;
+}
+
+export type AgentModelCall = (
+  messages: readonly OpenAiCompatibleMessage[],
+  tools: readonly OpenAiCompatibleTool[],
+) => Promise<AsyncIterable<RuntimeEvent>>;
+
+const DEFAULT_MAX_TOOL_ROUNDS = 8;
+const DEFAULT_OVERALL_TIMEOUT_MS = 5 * 60 * 1000;
+
+const toOpenAiTool = (manifest: ToolManifest): OpenAiCompatibleTool => ({
+  type: 'function',
+  function: {
+    name: manifest.name,
+    ...(manifest.description ? { description: manifest.description } : {}),
+    parameters: manifest.parameters,
+  },
+});
+
+export class MobileAgentLoop {
+  constructor(private readonly gateway: ToolGatewayClient) {}
+
+  async run(
+    initialMessages: readonly OpenAiCompatibleMessage[],
+    modelCall: AgentModelCall,
+    options: MobileAgentLoopOptions = {},
+  ): Promise<AsyncIterable<RuntimeEvent>> {
+    const manifests = await this.gateway.listTools();
+    const tools = manifests.map(toOpenAiTool);
+    const maxToolRounds = options.maxToolRounds ?? DEFAULT_MAX_TOOL_ROUNDS;
+    const maxToolResultBytes = options.maxToolResultBytes;
+    const deadline = Date.now() + (options.overallTimeoutMs ?? DEFAULT_OVERALL_TIMEOUT_MS);
+    const signal = options.signal;
+    const gateway = this.gateway;
+    const shouldPause = options.shouldPause ?? (() => false);
+
+    return (async function* () {
+      const messages = [...initialMessages];
+      let rounds = 0;
+      while (true) {
+        if (signal?.aborted) {
+          yield { type: 'run-paused' as const, reason: 'cancelled' as const };
+          return;
+        }
+        if (shouldPause()) {
+          yield { type: 'run-paused' as const, reason: 'app-suspended' as const };
+          return;
+        }
+        if (Date.now() >= deadline) {
+          yield { type: 'run-paused' as const, reason: 'timeout' as const };
+          return;
+        }
+
+        let stream: AsyncIterable<RuntimeEvent>;
+        try {
+          stream = await modelCall(messages, tools);
+        } catch (error) {
+          if (shouldPause()) {
+            yield { type: 'run-paused' as const, reason: 'app-suspended' as const };
+            return;
+          }
+          throw error;
+        }
+        const pendingCalls: Array<{ callId: string; name: string; arguments: string }> = [];
+        let assistantText = '';
+        let finishReason: string | null = null;
+        for await (const event of stream) {
+          if (event.type === 'text-delta') assistantText += event.delta;
+          if (event.type === 'tool-call') pendingCalls.push(event);
+          if (event.type === 'finish') finishReason = event.reason;
+          yield event;
+        }
+
+        if (pendingCalls.length === 0 || finishReason !== 'tool_calls') return;
+        if (rounds >= maxToolRounds) {
+          yield { type: 'error' as const, message: `Tool round limit reached (${maxToolRounds})` };
+          return;
+        }
+        rounds += 1;
+        messages.push({
+          role: 'assistant',
+          content: assistantText || null,
+          tool_calls: pendingCalls.map((call) => ({
+            id: call.callId,
+            type: 'function' as const,
+            function: { name: call.name, arguments: call.arguments },
+          })),
+        });
+
+        for (const call of pendingCalls) {
+          if (signal?.aborted || shouldPause()) {
+            yield { type: 'run-paused' as const, reason: signal?.aborted ? 'cancelled' as const : 'app-suspended' as const };
+            return;
+          }
+          validateToolCall(manifests, call);
+          let result;
+          try {
+            result = await gateway.callTool(call, { signal });
+          } catch (error) {
+            if (shouldPause()) {
+              yield { type: 'run-paused' as const, reason: 'app-suspended' as const };
+              return;
+            }
+            throw error;
+          }
+          const content = limitToolResult(result.content, maxToolResultBytes);
+          messages.push({ role: 'tool', content, tool_call_id: call.callId });
+          yield { type: 'tool-result' as const, callId: call.callId, name: call.name, content };
+        }
+      }
+    })();
+  }
+}

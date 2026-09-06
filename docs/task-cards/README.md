@@ -31,6 +31,14 @@
 | MOB-027 | 设置页插件入口恢复可用 | **待实施** | Mobile；最小接线现有 `Plugins` route |
 | MOB-028 | 关于页版本更新检查与确认下载 | **待实施** | Mobile；release channel 隔离 + signed APK 下载 |
 | MOB-029 | 拾言确认页播放器 / 场景 Action Sheet / Cloud 配置入口 | **完成** | Mobile；2026-09-04 真机验收通过验收条目 1–9 |
+| MOB-037 | Mobile 双入口与 Local Provider Agent Runtime | **进行中** | 阶段 A：运行时抽象、Provider 适配边界与独立凭据存储；Tool Gateway/UI 接线待协议确认 |
+| MOB-038 | Local Provider 多配置与选定 Provider 新建对话 | **待验收** | Mobile；多配置、独立 Key、选定 Provider 创建会话与聊天来源展示 |
+| MOB-039 | 双入口来源选择与统一新建会话 | **待验收** | Mobile；主列表来源菜单、Drawer 双来源与统一新建入口 |
+| MOB-040 | 本地对话可靠发送与重试 | **待验收** | Mobile；本地消息幂等写入、取消/超时语义与失败重试 |
+| MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | **待开始** | Mobile + Host；确认工具发现、鉴权、审批、取消、结果和凭据边界 |
+| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | **待开始** | Mobile；工具调用、暂停、取消、超时和失败状态接入聊天 UI |
+| MOB-043 | Host / Pi 持久运行时适配 | **待开始** | Mobile + Host/Pi；长任务、后台继续、审批暂停与恢复 |
+| MOB-044 | 双入口真机验收与发布加固 | **待开始** | Android/iOS；真实 Provider、Host、凭据、网络和发布矩阵 |
 
 ## 既有产品决策
 
@@ -120,3 +128,11 @@ MOB-021 已基于 MOB-020 PR #6 冻结的内容合同完成施工并合入 Mobil
 - `MOB-027-settings-plugin-entry.md`
 - `MOB-028-app-update-check-download.md`
 - `MOB-029-shiyan-confirmation-ux.md`
+- `MOB-037-mobile-dual-entry-local-provider-agent-runtime.md`
+- `MOB-038-local-provider-profiles-and-session-creation.md`
+- `MOB-039-dual-entry-source-selection-and-session-creation.md`
+- `MOB-040-local-conversation-reliable-send-and-retry.md`
+- `MOB-041-tool-gateway-protocol-and-credential-contract.md`
+- `MOB-042-local-agent-loop-ui-and-run-state.md`
+- `MOB-043-durable-host-pi-runtime-adapter.md`
+- `MOB-044-dual-entry-device-acceptance-and-release-hardening.md`

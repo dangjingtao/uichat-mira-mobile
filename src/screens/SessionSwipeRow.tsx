@@ -64,7 +64,9 @@ export function SessionSwipeRow({
     ? `项目会话${roleName ? ` · ${roleName}` : ''}`
     : roleName
       ? `角色 · ${roleName}`
-      : connectionStatus === 'connected'
+      : item.source === 'local-provider'
+        ? `本地 Provider${item.providerModel ? ` · ${item.providerModel}` : ''}`
+        : connectionStatus === 'connected'
         ? '继续与 Mira 对话'
         : '连接 Mira Host 后继续对话';
 

@@ -48,10 +48,12 @@ export function UnifiedRecordRow({
           {record.sceneName} · {formatRecordTime(record.createdAt)}
         </Text>
       </View>
-      <Text style={[styles.status, { color: statusColor[record.statusTone] }]}>
-        {record.statusLabel}
-      </Text>
-      <ChevronRight size={18} color={colors.text.soft} />
+      <View style={styles.trailing}>
+        <Text style={[styles.status, { color: statusColor[record.statusTone] }]}>
+          {record.statusLabel}
+        </Text>
+        <ChevronRight size={18} color={colors.text.soft} />
+      </View>
     </Pressable>
   );
 }
@@ -66,7 +68,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   main: { flex: 1, gap: spacing.xs },
+  trailing: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   title: { fontSize: fontSize.md, fontWeight: '600' },
-  status: { flexShrink: 0, fontSize: fontSize.xs, fontWeight: '600' },
+  status: {
+    flexShrink: 0,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
   meta: { fontSize: fontSize.xs, lineHeight: 18 },
 });

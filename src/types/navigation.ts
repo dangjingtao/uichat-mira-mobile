@@ -1,7 +1,7 @@
 export type RootStackParamList = {
   Bootstrap: undefined;
   SessionList: undefined;
-  Chat: { sessionId: string; title: string };
+  Chat: { sessionId: string; title: string; source?: 'remote-host' | 'local-provider'; providerName?: string | null; providerModel?: string | null };
   WorkspaceList: undefined;
   WorkspaceDetail: { workspaceId: string; workspaceName: string };
   HostConfig:
@@ -15,6 +15,7 @@ export type RootStackParamList = {
         code?: string;
       }
     | undefined;
+  LocalProviderConfig: undefined;
   Settings: undefined;
   Search: undefined;
   Personalization: undefined;

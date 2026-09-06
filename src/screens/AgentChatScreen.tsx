@@ -18,7 +18,16 @@ import { ChatScreen } from './ChatScreen';
 
 export function AgentChatScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
-  const { sessionId } = route.params;
+  const { sessionId, source } = route.params;
+
+  if (source === 'local-provider' || sessionId.startsWith('local-')) {
+    return <ChatScreen />;
+  }
+
+  return <RemoteAgentChatOverlay sessionId={sessionId} />;
+}
+
+function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
   const [runId, setRunId] = useState<string | null>(null);
   const [run, setRun] = useState<RemoteAgentRun | null>(null);
   const [loading, setLoading] = useState(false);

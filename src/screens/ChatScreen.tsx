@@ -35,6 +35,7 @@ import type { ConversationMatch } from '../chat/conversationTools';
 import { buildConversationShareText } from '../chat/conversationTools';
 import { miraHostClient } from '../api/miraHostClient';
 import { RemoteHostError } from '../api/remoteHttp';
+import { runtimeRegistry } from '../runtime/runtimeRegistry';
 import { useThreadReadStore } from '../store/threadReadStore';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, shadows, sizing, spacing } from '../theme/tokens';
@@ -44,6 +45,7 @@ import { ConversationSearchBar } from '../components/ConversationSearchBar';
 import { MessageAttachments } from '../components/MessageAttachments';
 import {
   getChatHistoryErrorMessage,
+  getChatSendErrorMessage,
   readCanonicalSessionTitle,
 } from './chatSessionState';
 
@@ -189,7 +191,7 @@ export function ChatScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
-  const { sessionId, title: routeTitle } = route.params;
+  const { sessionId, title: routeTitle, source, providerName, providerModel } = route.params;
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const markThreadRead = useThreadReadStore((state) => state.markThreadRead);
@@ -224,6 +226,11 @@ export function ChatScreen() {
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const menuButtonRef = useRef<View>(null);
   const abortRef = useRef(false);
+  const runtime = useMemo(
+    () => runtimeRegistry.runtimeForSession(sessionId, source),
+    [sessionId, source],
+  );
+  const isLocalProvider = runtime.kind === 'local-provider';
 
   useEffect(() => {
     setIsSearchVisible(false);
@@ -231,6 +238,7 @@ export function ChatScreen() {
   }, [sessionId]);
 
   const refreshSessionTitle = useCallback(async () => {
+    if (isLocalProvider) return;
     const canonicalTitle = await readCanonicalSessionTitle(
       miraHostClient,
       sessionId,
@@ -238,12 +246,12 @@ export function ChatScreen() {
     if (canonicalTitle !== null) {
       setSessionTitle(canonicalTitle);
     }
-  }, [sessionId]);
+  }, [isLocalProvider, sessionId]);
 
   const loadMessages = useCallback(async (): Promise<ChatMessage[] | null> => {
     setHistoryError(null);
     try {
-      const canonicalMessages = await miraHostClient.getMessages(sessionId);
+      const canonicalMessages = await runtime.getMessages(sessionId);
       setMessages(canonicalMessages);
       try {
         await markThreadRead(
@@ -263,7 +271,7 @@ export function ChatScreen() {
       setHistoryError(getChatHistoryErrorMessage(error));
       return null;
     }
-  }, [clearThreadRead, markThreadRead, sessionId]);
+  }, [clearThreadRead, markThreadRead, runtime, sessionId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -356,15 +364,12 @@ export function ChatScreen() {
       try {
         // Reuse the same user-message id on retry. Remote Host V1 requires a
         // stable messageId so an uncertain reconnect cannot duplicate a user message.
-        const stream = await miraHostClient.sendMessage(
-          sessionId,
-          content,
-          userMsg.id,
-        );
+        const stream = await runtime.sendMessage(sessionId, content, { messageId: userMsg.id });
         let fullReply = '';
-        for await (const chunk of stream) {
+        for await (const event of stream) {
           if (abortRef.current) break;
-          fullReply += chunk;
+          if (event.type === 'text-delta') fullReply += event.delta;
+          if (event.type === 'error') throw new Error(event.message);
           setStreamingText(fullReply);
           scrollToBottom();
         }
@@ -384,10 +389,7 @@ export function ChatScreen() {
             message.timestamp.getTime() >= userMsg.timestamp.getTime(),
         );
         if (!abortRef.current && !hasCanonicalAssistant) {
-          const message =
-            error instanceof Error && error.message
-              ? error.message
-              : '发送失败，请重试';
+          const message = getChatSendErrorMessage(error, runtime.kind);
           setFailedMessages((prev) =>
             new Map(prev).set(userMsg.id, message),
           );
@@ -402,14 +404,15 @@ export function ChatScreen() {
       loadMessages,
       refreshSessionTitle,
       scrollToBottom,
+      runtime,
       sessionId,
     ],
   );
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
-    miraHostClient.cancelCurrentSend();
-  }, []);
+    runtime.cancelActiveRun();
+  }, [runtime]);
 
   const openMenu = useCallback(() => {
     menuButtonRef.current?.measureInWindow((x, y, width, height) => {
@@ -542,12 +545,16 @@ export function ChatScreen() {
             <ChevronLeft size={24} color={colors.text.ink} />
           </Pressable>
         </View>
-        <Text
-          style={[styles.headerTitle, { color: colors.text.ink }]}
-          numberOfLines={1}
-        >
-          {sessionTitle}
-        </Text>
+        <View style={styles.headerTitleGroup}>
+          <Text style={[styles.headerTitle, { color: colors.text.ink }]} numberOfLines={1}>
+            {sessionTitle}
+          </Text>
+          <Text style={[styles.headerSource, { color: colors.text.soft }]} numberOfLines={1}>
+            {isLocalProvider
+              ? `${providerName || 'Local Provider'}${providerModel ? ` · ${providerModel}` : ''}`
+              : 'Remote Host'}
+          </Text>
+        </View>
         <View
           style={[
             styles.headerActionGroup,
@@ -780,12 +787,13 @@ const styles = StyleSheet.create({
   },
   groupDivider: { width: StyleSheet.hairlineWidth, height: 20 },
   headerTitle: {
-    flex: 1,
     fontFamily: Platform.select({ ios: 'Georgia', android: 'serif' }),
     fontSize: fontSize.xl,
     fontWeight: '600',
     textAlign: 'center',
   },
+  headerTitleGroup: { flex: 1, minWidth: 0, alignItems: 'center' },
+  headerSource: { fontSize: fontSize.xs, marginTop: 1 },
   container: { flex: 1 },
   messageList: {
     paddingHorizontal: spacing.lg,

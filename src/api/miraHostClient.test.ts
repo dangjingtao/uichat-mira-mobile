@@ -213,6 +213,7 @@ describe('PairedRemoteMiraHostClient session mapping', () => {
         id: 'thread-1',
         title: 'Project thread',
         updatedAt: new Date('2026-08-27T11:00:00.000Z'),
+        source: 'remote-host',
         workspaceId: 'workspace-1',
         knowledgeBaseId: 'kb-1',
         roleId: 'role-1',

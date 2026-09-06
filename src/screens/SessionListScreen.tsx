@@ -1,16 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,17 +11,19 @@ import { useThreadPinStore } from '../store/threadPinStore';
 import { isThreadPinned, sortSessionsByLocalPin } from '../store/threadPinning';
 import { selectThreadUnread, useThreadReadStore } from '../store/threadReadStore';
 import { miraHostClient } from '../api/miraHostClient';
+import { runtimeRegistry, type SessionSourceFilter } from '../runtime/runtimeRegistry';
 import { getSessionRoleName } from '../api/roleApi';
 import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { useTheme } from '../theme/ThemeContext';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
+import { ConnectionSourceDropdown, type ConnectionSourceOption } from '../components/ConnectionSourceDropdown';
+import { type ConnectionVisualStatus } from '../components/ConnectionStatusDot';
+import { ProviderConfigStore } from '../provider/providerConfigStore';
 import { CustomDrawer } from '../components/CustomDrawer';
 import { EmptyStateIllustration } from '../components/EmptyStateIllustration';
-import { RemoteDiagnosticNotice } from '../components/RemoteDiagnosticNotice';
 import {
   classifySessionLoadFailure,
   type RemoteConnectionDiagnostic,
-  type RemoteConnectionDiagnosticAction,
 } from '../connectivity/remoteConnectionDiagnostics';
 import { resolveSessionCollectionState } from './sessionCollectionState';
 import { resolveSessionOpenTarget } from './sessionNavigation';
@@ -40,26 +31,17 @@ import { SessionSwipeRow } from './SessionSwipeRow';
 
 const DRAWER_WIDTH = Math.floor(Dimensions.get('window').width * 0.82);
 
-function getStatusColor(
-  status: string,
-  colors: ReturnType<typeof useTheme>['colors'],
-): string {
-  switch (status) {
-    case 'connected':
-      return colors.status.success;
-    case 'connecting':
-    case 'reconnecting':
-      return colors.status.warning;
-    default:
-      return colors.text.soft;
-  }
-}
+const getEmptyDescription = (source: SessionSourceFilter): string => {
+  if (source === 'local-provider') return '尚未创建本地连接会话';
+  if (source === 'remote-host') return '远程连接当前没有可用会话';
+  return '远程连接与本地连接当前都没有会话';
+};
 
 export function SessionListScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useTheme();
-  const { connectionStatus } = useHostStore();
+  const { connectionStatus, config } = useHostStore();
   const roleNames = useRoleNameMap();
   const pinnedAtByThreadId = useThreadPinStore((state) => state.pinnedAtByThreadId);
   const hydratePins = useThreadPinStore((state) => state.hydrate);
@@ -71,6 +53,8 @@ export function SessionListScreen() {
   const clearThreadRead = useThreadReadStore((state) => state.clearThread);
   const insets = useSafeAreaInsets();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [sourceFilter, setSourceFilter] = useState<SessionSourceFilter>('all');
+  const [localConfigured, setLocalConfigured] = useState(false);
   const [canDeleteSessions, setCanDeleteSessions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadDiagnostic, setLoadDiagnostic] =
@@ -79,6 +63,38 @@ export function SessionListScreen() {
   const [openSwipeRowId, setOpenSwipeRowId] = useState<string | null>(null);
   const drawerAnim = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const backdropAnim = useState(new Animated.Value(0))[0];
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void new ProviderConfigStore().load().then((configs) => {
+      if (!cancelled) setLocalConfigured(configs.length > 0);
+    }).catch(() => {
+      if (!cancelled) setLocalConfigured(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const remoteStatus: ConnectionVisualStatus = loadDiagnostic
+    ? 'error'
+    : connectionStatus === 'connected'
+      ? 'connected'
+      : connectionStatus === 'connecting' || connectionStatus === 'reconnecting'
+        ? 'connecting'
+        : config
+          ? 'disconnected'
+          : 'not-configured';
+  const sourceOptions: ConnectionSourceOption<SessionSourceFilter>[] = [
+    { value: 'all', label: '全部任务', description: '同时显示远程和本地会话', status: localConfigured || !!config ? 'connected' : 'not-configured' },
+    { value: 'remote-host', label: '远程连接', description: '来自已配对 Mira Host 的会话', status: remoteStatus, disabled: remoteStatus !== 'connected' && remoteStatus !== 'connecting' },
+    { value: 'local-provider', label: '本地连接', description: '保存在当前设备的直连会话', status: localConfigured ? 'connected' : 'not-configured' },
+  ];
+
+  React.useEffect(() => {
+    const remoteUnavailable = remoteStatus !== 'connected' && remoteStatus !== 'connecting';
+    if (sourceFilter === 'remote-host' && remoteUnavailable) {
+      setSourceFilter('all');
+    }
+  }, [remoteStatus, sourceFilter]);
 
   const openDrawer = useCallback(() => {
     setDrawerOpen(true);
@@ -116,19 +132,21 @@ export function SessionListScreen() {
     setLoadDiagnostic(null);
     try {
       const [list, canDelete] = await Promise.all([
-        miraHostClient.listSessions(),
-        miraHostClient.canDeleteSession().catch(() => false),
+        runtimeRegistry.listSessions(sourceFilter),
+        sourceFilter === 'local-provider' ? Promise.resolve(false) : miraHostClient.canDeleteSession().catch(() => false),
       ]);
       setSessions(list);
       setCanDeleteSessions(canDelete);
-      void syncUnreadSessions(list).catch(() => undefined);
+      void syncUnreadSessions(
+        list.filter((session) => session.source !== 'local-provider'),
+      ).catch(() => undefined);
     } catch (error) {
       setCanDeleteSessions(false);
       setLoadDiagnostic(await classifySessionLoadFailure(error));
     } finally {
       setIsLoading(false);
     }
-  }, [syncUnreadSessions]);
+  }, [sourceFilter, syncUnreadSessions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -165,17 +183,6 @@ export function SessionListScreen() {
     [insets.bottom, sessions.length],
   );
 
-  const handleDiagnosticAction = useCallback(
-    (action: RemoteConnectionDiagnosticAction) => {
-      if (action === 'retry') {
-        void loadSessions();
-        return;
-      }
-      navigation.navigate('HostConfig');
-    },
-    [loadSessions, navigation],
-  );
-
   const openSession = (session: Session) => {
     const target = resolveSessionOpenTarget(session);
     if (target.kind === 'contract-error') {
@@ -185,6 +192,9 @@ export function SessionListScreen() {
     navigation.navigate('Chat', {
       sessionId: session.id,
       title: session.title,
+      source: session.source,
+      providerName: session.providerName,
+      providerModel: session.providerModel,
     });
   };
 
@@ -245,13 +255,7 @@ export function SessionListScreen() {
           <Menu size={20} color={colors.text.ink} />
         </Pressable>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.text.ink }]}>Mira</Text>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: getStatusColor(connectionStatus, colors) },
-            ]}
-          />
+          <ConnectionSourceDropdown value={sourceFilter} options={sourceOptions} onChange={setSourceFilter} />
         </View>
         <Pressable
           onPress={() => navigation.navigate('Settings')}
@@ -271,13 +275,7 @@ export function SessionListScreen() {
         contentContainerStyle={listContentStyle}
         onScrollBeginDrag={() => setOpenSwipeRowId(null)}
         ListHeaderComponent={
-          collectionState === 'data' && loadDiagnostic ? (
-            <RemoteDiagnosticNotice
-              diagnostic={loadDiagnostic}
-              compact
-              onAction={handleDiagnosticAction}
-            />
-          ) : null
+          null
         }
         renderItem={({ item, index }) => (
           <>
@@ -294,7 +292,7 @@ export function SessionListScreen() {
               colors={colors}
               isPinned={isThreadPinned(pinnedAtByThreadId, item.id)}
               isUnread={selectThreadUnread(progressByThreadId, item.id)}
-              canDelete={canDeleteSessions}
+              canDelete={canDeleteSessions && item.source !== 'local-provider'}
               isOpen={openSwipeRowId === item.id}
               onSwipeStateChange={(open) =>
                 setOpenSwipeRowId(open ? item.id : (current) =>
@@ -321,14 +319,7 @@ export function SessionListScreen() {
           }
 
           if (collectionState === 'error' && loadDiagnostic) {
-            return (
-              <View style={styles.emptyState}>
-                <RemoteDiagnosticNotice
-                  diagnostic={loadDiagnostic}
-                  onAction={handleDiagnosticAction}
-                />
-              </View>
-            );
+            return <View style={styles.emptyState}><Text style={[styles.emptyTitle, { color: colors.text.ink }]}>连接不可用</Text><Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>请在“连接”中检查远程连接状态</Text></View>;
           }
 
           return (
@@ -337,7 +328,7 @@ export function SessionListScreen() {
                 <EmptyStateIllustration size={168} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text.ink }]}>暂无会话</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>Remote Host V1 当前只展示桌面端已有会话</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.text.soft }]}>{getEmptyDescription(sourceFilter)}</Text>
             </View>
           );
         }}
@@ -389,14 +380,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: spacing.xs,
   },
-  statusDot: {
-    width: spacing.sm,
-    height: spacing.sm,
-    borderRadius: radius.full,
-    marginLeft: spacing.sm,
-  },
-  headerTitle: { fontSize: fontSize.titleLg, fontWeight: '600' },
   settingsBtn: {
     width: sizing.buttonHeight,
     height: sizing.buttonHeight,

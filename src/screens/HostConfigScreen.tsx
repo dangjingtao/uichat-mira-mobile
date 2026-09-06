@@ -448,8 +448,9 @@ export function HostConfigScreen() {
         visible={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onScanned={uri => {
-          setScannerOpen(false);
-          loadPairingUri(uri);
+          if (loadPairingUri(uri)) {
+            setScannerOpen(false);
+          }
         }}
       />
 

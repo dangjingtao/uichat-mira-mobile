@@ -26,6 +26,7 @@ const threadToSession = (thread: RemoteThread): Session => ({
   id: thread.id,
   title: thread.title,
   updatedAt: new Date(thread.updatedAt),
+  source: 'remote-host',
   workspaceId: thread.workspaceId,
   knowledgeBaseId: thread.knowledgeBaseId,
   roleId: thread.roleId,

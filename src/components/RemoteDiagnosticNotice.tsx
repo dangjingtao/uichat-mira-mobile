@@ -24,10 +24,6 @@ export function RemoteDiagnosticNotice({
     <View
       style={[
         compact ? styles.compact : styles.full,
-        {
-          backgroundColor: colors.bg.card,
-          borderColor: colors.border.default,
-        },
       ]}
       accessibilityRole="alert"
     >
@@ -90,16 +86,15 @@ export function RemoteDiagnosticNotice({
 
 const styles = StyleSheet.create({
   full: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
   },
   compact: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.md,
+    width: '100%',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     marginVertical: spacing.md,

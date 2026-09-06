@@ -62,7 +62,7 @@ describe('Shiyan confirmation UX wiring', () => {
 
   it('keeps delete failures visible instead of navigating as if deletion succeeded', () => {
     const submit = readSource('src/shiyan/ShiyanCaptureSubmitScreen.tsx');
-    expect(submit).toContain("Alert.alert(\n                '无法删除'");
+    expect(submit).toMatch(/Alert\.alert\(\s*'无法删除'/);
     expect(submit).not.toContain(".catch(() => navigation.navigate('ShiyanLocalDrafts'))");
   });
 

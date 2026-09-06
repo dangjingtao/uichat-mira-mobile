@@ -1,6 +1,6 @@
 # Mira Mobile Work Ledger
 
-更新时间：2026-09-04（Asia/Shanghai）
+更新时间：2026-09-06（Asia/Shanghai）
 
 这是 Mira Mobile 的唯一当前任务台账，按 Mira Forge 的台账规则维护。Mobile 任务继续使用本仓库既有的 `MOB-*` 编号；Forge 的 `Txxx` 编号只属于 Forge 自身工作台，不在 Mobile 仓库复制。
 
@@ -48,8 +48,26 @@
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | REVIEW | **待真机/真实服务验证**；PR #91 squash-merged as `eb5f90a`; current-head Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned iPhone/IPA build all green; OpenCode review was cancelled without verdict; verify Android/iOS More Sheet + system Share Sheet, real GitHub Delivery/canonical URL, retention changes, and light/dark UI before PASS |
 | MOB-035 | 远程连接状态诊断与会话错误分层 | REVIEW | **待真机验证**；PR #92 squash-merged as `0d5f2c6e`; final-head Mobile CI fully green; OpenCode review cancelled without verdict after prior Codex P2 was fixed and resolved; Android state matrix + iOS equivalent smoke required before PASS |
 | MOB-036 | 桌面配对入口与授权 Bottom Sheet 收口 | PASS | PR #90 squash-merged as `40a57227`; product owner completed real-device acceptance on 2026-09-04: all 5 acceptance paths (扫码→Sheet→关闭 / 扫码→提交→批准→Toast→首页 / 粘贴→Sheet→提交 / Desktop 拒绝 / 请求过期) passed; 与 MOB-009 同批次升 PASS，两卡真机 5 路径互为佐证 |
+| MOB-037 | Mobile 双入口与 Local Provider Agent Runtime | DOING | 2026-09-06 阶段 A + 阶段 1 + 阶段 B 基础完成：RuntimeRegistry、来源筛选、本地 Provider 配置页、本地聊天流、ToolGateway 合同、工具策略、8 轮前台 Loop 与挂起边界；真实 Gateway 协议、Loop UI、长期运行时与真机验证待完成 |
+| MOB-038 | Local Provider 多配置与选定 Provider 新建对话 | REVIEW | 2026-09-06 代码完成；多 Provider upsert/remove、独立 Key、选定 Provider 创建会话、聊天头部来源展示与删除保护已自动化验证；Android arm64-v8a debug 构建通过；待 Android / iOS 功能验收 |
+| MOB-039 | 双入口来源选择与统一新建会话 | REVIEW | 2026-09-06 代码与自动化验证完成；主列表来源菜单、Drawer 双来源展示与统一新建入口待 Android / iOS 功能验收 |
+| MOB-040 | 本地对话可靠发送与重试 | REVIEW | 2026-09-06 代码与自动化验证完成；本地消息幂等写入、取消/超时语义与失败重试待 Android / iOS 功能验收 |
+| MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | TODO | 2026-09-06 已派卡；等待 Mira Host / Tool Gateway 明确 endpoint、鉴权、工具发现、审批、取消、结果和凭据隔离合同 |
+| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | TODO | 2026-09-06 已派卡；依赖 MOB-041，当前仅有协议无关运行时和测试替身 |
+| MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
+| MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
 
 ## Deferred Engineering Governance
+
+> 口径更新（2026-09-05）：原先的 Draft 设计议题已正式升级为 `MOB-037`。下方如仍保留“暂不分配新的 `MOB-*` 编号”的历史说明，以本更新和 `MOB-037` 正式任务卡为准；后续实现、协议确认和验收证据统一回写 `MOB-037` 与本台账。
+
+### MOB-037 设计登记
+
+- [MOB-037：Mobile 双入口与 Local Provider Agent Runtime](../task-cards/MOB-037-mobile-dual-entry-local-provider-agent-runtime.md)：**DOING**（阶段 A + 阶段 1 最小 UI 接线）。
+- 设计附件：[Mobile Dual-Entry and Local Provider Agent Runtime Design](../remote-access/local-provider-agent-runtime-design.md)。
+- 阶段 A、阶段 1 最小 UI 接线和阶段 B 基础 Loop 已落地；当前没有真实 Tool Gateway 协议实现、Loop UI 状态或跨端验收证据。
+
+后续正式任务卡已派出：MOB-041 负责 Tool Gateway / MCP 协议与凭据合同，MOB-042 负责本地 Agent Loop UI，MOB-043 负责 Host / Pi 持久运行时适配，MOB-044 负责 Android / iOS 真机验收与发布加固。未确认的协议项继续保持为阻塞前置，不在移动端猜测实现。
 
 产品负责人要求先记录、暂不插入当前功能施工；等当前正在收尾的 Mobile 功能卡 / 功能批次结束后，再集中建立治理任务卡并执行。
 

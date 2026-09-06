@@ -75,6 +75,8 @@ feature/* -> dev -> test -> prod
 
 Debug 构建使用 Android 工具链维护在用户目录中的标准 debug keystore。仓库不会提交 `debug.keystore`，干净环境首次构建时由工具链创建或复用本机凭据。
 
+快速安装已有 APK 时，可以把 APK 文件直接拖到仓库根目录的 `install-release-apk.bat` 上；也可以双击该脚本后粘贴 APK 完整路径。脚本会自动查找 ADB、检测已授权设备、覆盖安装并启动应用。只有签名不一致时，脚本才会在明确提示会清除本地数据后询问是否卸载旧版。
+
 Release 构建禁止回退到 debug 签名。构建 release 前，必须通过 `~/.gradle/gradle.properties` 或环境变量提供以下四项：
 
 ```properties

@@ -21,12 +21,14 @@ import {
   Image as ImageIcon,
   Monitor,
   Search,
+  Smartphone,
   SquarePen,
 } from 'lucide-react-native';
 import type { RootStackParamList } from '../types/navigation';
 import type { Session } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { miraHostClient } from '../api/miraHostClient';
+import { runtimeRegistry } from '../runtime/runtimeRegistry';
 import { getSessionRoleName } from '../api/roleApi';
 import { useRoleNameMap } from '../hooks/useRoleNameMap';
 import { fontSize, radius, sizing, spacing } from '../theme/tokens';
@@ -63,7 +65,8 @@ const categories: CategoryItem[] = [
   { id: 'files', label: '文件库', icon: FolderKanban },
   // Product term “项目” maps to the Desktop Host Chat Workspace domain.
   { id: 'workspaces', label: '项目', icon: FolderOpen },
-  { id: 'remote', label: 'Remote', icon: Monitor },
+  { id: 'remote', label: '远程连接', icon: Monitor },
+  { id: 'local-provider', label: '本地连接', icon: Smartphone },
   { id: 'planned', label: '已计划', icon: Clock },
   { id: 'plugins', label: '插件', icon: Grid3x3 },
 ];
@@ -94,9 +97,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     setLoading(true);
     setLoadDiagnostic(null);
     try {
-      const list = await miraHostClient.listSessions();
+      const list = await runtimeRegistry.listSessions('all');
       setSessions(list);
-      void syncUnreadSessions(list.slice(0, 20)).catch(() => undefined);
+      void syncUnreadSessions(
+        list.filter((session) => session.source !== 'local-provider').slice(0, 20),
+      ).catch(() => undefined);
     } catch (error) {
       setLoadDiagnostic(await classifySessionLoadFailure(error));
     } finally {
@@ -121,7 +126,9 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   // Pinned threads beyond the Recent cap still need unread observation.
   React.useEffect(() => {
     if (pinnedSessions.length === 0) return;
-    void syncUnreadSessions(pinnedSessions).catch(() => undefined);
+    void syncUnreadSessions(
+      pinnedSessions.filter((session) => session.source !== 'local-provider'),
+    ).catch(() => undefined);
   }, [pinnedSessions, syncUnreadSessions]);
 
   const collectionState = resolveSessionCollectionState(
@@ -145,6 +152,9 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     navigation.navigate('Chat', {
       sessionId: session.id,
       title: session.title,
+      source: session.source,
+      providerName: session.providerName,
+      providerModel: session.providerModel,
     });
   }, [navigation, onClose]);
 
@@ -156,6 +166,11 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
   const handleOpenRemoteConnection = useCallback(() => {
     onClose();
     navigation.navigate('HostConfig');
+  }, [navigation, onClose]);
+
+  const handleOpenLocalProvider = useCallback(() => {
+    onClose();
+    navigation.navigate('LocalProviderConfig');
   }, [navigation, onClose]);
 
   const handleOpenPlugins = () => {
@@ -174,26 +189,41 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
     [handleOpenRemoteConnection, loadSessions],
   );
 
-  const handleCreateChat = useCallback(async () => {
-    if (creatingChat) return;
+  const createRemoteChat = useCallback(async () => {
     setCreatingChat(true);
     try {
       const session = await miraHostClient.createSession();
-      setCreatingChat(false);
       onClose();
       navigation.navigate('Chat', {
         sessionId: session.id,
         title: session.title,
+        source: session.source,
       });
     } catch (error) {
-      setCreatingChat(false);
       const message =
         error instanceof Error && error.message
           ? error.message
-          : '无法新建会话，请稍后重试。';
-      Alert.alert('无法新建会话', message);
+          : '无法新建远程会话，请稍后重试。';
+      Alert.alert('无法新建远程会话', message);
+    } finally {
+      setCreatingChat(false);
     }
-  }, [creatingChat, navigation, onClose]);
+  }, [navigation, onClose]);
+
+  const handleCreateChat = useCallback(() => {
+    if (creatingChat) return;
+    Alert.alert('新建会话', '选择会话来源', [
+      {
+        text: '远程连接',
+        onPress: () => void createRemoteChat(),
+      },
+      {
+        text: '本地连接',
+        onPress: handleOpenLocalProvider,
+      },
+      { text: '取消', style: 'cancel' },
+    ]);
+  }, [creatingChat, createRemoteChat, handleOpenLocalProvider]);
 
   const renderDrawerSession = useCallback(
     ({ item }: { item: Session }) => {
@@ -299,18 +329,22 @@ export function CustomDrawer({ onClose }: CustomDrawerProps) {
         <View style={styles.categories}>
           {categories.map((cat) => {
             const interactive =
-              cat.id === 'remote' || cat.id === 'workspaces' || cat.id === 'plugins';
+              cat.id === 'remote' || cat.id === 'local-provider' || cat.id === 'workspaces' || cat.id === 'plugins';
             const onPress =
               cat.id === 'remote'
                 ? handleOpenRemoteConnection
+                : cat.id === 'local-provider'
+                  ? handleOpenLocalProvider
                 : cat.id === 'workspaces'
                   ? handleOpenWorkspaces
                   : cat.id === 'plugins'
                     ? handleOpenPlugins
                     : undefined;
             const accessibilityLabel =
-              cat.id === 'remote'
-                ? 'Remote connection'
+                cat.id === 'remote'
+                    ? '远程连接'
+                    : cat.id === 'local-provider'
+                      ? '本地连接'
                 : cat.id === 'workspaces'
                   ? '项目'
                   : cat.id === 'plugins'

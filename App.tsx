@@ -13,6 +13,7 @@ import { WorkspaceListScreen } from './src/screens/WorkspaceListScreen';
 import { WorkspaceDetailScreen } from './src/screens/WorkspaceDetailScreen';
 import { HostConfigScreen } from './src/screens/HostConfigScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { LocalProviderConfigScreen } from './src/screens/LocalProviderConfigScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { PersonalizationScreen } from './src/screens/PersonalizationScreen';
 import { ReportErrorScreen } from './src/screens/ReportErrorScreen';
@@ -38,6 +39,7 @@ import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConn
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
 import { deviceCredentialStore } from './src/security/deviceCredentialStore';
 import { useHostStore } from './src/store/hostStore';
+import { runtimeRegistry } from './src/runtime/runtimeRegistry';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,6 +70,7 @@ function AppInner() {
     let previousState: AppStateStatus = AppState.currentState;
     let resumeGeneration = 0;
     const subscription = AppState.addEventListener('change', nextState => {
+      runtimeRegistry.local.setExecutionSuspended(nextState !== 'active');
       if (nextState === 'active' && previousState !== 'active') {
         remoteMiraHostClient.refreshRelayConnection();
         if (useHostStore.getState().connectionStatus === 'connected') {
@@ -161,6 +164,7 @@ function AppInner() {
         <Stack.Screen name="WorkspaceDetail" component={WorkspaceDetailScreen} />
         <Stack.Screen name="HostConfig" component={HostConfigScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="LocalProviderConfig" component={LocalProviderConfigScreen} />
         <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="Personalization" component={PersonalizationScreen} />
         <Stack.Screen name="Plugins" component={PluginsScreen} />
