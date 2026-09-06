@@ -1,6 +1,6 @@
 # MOB-046：OpenAI-compatible URL / SSE / Tool Call 兼容性修复
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**REVIEW**（2026-09-07 PR #100 已合入 `dev`；自动化与 CodeRabbit Review 收口，真实 Provider / 真机矩阵挂 MOB-044）
 
 范围：Mira Mobile Local Provider adapter
 
@@ -103,3 +103,16 @@ None。本卡不决定 Tool Gateway 协议。
 ## Handoff
 
 先用测试复现上述三个兼容缺口，再修改实现。若真实仓库已经修复其中某项，不重复重写，只补缺失证据。
+
+
+## Implementation Evidence
+
+- PR #100 squash-merged into `dev` as `3ad288da`.
+- Base URL endpoint resolution now covers `https://host`, `https://host/v1`, and path-prefixed `https://host/api/v1` without producing duplicate `/v1/v1`; Chat Completions V1 remains the only supported protocol.
+- SSE `finish_reason` remains the model-turn semantic. `[DONE]` is treated as transport completion and no longer overwrites an already received `stop` / `tool_calls`; the legacy `finish: null` fallback is retained only for providers that finish with `[DONE]` and never emit a finish reason.
+- Streamed tool calls are aggregated by protocol `tool_calls[].index`; array position is used only when the provider omits `index`. Interleaved fragments are kept separate and flushed deterministically by index.
+- Split tool-call metadata is supported: an `id`-only fragment can be followed by a `function`-only fragment for the same index without losing the final `callId`.
+- CodeRabbit identified one valid protocol edge case (dropping `id`-only tool-call fragments). It was fixed in `aa470112`, confirmed as addressed by CodeRabbit, and the review thread is resolved.
+- Final head `aa470112`: Typecheck, Lint, full Jest, and Android debug APK build/upload all passed.
+- `RuntimeEvent`, Tool Gateway / MCP contracts, HTTPS policy, embedded-credential rejection, and Provider-to-UI boundaries were not broadened.
+- Real OpenAI-compatible Provider coverage and Android/iOS device matrix remain under MOB-044, so this card stays `REVIEW` rather than `PASS`.
