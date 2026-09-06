@@ -59,6 +59,10 @@ export class LocalProviderRuntime implements ConversationRuntime {
     return this.sessionRepository.create(config.id, title);
   }
 
+  deleteSession(sessionId: string): Promise<void> {
+    return this.sessionRepository.delete(sessionId);
+  }
+
   getMessages(sessionId: string): Promise<ChatMessage[]> {
     return this.sessionRepository.getMessages(sessionId);
   }

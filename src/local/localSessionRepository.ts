@@ -152,6 +152,16 @@ export class LocalSessionRepository {
     await this.saveStored(values);
   }
 
+  async delete(sessionId: string): Promise<void> {
+    const values = await this.loadStored();
+    const index = values.findIndex((item) => item.id === sessionId);
+    if (index < 0) throw new Error('Local session was not found');
+    await this.saveStored([
+      ...values.slice(0, index),
+      ...values.slice(index + 1),
+    ]);
+  }
+
   async clear(): Promise<void> {
     await this.store.remove(STORAGE_KEY);
   }

@@ -37,6 +37,13 @@ export class RuntimeRegistry {
     return sessions.sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
   }
 
+  deleteSession(sessionId: string, source?: SessionSource): Promise<void> {
+    const runtime = this.runtimeForSession(sessionId, source);
+    return runtime.kind === 'local-provider'
+      ? this.local.deleteSession(sessionId)
+      : this.remote.deleteSession(sessionId);
+  }
+
   createLocalSession(title?: string, providerId?: string): Promise<Session> {
     return this.local.createSession(title, providerId);
   }

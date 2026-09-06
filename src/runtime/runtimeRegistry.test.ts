@@ -30,6 +30,26 @@ describe('RuntimeRegistry', () => {
     ]);
   });
 
+  it('routes session deletion to the matching runtime only', async () => {
+    const localDeletes: string[] = [];
+    const remoteDeletes: string[] = [];
+    const local = {
+      ...runtime('local-provider', []),
+      deleteSession: async (sessionId: string) => { localDeletes.push(sessionId); },
+    };
+    const remote = {
+      ...runtime('remote-host', []),
+      deleteSession: async (sessionId: string) => { remoteDeletes.push(sessionId); },
+    };
+    const registry = new RuntimeRegistry(local as never, remote as never);
+
+    await registry.deleteSession('local-1', 'local-provider');
+    await registry.deleteSession('remote-1', 'remote-host');
+
+    expect(localDeletes).toEqual(['local-1']);
+    expect(remoteDeletes).toEqual(['remote-1']);
+  });
+
   it('keeps the available source when the other source fails', async () => {
     const local = runtime('local-provider', [session('local-1', 'local-provider', '2026-09-06T02:00:00.000Z')]);
     const remote = runtime('remote-host', []) as ConversationRuntime;
