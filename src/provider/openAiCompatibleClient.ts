@@ -200,21 +200,29 @@ const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedPr
       for (const [fallbackIndex, call] of deltaRecord.tool_calls.entries()) {
         if (!call || typeof call !== 'object' || Array.isArray(call)) continue;
         const record = call as Record<string, unknown>;
-        const fn = record.function;
-        if (!fn || typeof fn !== 'object' || Array.isArray(fn)) continue;
-        const functionRecord = fn as Record<string, unknown>;
         const protocolIndex = record.index;
         const index =
           typeof protocolIndex === 'number' && Number.isInteger(protocolIndex) && protocolIndex >= 0
             ? protocolIndex
             : fallbackIndex;
+        const fn = record.function;
+        const functionRecord =
+          fn && typeof fn === 'object' && !Array.isArray(fn)
+            ? fn as Record<string, unknown>
+            : null;
+        if (typeof record.id !== 'string' && !functionRecord) continue;
         const previous = pendingToolCalls.get(index) ?? { id: '', name: '', arguments: '' };
         pendingToolCalls.set(index, {
           id: typeof record.id === 'string' ? record.id : previous.id,
-          name: typeof functionRecord.name === 'string' ? functionRecord.name : previous.name,
+          name:
+            functionRecord && typeof functionRecord.name === 'string'
+              ? functionRecord.name
+              : previous.name,
           arguments:
             previous.arguments +
-            (typeof functionRecord.arguments === 'string' ? functionRecord.arguments : ''),
+            (functionRecord && typeof functionRecord.arguments === 'string'
+              ? functionRecord.arguments
+              : ''),
         });
       }
     }

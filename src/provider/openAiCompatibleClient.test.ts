@@ -205,6 +205,45 @@ describe('OpenAiCompatibleClient', () => {
     ]);
   });
 
+  it('retains an id-only tool fragment until the function fields arrive', async () => {
+    const xhr = new FakeXhr(
+      sse(
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                id: 'call-split',
+              }],
+            },
+          }],
+        },
+        {
+          choices: [{
+            delta: {
+              tool_calls: [{
+                index: 0,
+                function: { name: 'search', arguments: '{"q":"mira"}' },
+              }],
+            },
+          }],
+        },
+        { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+        '[DONE]',
+      ),
+    );
+
+    const stream = await createClient(xhr).streamChat({
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'find' }],
+    });
+
+    await expect(collect(stream)).resolves.toEqual([
+      { type: 'tool-call', callId: 'call-split', name: 'search', arguments: '{"q":"mira"}' },
+      { type: 'finish', reason: 'tool_calls' },
+    ]);
+  });
+
   it('falls back to the fragment array position when tool call index is omitted', async () => {
     const xhr = new FakeXhr(
       sse(
