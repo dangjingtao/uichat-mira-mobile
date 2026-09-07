@@ -1,6 +1,10 @@
 import type { RuntimeEvent } from './conversationRuntime';
 import { MobileAgentLoop } from './mobileAgentLoop';
-import type { ToolGatewayClient } from '../tools/toolGatewayClient';
+import {
+  ToolApprovalRequiredError,
+  type ToolApprovalRequest,
+  type ToolGatewayClient,
+} from '../tools/toolGatewayClient';
 
 const collect = async (stream: AsyncIterable<RuntimeEvent>) => {
   const events: RuntimeEvent[] = [];
@@ -43,6 +47,151 @@ describe('MobileAgentLoop', () => {
       { type: 'tool-result', callId: 'c1', name: 'search', content: 'result:search' },
       { type: 'text-delta', delta: 'done' },
     ]));
+  });
+
+  it('pauses for mobile approval, resumes the frozen call, and continues the model', async () => {
+    const approval: ToolApprovalRequest = {
+      invocationId: 'inv-1',
+      callId: 'c1',
+      name: 'terminal_session',
+      arguments: '{"command":"pwd"}',
+      message: 'Run terminal command',
+      scope: 'terminal',
+    };
+    const gateway: ToolGatewayClient = {
+      listTools: async () => [
+        {
+          name: 'terminal_session',
+          parameters: { type: 'object' },
+          requiresApproval: true,
+        },
+      ],
+      callTool: async () => {
+        throw new ToolApprovalRequiredError(approval);
+      },
+      resolveApproval: async (request, decision) => {
+        expect(request).toEqual(approval);
+        expect(decision).toBe('approved');
+        return {
+          status: 'completed',
+          result: { content: '/workspace' },
+        };
+      },
+    };
+    const requested: ToolApprovalRequest[] = [];
+    let round = 0;
+    const loop = new MobileAgentLoop(gateway);
+
+    const events = await collect(
+      await loop.run(
+        [{ role: 'user', content: 'pwd' }],
+        async () => {
+          round += 1;
+          if (round === 1) {
+            return (async function* () {
+              yield {
+                type: 'tool-call' as const,
+                callId: 'c1',
+                name: 'terminal_session',
+                arguments: '{"command":"pwd"}',
+              };
+              yield { type: 'finish' as const, reason: 'tool_calls' };
+            })();
+          }
+          return (async function* () {
+            yield { type: 'text-delta' as const, delta: 'done' };
+            yield { type: 'finish' as const, reason: 'stop' };
+          })();
+        },
+        {
+          requestApproval: async value => {
+            requested.push(value);
+            return 'approved';
+          },
+        },
+      ),
+    );
+
+    expect(requested).toEqual([approval]);
+    expect(events).toEqual(
+      expect.arrayContaining([
+        {
+          type: 'approval-required',
+          invocationId: 'inv-1',
+          callId: 'c1',
+          name: 'terminal_session',
+          message: 'Run terminal command',
+          scope: 'terminal',
+        },
+        {
+          type: 'approval-resolved',
+          invocationId: 'inv-1',
+          callId: 'c1',
+          name: 'terminal_session',
+          decision: 'approved',
+        },
+        {
+          type: 'tool-result',
+          callId: 'c1',
+          name: 'terminal_session',
+          content: '/workspace',
+        },
+        { type: 'text-delta', delta: 'done' },
+      ]),
+    );
+  });
+
+  it('stops the current Agent run after mobile rejection without adding a tool result', async () => {
+    const approval: ToolApprovalRequest = {
+      invocationId: 'inv-reject',
+      callId: 'c1',
+      name: 'terminal_session',
+      arguments: '{"command":"rm -rf tmp"}',
+      message: 'Approval required',
+    };
+    const gateway: ToolGatewayClient = {
+      listTools: async () => [
+        { name: 'terminal_session', parameters: { type: 'object' } },
+      ],
+      callTool: async () => {
+        throw new ToolApprovalRequiredError(approval);
+      },
+      resolveApproval: async (_request, decision) => {
+        expect(decision).toBe('rejected');
+        return { status: 'rejected' };
+      },
+    };
+    const loop = new MobileAgentLoop(gateway);
+
+    const events = await collect(
+      await loop.run(
+        [],
+        async () =>
+          (async function* () {
+            yield {
+              type: 'tool-call' as const,
+              callId: 'c1',
+              name: 'terminal_session',
+              arguments: approval.arguments,
+            };
+            yield { type: 'finish' as const, reason: 'tool_calls' };
+          })(),
+        { requestApproval: async () => 'rejected' },
+      ),
+    );
+
+    expect(events).toContainEqual({
+      type: 'approval-resolved',
+      invocationId: 'inv-reject',
+      callId: 'c1',
+      name: 'terminal_session',
+      decision: 'rejected',
+    });
+    expect(events.at(-1)).toEqual({
+      type: 'run-paused',
+      reason: 'approval-rejected',
+    });
+    expect(events.some(event => event.type === 'tool-result')).toBe(false);
   });
 
   it('stops at the configured round limit', async () => {
