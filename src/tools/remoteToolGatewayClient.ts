@@ -216,6 +216,12 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
     }
 
     if (!completion) {
+      if (abortRequested || options.signal?.aborted) {
+        throw new ToolGatewayError(
+          'TOOL_CANCELLED',
+          'Remote tool invocation was cancelled',
+        );
+      }
       throw new ToolGatewayError(
         'TOOL_STREAM_INCOMPLETE',
         'Remote tool stream ended without a final result',
