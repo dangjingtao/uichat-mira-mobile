@@ -5,7 +5,11 @@ import { providerCredentialStore, type ProviderCredentialStore } from '../securi
 import { LocalSessionRepository } from '../local/localSessionRepository';
 import type { ConversationRuntime, RuntimeEvent } from './conversationRuntime';
 import { MobileAgentLoop } from './mobileAgentLoop';
-import type { ToolGatewayClient } from '../tools/toolGatewayClient';
+import type {
+  ToolApprovalDecision,
+  ToolApprovalRequest,
+  ToolGatewayClient,
+} from '../tools/toolGatewayClient';
 
 const createMessageId = () => `local-message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -26,6 +30,14 @@ export class LocalProviderRuntime implements ConversationRuntime {
   private readonly clientFactory: (config: LocalProviderConfig, apiKey: string) => OpenAiCompatibleClient;
   private readonly toolGateway?: ToolGatewayClient;
   private activeClient: OpenAiCompatibleClient | null = null;
+  private activeAbortController: AbortController | null = null;
+  private pendingApproval:
+    | {
+        invocationId: string;
+        resolve: (decision: ToolApprovalDecision) => void;
+        reject: (error: Error) => void;
+      }
+    | null = null;
   private executionSuspended = false;
 
   constructor(options: LocalProviderRuntimeOptions = {}) {
@@ -101,16 +113,35 @@ export class LocalProviderRuntime implements ConversationRuntime {
         content: message.content,
       }),
     );
-    const stream = options?.agentEnabled && this.toolGateway
-      ? await new MobileAgentLoop(this.toolGateway).run(
-          requestMessages,
-          (messages, tools) => client.streamChat({ model: config.model, messages: [...messages], tools: [...tools] }),
-          { shouldPause: () => this.executionSuspended },
-        )
-      : await client.streamChat({
-      model: config.model,
-      messages: requestMessages,
-    });
+    const abortController =
+      options?.agentEnabled && this.toolGateway
+        ? new AbortController()
+        : null;
+    if (abortController) {
+      this.activeAbortController = abortController;
+    }
+
+    const stream =
+      options?.agentEnabled && this.toolGateway
+        ? await new MobileAgentLoop(this.toolGateway).run(
+            requestMessages,
+            (messages, tools) =>
+              client.streamChat({
+                model: config.model,
+                messages: [...messages],
+                tools: [...tools],
+              }),
+            {
+              shouldPause: () => this.executionSuspended,
+              signal: abortController?.signal,
+              requestApproval: (approval) =>
+                this.waitForApprovalDecision(approval),
+            },
+          )
+        : await client.streamChat({
+            model: config.model,
+            messages: requestMessages,
+          });
     const repository = this.sessionRepository;
     const runtime = this;
     const assistantId = createMessageId();
@@ -128,18 +159,70 @@ export class LocalProviderRuntime implements ConversationRuntime {
         }
       } finally {
         if (runtime.activeClient === client) runtime.activeClient = null;
+        if (runtime.activeAbortController === abortController) {
+          runtime.activeAbortController = null;
+        }
+        runtime.rejectPendingApproval(
+          new Error('Local Agent run ended before approval was resolved'),
+        );
       }
     })();
   }
 
+  getAgentEnabled(sessionId: string): Promise<boolean> {
+    return this.sessionRepository.getAgentEnabled(sessionId);
+  }
+
+  setAgentEnabled(sessionId: string, enabled: boolean): Promise<void> {
+    return this.sessionRepository.setAgentEnabled(sessionId, enabled);
+  }
+
+  resolveToolApproval(
+    invocationId: string,
+    decision: ToolApprovalDecision,
+  ) {
+    const pending = this.pendingApproval;
+    if (!pending || pending.invocationId !== invocationId) return;
+    this.pendingApproval = null;
+    pending.resolve(decision);
+  }
+
   cancelActiveRun() {
+    this.activeAbortController?.abort();
+    this.activeAbortController = null;
     this.activeClient?.cancelActiveRun();
     this.activeClient = null;
+    this.rejectPendingApproval(new Error('Local Agent run was cancelled'));
   }
 
   setExecutionSuspended(suspended: boolean) {
     this.executionSuspended = suspended;
-    if (suspended) this.activeClient?.cancelActiveRun();
+    if (!suspended) return;
+    this.activeAbortController?.abort();
+    this.activeClient?.cancelActiveRun();
+    this.rejectPendingApproval(new Error('Local Agent run was suspended'));
   }
 
+  private waitForApprovalDecision(
+    approval: ToolApprovalRequest,
+  ): Promise<ToolApprovalDecision> {
+    this.rejectPendingApproval(
+      new Error('A newer tool approval replaced the previous request'),
+    );
+
+    return new Promise<ToolApprovalDecision>((resolve, reject) => {
+      this.pendingApproval = {
+        invocationId: approval.invocationId,
+        resolve,
+        reject,
+      };
+    });
+  }
+
+  private rejectPendingApproval(error: Error) {
+    const pending = this.pendingApproval;
+    if (!pending) return;
+    this.pendingApproval = null;
+    pending.reject(error);
+  }
 }
