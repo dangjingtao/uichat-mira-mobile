@@ -7,6 +7,9 @@ import {
   parseRemoteManifest,
   parseRemoteMessage,
   parseRemoteThread,
+  parseRemoteToolGatewayStreamEvent,
+  parseRemoteToolInvocationProjection,
+  parseRemoteToolManifest,
   type PairingClaimResponse,
   type PairingPollResponse,
   type RemoteAgentRun,
@@ -15,6 +18,9 @@ import {
   type RemoteManifest,
   type RemoteMessage,
   type RemoteThread,
+  type RemoteToolGatewayStreamEvent,
+  type RemoteToolInvocationProjection,
+  type RemoteToolManifest,
 } from '../protocol/remoteHostV1';
 import {
   parsePairingUriV1,
@@ -67,6 +73,19 @@ export interface PendingPairing {
 export interface RestoredRemoteConnection {
   credential: StoredDeviceCredential;
   manifest: RemoteManifest;
+}
+
+export interface RemoteToolInvocationInput {
+  toolId: string;
+  args?: Record<string, unknown>;
+}
+
+export interface RemoteToolApprovalInput {
+  invocationId: string;
+  decision: 'approved' | 'rejected';
+  toolId: string;
+  args?: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 export interface SendRemoteMessageInput {
@@ -158,6 +177,13 @@ const attachTransportAttempts = (
     causeDetails: error.details,
   });
 };
+
+const REMOTE_TOOL_ROUTES = {
+  list: 'GET /remote/v1/tools',
+  invoke: 'POST /remote/v1/tool-invocations/stream',
+  approval: 'POST /remote/v1/tool-invocations/:invocationId/approval',
+  cancel: 'POST /remote/v1/tool-invocations/:invocationId/cancel',
+} as const;
 
 export class RemoteMiraHostClient {
   private activeCredential: StoredDeviceCredential | null = null;
@@ -532,6 +558,120 @@ export class RemoteMiraHostClient {
     });
   }
 
+  async listRemoteTools(): Promise<RemoteToolManifest[]> {
+    return this.withCredentialScope('tools:read', async credential => {
+      const manifest = await this.getManifestWithCredential(credential);
+      this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.list);
+      return this.requestCredentialJson(credential, {
+        path: '/remote/v1/tools',
+        credential: credential.credential,
+        parse: value => parseArray(value, parseRemoteToolManifest, 'remoteTools'),
+      });
+    });
+  }
+
+  async openToolInvocation(
+    input: RemoteToolInvocationInput,
+  ): Promise<PostSseSession<RemoteToolGatewayStreamEvent>> {
+    return this.withCredentialScope('tools:invoke', async credential => {
+      const operation: SseOperation<RemoteToolGatewayStreamEvent> = {
+        path: '/remote/v1/tool-invocations/stream',
+        credential: credential.credential,
+        body: {
+          toolId: input.toolId,
+          args: input.args ?? {},
+        },
+        parse: parseRemoteToolGatewayStreamEvent,
+      };
+
+      const order = this.transportOrder(credential);
+      let lastError: unknown = new RemoteHostError(
+        'REMOTE_ENDPOINT_UNAVAILABLE',
+        'No Mira remote endpoint is available for tool execution',
+      );
+
+      for (let index = 0; index < order.length; index += 1) {
+        const transport = order[index];
+        try {
+          const manifest = await this.requestJsonOnTransport(credential, transport, {
+            path: '/remote/v1/manifest',
+            credential: credential.credential,
+            parse: parseRemoteManifest,
+          });
+          this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.invoke);
+          if (transport === 'direct') this.directRetryAfter = 0;
+          return this.openSseOnTransport(credential, transport, operation);
+        } catch (error) {
+          lastError = error;
+          const hasNext = index + 1 < order.length;
+          if (!hasNext) throw error;
+
+          if (transport === 'direct' && isDirectNetworkError(error)) {
+            this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
+            continue;
+          }
+          if (transport === 'relay' && isRelayTransportError(error)) {
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      throw lastError;
+    });
+  }
+
+  async resolveToolApproval(
+    input: RemoteToolApprovalInput,
+  ): Promise<RemoteToolInvocationProjection> {
+    return this.withCredentialScope('tools:approve', async credential =>
+      this.dispatchCredentialJsonMutationOnce(credential, {
+        path: `/remote/v1/tool-invocations/${encodeURIComponent(input.invocationId)}/approval`,
+        method: 'POST',
+        credential: credential.credential,
+        signal: input.signal,
+        body: {
+          decision: input.decision,
+          toolId: input.toolId,
+          args: input.args ?? {},
+        },
+        parse: parseRemoteToolInvocationProjection,
+      }, 'TOOL_APPROVAL_UNCERTAIN', REMOTE_TOOL_ROUTES.approval),
+    );
+  }
+
+  async cancelToolInvocation(
+    invocationId: string,
+  ): Promise<{ invocationId: string; accepted: boolean; status: string }> {
+    return this.withCredentialScope('tools:control', async credential => {
+      const manifest = await this.getManifestWithCredential(credential);
+      this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.cancel);
+      return this.requestCredentialJson(credential, {
+        path: `/remote/v1/tool-invocations/${encodeURIComponent(invocationId)}/cancel`,
+        method: 'POST',
+        credential: credential.credential,
+        parse: value => {
+          if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            throw new Error('Tool cancellation response must be an object');
+          }
+          const record = value as Record<string, unknown>;
+          if (
+            typeof record.invocationId !== 'string' ||
+            typeof record.accepted !== 'boolean' ||
+            typeof record.status !== 'string'
+          ) {
+            throw new Error('Tool cancellation response is incomplete');
+          }
+          return {
+            invocationId: record.invocationId,
+            accepted: record.accepted,
+            status: record.status,
+          };
+        },
+      });
+    });
+  }
+
   async getAgentRun(runId: string): Promise<RemoteAgentRun> {
     return this.agentRequest(runId, 'GET', '');
   }
@@ -643,6 +783,107 @@ export class RemoteMiraHostClient {
         parse: parseRemoteAgentRun,
       }),
     );
+  }
+
+  private assertRemoteToolRoute(
+    manifest: RemoteManifest,
+    route: string,
+  ) {
+    if (!manifest.routes.tools.includes(route)) {
+      throw new RemoteHostError(
+        'REMOTE_TOOL_ROUTE_UNAVAILABLE',
+        `Mira Host does not advertise required tool route: ${route}`,
+        undefined,
+        { route },
+      );
+    }
+  }
+
+  private async withCredentialScope<T>(
+    scope: RemoteDeviceScope,
+    operation: (credential: StoredDeviceCredential) => Promise<T>,
+  ): Promise<T> {
+    const credential = await this.requireCredential();
+    if (!credential.scopes.includes(scope)) {
+      throw new RemoteHostError(
+        'REMOTE_SCOPE_REQUIRED',
+        `Paired device is missing required scope: ${scope}`,
+        403,
+        { scope },
+      );
+    }
+
+    try {
+      return await operation(credential);
+    } catch (error) {
+      if (
+        error instanceof RemoteHostError &&
+        error.status === 401
+      ) {
+        this.activeCredential = null;
+        await this.credentialStore.clear();
+      }
+      throw error;
+    }
+  }
+
+  private async dispatchCredentialJsonMutationOnce<T>(
+    credential: StoredDeviceCredential,
+    operation: JsonOperation<T>,
+    uncertainCode: string,
+    requiredToolRoute?: string,
+  ): Promise<T> {
+    const order = this.transportOrder(credential);
+    let lastError: unknown = new RemoteHostError(
+      'REMOTE_ENDPOINT_UNAVAILABLE',
+      'No Mira remote endpoint is available',
+    );
+
+    for (let index = 0; index < order.length; index += 1) {
+      const transport = order[index];
+      try {
+        const manifest = await this.requestJsonOnTransport(credential, transport, {
+          path: '/remote/v1/manifest',
+          credential: credential.credential,
+          parse: parseRemoteManifest,
+        });
+        if (requiredToolRoute) {
+          this.assertRemoteToolRoute(manifest, requiredToolRoute);
+        }
+        if (transport === 'direct') this.directRetryAfter = 0;
+      } catch (error) {
+        lastError = error;
+        const hasNext = index + 1 < order.length;
+        if (!hasNext) throw error;
+        if (transport === 'direct' && isDirectNetworkError(error)) {
+          this.directRetryAfter = Date.now() + DIRECT_RETRY_COOLDOWN_MS;
+          continue;
+        }
+        if (transport === 'relay' && isRelayTransportError(error)) {
+          continue;
+        }
+        throw error;
+      }
+
+      try {
+        return await this.requestJsonOnTransport(credential, transport, operation);
+      } catch (error) {
+        if (
+          (transport === 'direct' && isDirectNetworkError(error)) ||
+          (transport === 'relay' && isRelayTransportError(error))
+        ) {
+          throw new RemoteHostError(
+            uncertainCode,
+            'Mira Host may have accepted the tool control request; refresh the invocation state before retrying',
+            undefined,
+            error,
+          );
+        }
+        throw error;
+      }
+    }
+
+    throw lastError;
   }
 
   private async requestCredentialJson<T>(

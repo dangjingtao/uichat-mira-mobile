@@ -52,7 +52,7 @@
 | MOB-038 | Local Provider 多配置与选定 Provider 新建对话 | REVIEW | 2026-09-06 代码完成；多 Provider upsert/remove、独立 Key、选定 Provider 创建会话、聊天头部来源展示与删除保护已自动化验证；Android arm64-v8a debug 构建通过；待 Android / iOS 功能验收 |
 | MOB-039 | 双入口来源选择与统一新建会话 | REVIEW | 2026-09-06 代码与自动化验证完成；主列表来源菜单、Drawer 双来源展示与统一新建入口待 Android / iOS 功能验收 |
 | MOB-040 | 本地对话可靠发送与重试 | REVIEW | 2026-09-06 代码与自动化验证完成；本地消息幂等写入、取消/超时语义与失败重试待 Android / iOS 功能验收 |
-| MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | TODO | 2026-09-06 已派卡；等待 Mira Host / Tool Gateway 明确 endpoint、鉴权、工具发现、审批、取消、结果和凭据隔离合同 |
+| MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | DOING | 2026-09-07 开工；V1 合同已冻结为 paired Mira Host Remote Gateway -> Harness / remote tools，新增独立 `tools:*` scope、Agent exposure projection、exact inputHash + owner-bound mobile approval、真实 cancel；Mobile `RemoteToolGatewayClient` 已接线，Host PR #117 已开，等待两仓 CI / review 收口 |
 | MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | TODO | 2026-09-06 已派卡；依赖 MOB-041，当前仅有协议无关运行时和测试替身 |
 | MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |

@@ -1,6 +1,6 @@
 # MOB-041：Tool Gateway / MCP 协议与凭据合同确认
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**DOING**（2026-09-07 开工）
 
 范围：Mira Mobile + Mira Host / Tool Gateway 协议协作
 
@@ -47,6 +47,20 @@
 - 认证失败、工具未授权、Schema 错误、超时、取消和结果过大均有明确语义。
 - 合同没有允许任意 URL、任意本地进程或把 Provider Key 传给 Gateway 的路径。
 - 变更记录包含兼容范围、版本策略和迁移说明。
+
+## 2026-09-07 施工记录
+
+已冻结并开始实现 V1 合同：[Mira Mobile Tool Gateway V1](../remote-access/mobile-tool-gateway-v1.md)。
+
+当前施工结论：
+
+- V1 具体 Gateway 落在已配对 Mira Host 的 Remote Gateway 能力面，底层复用现有 Harness / External MCP，不建设第二套工具执行系统。
+- Provider API Key 不进入 Gateway；V1 使用 paired device credential 的独立 `tools:read / tools:invoke / tools:approve / tools:control` scope。
+- 旧 paired device 不静默扩权；缺少 `tools:*` 时原 Remote 会话仍可使用，工具能力需要明确权限升级 / 重新配对。
+- Host 只投影当前 Agent exposure 的工具定义；External MCP 继续受 connected / discovered / Agent Access 等既有门禁约束。
+- Mobile 使用 model-safe tool name，Host canonical tool id 不由模型自行构造。
+- Host approval 绑定原 invocation owner、toolId 和 inputHash；Mobile 改参数后旧批准无效。
+- Mobile 真实 `RemoteToolGatewayClient` 已接入现有 `ToolGatewayClient` 抽象，批准交互本身继续由 MOB-042 接入 RuntimeEvent/UI。
 
 ## 阻塞关系
 
