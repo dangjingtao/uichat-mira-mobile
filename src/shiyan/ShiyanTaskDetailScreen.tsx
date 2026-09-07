@@ -664,7 +664,7 @@ export function ShiyanTaskDetailScreen({
             />
           ) : null}
 
-          <View style={styles.tabBar}>
+          <View style={[styles.tabBar, { borderBottomColor: colors.border.default }]}>
             {(['organized', 'transcript'] as const).map((tab) => (
               <Pressable key={tab} onPress={() => setContentTab(tab)} style={[styles.tab, contentTab === tab && { borderBottomColor: colors.primary }]}>
                 <Text style={[styles.tabText, { color: contentTab === tab ? colors.primary : colors.text.soft }]}>{tab === 'organized' ? '整理稿' : '原文'}</Text>
@@ -702,7 +702,6 @@ export function ShiyanTaskDetailScreen({
             </View>
           ) : null}
 
-          {contentTab === 'organized' && reviewResult && !finalEditorOpen ? null : null}
 
           {adjustOpen ? (
             <View
@@ -953,7 +952,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sceneValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
+  tabBar: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   tab: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: fontSize.button, fontWeight: '600' },
   editEntry: { alignSelf: 'flex-end', paddingVertical: spacing.sm, paddingHorizontal: spacing.md },

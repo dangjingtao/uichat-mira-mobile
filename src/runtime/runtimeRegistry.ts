@@ -39,10 +39,7 @@ export class RuntimeRegistry {
   }
 
   deleteSession(sessionId: string, source?: SessionSource): Promise<void> {
-    const runtime = this.runtimeForSession(sessionId, source);
-    return runtime.kind === 'local-provider'
-      ? this.local.deleteSession(sessionId)
-      : this.remote.deleteSession(sessionId);
+    return this.runtimeForSession(sessionId, source).deleteSession(sessionId);
   }
 
   createLocalSession(title?: string, providerId?: string): Promise<Session> {

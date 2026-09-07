@@ -20,6 +20,7 @@ export interface ConversationRuntime {
   /** True only when the runtime has a confirmed tool gateway implementation. */
   readonly supportsAgent?: boolean;
   listSessions(): Promise<Session[]>;
+  deleteSession(sessionId: string): Promise<void>;
   getMessages(sessionId: string): Promise<ChatMessage[]>;
   sendMessage(
     sessionId: string,
