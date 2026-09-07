@@ -207,11 +207,36 @@ export class MobileAgentLoop {
               }
 
               let resolution;
+              const approvalController = new AbortController();
+              let approvalResolveTimedOut = false;
+              let approvalResolveTimeout: ReturnType<typeof setTimeout> | null =
+                null;
+              const abortApprovalFromRun = () => approvalController.abort();
+              if (signal?.aborted) {
+                approvalController.abort();
+              } else {
+                signal?.addEventListener('abort', abortApprovalFromRun, {
+                  once: true,
+                });
+              }
               try {
+                const remainingMs = deadline - Date.now();
+                if (remainingMs <= 0) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'timeout' as const,
+                  };
+                  return;
+                }
+                approvalResolveTimeout = setTimeout(() => {
+                  approvalResolveTimedOut = true;
+                  approvalController.abort();
+                }, remainingMs);
+
                 resolution = await gateway.resolveApproval(
                   approval,
                   decision,
-                  { signal },
+                  { signal: approvalController.signal },
                 );
               } catch (approvalError) {
                 if (
@@ -234,7 +259,25 @@ export class MobileAgentLoop {
                   };
                   return;
                 }
+                if (
+                  approvalResolveTimedOut ||
+                  Date.now() >= deadline
+                ) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'timeout' as const,
+                  };
+                  return;
+                }
                 throw approvalError;
+              } finally {
+                if (approvalResolveTimeout) {
+                  clearTimeout(approvalResolveTimeout);
+                }
+                signal?.removeEventListener(
+                  'abort',
+                  abortApprovalFromRun,
+                );
               }
               yield {
                 type: 'approval-resolved' as const,
