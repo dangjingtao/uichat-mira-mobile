@@ -235,9 +235,9 @@ export function LocalProviderConfigScreen() {
           ))}
         </ScrollView>
         <Text style={[styles.help, { color: colors.text.soft }]}>手机直连 OpenAI-compatible Provider。API Key 只保存在设备安全存储中。</Text>
-        <Field label="名称" value={config.name} onChangeText={(name) => setConfig((current) => ({ ...current, name }))} colors={colors} />
-        <Field label="Provider 地址" value={config.baseUrl} onChangeText={(baseUrl) => setConfig((current) => ({ ...current, baseUrl }))} placeholder="https://example.com" colors={colors} autoCapitalize="none" />
-        <Field label="模型" value={config.model} onChangeText={(model) => setConfig((current) => ({ ...current, model }))} colors={colors} autoCapitalize="none" />
+        <Field label="名称" value={config.name} onChangeText={(name) => setConfig((current) => ({ ...current, name }))} colors={colors} editable={!saving && !clearingKey} />
+        <Field label="Provider 地址" value={config.baseUrl} onChangeText={(baseUrl) => setConfig((current) => ({ ...current, baseUrl }))} placeholder="https://example.com" colors={colors} autoCapitalize="none" editable={!saving && !clearingKey} />
+        <Field label="模型" value={config.model} onChangeText={(model) => setConfig((current) => ({ ...current, model }))} colors={colors} autoCapitalize="none" editable={!saving && !clearingKey} />
         <Field
           label="API Key"
           value={apiKeyDraft}
@@ -246,6 +246,7 @@ export function LocalProviderConfigScreen() {
           colors={colors}
           secureTextEntry
           autoCapitalize="none"
+          editable={!saving && !clearingKey}
         />
         <Text style={[styles.credentialHelp, { color: colors.text.soft }]}>
           {hasStoredKey ? '已在设备安全存储中保存。留空并保存配置会继续使用原 Key。' : '尚未保存 API Key。'}
@@ -272,11 +273,11 @@ export function LocalProviderConfigScreen() {
   );
 }
 
-function Field({ label, value, onChangeText, colors, placeholder, secureTextEntry, autoCapitalize }: { label: string; value: string; onChangeText: (value: string) => void; colors: ReturnType<typeof useTheme>['colors']; placeholder?: string; secureTextEntry?: boolean; autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters' }) {
+function Field({ label, value, onChangeText, colors, placeholder, secureTextEntry, autoCapitalize, editable = true }: { label: string; value: string; onChangeText: (value: string) => void; colors: ReturnType<typeof useTheme>['colors']; placeholder?: string; secureTextEntry?: boolean; autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'; editable?: boolean }) {
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: colors.text.ink }]}>{label}</Text>
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.text.placeholder} secureTextEntry={secureTextEntry} autoCapitalize={autoCapitalize} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }]} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.text.placeholder} secureTextEntry={secureTextEntry} autoCapitalize={autoCapitalize} editable={editable} style={[styles.input, { color: colors.text.ink, backgroundColor: colors.bg.card, borderColor: colors.border.default }, !editable && styles.disabledButton]} />
     </View>
   );
 }
