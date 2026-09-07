@@ -115,6 +115,16 @@ export class LocalProviderRuntime implements ConversationRuntime {
         content: message.content,
       }),
     );
+    if (options?.agentEnabled && this.activeRunToken) {
+      this.activeAbortController?.abort();
+      this.activeClient?.cancelActiveRun();
+      this.rejectPendingApproval(
+        new Error('A newer local Agent run replaced the previous run'),
+      );
+      this.activeAbortController = null;
+      this.activeRunToken = null;
+    }
+
     const abortController =
       options?.agentEnabled && this.toolGateway
         ? new AbortController()
@@ -239,6 +249,11 @@ export class LocalProviderRuntime implements ConversationRuntime {
     runToken: symbol,
     approval: ToolApprovalRequest,
   ): Promise<ToolApprovalDecision> {
+    if (this.activeRunToken !== runToken) {
+      return Promise.reject(
+        new Error('Local Agent run is no longer active'),
+      );
+    }
     this.rejectPendingApproval(
       new Error('A newer tool approval replaced the previous request'),
     );
