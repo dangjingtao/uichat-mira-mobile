@@ -222,7 +222,7 @@ export function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [agentEnabled, setAgentEnabled] = useState(false);
-  const [agentModeLoading, setAgentModeLoading] = useState(false);
+  const [agentModeLoading, setAgentModeLoading] = useState(true);
   const [agentPhase, setAgentPhase] = useState<LocalAgentRunPhase>('idle');
   const [agentActivities, setAgentActivities] = useState<LocalAgentActivity[]>([]);
   const [agentPauseReason, setAgentPauseReason] =
@@ -304,9 +304,20 @@ export function ChatScreen() {
     const subscription = AppState.addEventListener('change', syncExecutionState);
     return () => {
       subscription.remove();
-      runtime.setExecutionSuspended?.(false);
     };
   }, [isLocalProvider, runtime]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLocalProvider || !runtime.setExecutionSuspended) {
+        return undefined;
+      }
+      runtime.setExecutionSuspended(AppState.currentState !== 'active');
+      return () => {
+        runtime.setExecutionSuspended?.(true);
+      };
+    }, [isLocalProvider, runtime]),
+  );
 
   const refreshSessionTitle = useCallback(async () => {
     if (isLocalProvider) return;
@@ -488,7 +499,13 @@ export function ChatScreen() {
   const sendMessage = useCallback(
     async (text?: string, existingMessage?: ChatMessage) => {
       const content = (text ?? existingMessage?.content ?? inputText).trim();
-      if (!content || isLoading) return;
+      if (
+        !content ||
+        isLoading ||
+        (supportsLocalAgent && agentModeLoading)
+      ) {
+        return;
+      }
 
       const userMsg: ChatMessage =
         existingMessage ?? {
@@ -649,6 +666,7 @@ export function ChatScreen() {
     },
     [
       agentEnabled,
+      agentModeLoading,
       inputText,
       isLoading,
       loadMessages,
@@ -1039,7 +1057,9 @@ export function ChatScreen() {
               placeholderTextColor={colors.text.placeholder}
               multiline
               maxLength={500}
-              editable={!isLoading}
+              editable={
+                !isLoading && !(supportsLocalAgent && agentModeLoading)
+              }
               blurOnSubmit={false}
               onSubmitEditing={() => void sendMessage()}
             />
@@ -1074,12 +1094,16 @@ export function ChatScreen() {
                       ? colors.primaryActive
                       : colors.primary,
                   },
-                  !inputText.trim() && {
+                  (!inputText.trim() ||
+                    (supportsLocalAgent && agentModeLoading)) && {
                     backgroundColor: colors.primaryDisabled,
                   },
                 ]}
                 onPress={() => void sendMessage()}
-                disabled={!inputText.trim()}
+                disabled={
+                  !inputText.trim() ||
+                  (supportsLocalAgent && agentModeLoading)
+                }
               >
                 <Send size={18} color={colors.onPrimary} strokeWidth={2.5} />
               </Pressable>
