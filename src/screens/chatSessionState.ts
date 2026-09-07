@@ -1,5 +1,6 @@
 import type { MiraHostApi } from '../api/miraHost';
 import { RemoteHostError } from '../api/remoteHttp';
+import { ToolGatewayError } from '../tools/toolGatewayClient';
 import type { RuntimeKind } from '../runtime/conversationRuntime';
 
 type SessionReader = Pick<MiraHostApi, 'getSession'>;
@@ -55,6 +56,29 @@ export const getChatSendErrorMessage = (
     if (error.status === 404) return 'Provider 地址或模型不可用，请检查配置';
     if (error.status === 429) return 'Provider 请求过于频繁，请稍后重试';
     if (error.status !== undefined && error.status >= 500) return 'Provider 服务暂时不可用，请稍后重试';
+  }
+
+  if (error instanceof ToolGatewayError) {
+    if (error.code === 'TOOL_CANCELLED') return '本次 Agent 运行已取消';
+    if (error.code === 'TOOL_ARGUMENTS_INVALID') return '工具参数无效，本轮已停止';
+    if (error.code === 'TOOL_NOT_AVAILABLE') return '这个工具当前不可用';
+    if (error.code === 'TOOL_STREAM_INCOMPLETE') return '工具连接中断，可重新发送';
+    if (error.code === 'TOOL_APPROVAL_UNCERTAIN') {
+      return '工具审批结果暂时无法确认，请刷新状态后再决定是否重试';
+    }
+    return error.message || '远程工具执行失败，请重试';
+  }
+
+  if (error instanceof RemoteHostError) {
+    if (error.code === 'REMOTE_SCOPE_REQUIRED') {
+      return '当前配对设备没有工具权限，请重新配对或升级权限';
+    }
+    if (error.code === 'REMOTE_TOOL_ROUTE_UNAVAILABLE') {
+      return '当前 Mira Host 还没有提供工具能力';
+    }
+    if (error.code === 'NETWORK_ERROR') {
+      return '无法连接远程工具 Host，请检查远程连接';
+    }
   }
 
   if (error instanceof Error) {
