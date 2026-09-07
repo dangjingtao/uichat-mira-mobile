@@ -290,6 +290,76 @@ describe('MobileAgentLoop', () => {
     });
   });
 
+  it('times out a stalled approval resolution request within the overall deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const approval: ToolApprovalRequest = {
+        invocationId: 'inv-resolve-timeout',
+        callId: 'c1',
+        name: 'terminal_session',
+        arguments: '{}',
+        message: 'Approval required',
+      };
+      let markResolveStarted!: () => void;
+      const resolveStarted = new Promise<void>(resolve => {
+        markResolveStarted = resolve;
+      });
+      const gateway: ToolGatewayClient = {
+        listTools: async () => [
+          { name: 'terminal_session', parameters: { type: 'object' } },
+        ],
+        callTool: async () => {
+          throw new ToolApprovalRequiredError(approval);
+        },
+        resolveApproval: async (_request, _decision, options) => {
+          markResolveStarted();
+          return new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener(
+              'abort',
+              () =>
+                reject(
+                  new ToolGatewayError(
+                    'TOOL_CANCELLED',
+                    'approval request cancelled',
+                  ),
+                ),
+              { once: true },
+            );
+          });
+        },
+      };
+      const loop = new MobileAgentLoop(gateway);
+      const stream = await loop.run(
+        [],
+        async () =>
+          (async function* () {
+            yield {
+              type: 'tool-call' as const,
+              callId: 'c1',
+              name: 'terminal_session',
+              arguments: '{}',
+            };
+            yield { type: 'finish' as const, reason: 'tool_calls' };
+          })(),
+        {
+          overallTimeoutMs: 50,
+          requestApproval: async () => 'approved',
+        },
+      );
+
+      const collected = collect(stream);
+      await resolveStarted;
+      await jest.advanceTimersByTimeAsync(50);
+
+      await expect(collected).resolves.toContainEqual({
+        type: 'run-paused',
+        reason: 'timeout',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('does not misreport an uncertain approval dispatch as cancellation', async () => {
     const approval: ToolApprovalRequest = {
       invocationId: 'inv-uncertain',
