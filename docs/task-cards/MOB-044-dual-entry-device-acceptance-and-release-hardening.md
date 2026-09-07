@@ -1,6 +1,6 @@
 # MOB-044：双入口真机验收与发布加固
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**DOING**（2026-09-07 已开始总验收；先收自动化/发布链证据，Android/iOS 真机矩阵持续补齐）
 
 范围：Mira Mobile；Android / iOS；真实 Mira Host 与真实 OpenAI-compatible Provider
 
@@ -43,3 +43,11 @@
 - Android / iOS 验收记录。
 - 版本、设备、网络条件和服务端合同版本。
 - 已知问题、复现步骤、修复卡关联和发布说明。
+
+
+## 2026-09-07 验收记录
+
+- 基线：Mobile `dev@bc200bae`，包含 MOB-043 合并结果。
+- 自动化基线：同 commit 的 `Mobile CI` 已完成并成功；质量门禁、Android debug、Android signed release、iOS simulator + unsigned device build、dev prerelease publish 均已通过。
+- 发布链异常：同 commit 的 `R2 Release Truth` 在“Publish versioned assets and latest manifest to R2”失败，待定位；在修复前不得把发布加固判定为 PASS。
+- 真机矩阵：尚未登记 Android / iOS 真实设备证据；不得以 CI、模拟器或 unsigned device build 代替。
