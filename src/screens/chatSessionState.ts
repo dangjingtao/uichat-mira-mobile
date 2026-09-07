@@ -46,9 +46,17 @@ export const getChatSendErrorMessage = (
   }
 
   if (error instanceof RemoteHostError) {
+    if (error.code === 'REMOTE_SCOPE_REQUIRED') {
+      return '当前配对设备没有工具权限，请重新配对或升级权限';
+    }
+    if (error.code === 'REMOTE_TOOL_ROUTE_UNAVAILABLE') {
+      return '当前 Mira Host 还没有提供工具能力';
+    }
     if (error.code === 'REQUEST_ABORTED') return '本次发送已取消';
     if (error.code === 'PROVIDER_TIMEOUT') return 'Provider 响应超时，请重试';
-    if (error.code === 'NETWORK_ERROR') return '无法连接 Provider，请检查网络和地址';
+    if (error.code === 'NETWORK_ERROR') {
+      return '无法连接 Provider 或远程工具 Host，请检查网络';
+    }
     if (error.code === 'INVALID_PROVIDER_URL') return 'Provider 地址无效，请检查配置';
     if (error.code === 'INSECURE_PROVIDER_URL') return '当前构建只允许 HTTPS Provider 地址';
     if (error.code === 'INVALID_PROVIDER_EVENT') return 'Provider 返回了不兼容的流式响应';
@@ -67,18 +75,6 @@ export const getChatSendErrorMessage = (
       return '工具审批结果暂时无法确认，请刷新状态后再决定是否重试';
     }
     return error.message || '远程工具执行失败，请重试';
-  }
-
-  if (error instanceof RemoteHostError) {
-    if (error.code === 'REMOTE_SCOPE_REQUIRED') {
-      return '当前配对设备没有工具权限，请重新配对或升级权限';
-    }
-    if (error.code === 'REMOTE_TOOL_ROUTE_UNAVAILABLE') {
-      return '当前 Mira Host 还没有提供工具能力';
-    }
-    if (error.code === 'NETWORK_ERROR') {
-      return '无法连接远程工具 Host，请检查远程连接';
-    }
   }
 
   if (error instanceof Error) {
