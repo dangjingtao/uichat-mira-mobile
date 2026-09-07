@@ -3,6 +3,7 @@ export interface ToolManifest {
   description?: string;
   parameters: Record<string, unknown>;
   destructive?: boolean;
+  requiresApproval?: boolean;
 }
 
 export interface ToolCallRequest {
