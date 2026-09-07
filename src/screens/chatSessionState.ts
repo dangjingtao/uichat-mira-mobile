@@ -1,6 +1,7 @@
 import type { MiraHostApi } from '../api/miraHost';
 import { RemoteHostError } from '../api/remoteHttp';
 import { ToolGatewayError } from '../tools/toolGatewayClient';
+import { ToolPolicyError } from '../tools/toolPolicy';
 import type { RuntimeKind } from '../runtime/conversationRuntime';
 
 type SessionReader = Pick<MiraHostApi, 'getSession'>;
@@ -75,6 +76,16 @@ export const getChatSendErrorMessage = (
       return '工具审批结果暂时无法确认，请刷新状态后再决定是否重试';
     }
     return error.message || '远程工具执行失败，请重试';
+  }
+
+  if (error instanceof ToolPolicyError) {
+    if (error.message.includes('arguments')) {
+      return '工具参数无效，本轮已停止';
+    }
+    if (error.message.includes('not allowed')) {
+      return '模型请求了未授权工具，本轮已停止';
+    }
+    return '工具调用不符合当前安全策略，本轮已停止';
   }
 
   if (error instanceof Error) {
