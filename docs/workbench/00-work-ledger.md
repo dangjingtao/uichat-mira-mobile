@@ -58,8 +58,8 @@
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
 | MOB-045 | Local Provider 会话生命周期闭环 | REVIEW | PR #99 squash-merged as `1062e0c2`；单会话本地删除、RuntimeRegistry Local/Remote 路由、设备本地 pin/read 清理及 Provider 删除解锁已落地；CodeRabbit 两项数据完整性/路由问题已修复并确认；Typecheck/Lint/Jest + Android debug build 通过；Android/iOS 真机删除与 Provider 解锁验收挂 MOB-044 |
 | MOB-046 | OpenAI-compatible URL / SSE / Tool Call 兼容性修复 | PASS | PR #100 squash-merged as `3ad288da`；Base URL root/`/v1`/`/api/v1` 统一落到单一 Chat Completions endpoint，不再重复 `/v1`；`[DONE]` 不再覆盖已有 `finish_reason`；多 tool-call 按协议 index 聚合并兼容缺 index fallback、交错分片及 id-only→function-only 分片；CodeRabbit 唯一协议问题已修复并确认；final-head Typecheck/Lint/Jest + Android debug build 通过；卡内验收已收口，真实 Provider / 真机矩阵独立归 MOB-044 |
-| MOB-047 | Provider API Key 配置 UX 与凭据状态安全修复 | TODO | 2026-09-06 已派卡；移除 ******** sentinel，分离 hasStoredKey 与新 Key 输入，补显式清除 |
-| MOB-048 | 双链路提交窄范围代码卫生收尾 | TODO | 2026-09-06 已派卡；必须等待 MOB-045/046/047 合入后基于最新 dev 执行，不启动 broad architecture refactor |
+| MOB-047 | Provider API Key 配置 UX 与凭据状态安全修复 | PASS | PR #101 squash-merged as `75dc3fe5`；移除可编辑 `********` sentinel，分离 `hasStoredKey` 与新 Key draft；普通保存保留旧 Key，仅非空新 Key 才替换；显式确认清除；Provider 切换/保存/清除均有异步状态守卫并锁定并发编辑；CodeRabbit 两项 functional finding 已修复；维护者最终自审无新增 P0-P2；final-head Typecheck/Lint/Jest 通过，Android debug APK 已完成构建并进入 artifact upload；原生 secure-store 真机读写继续归 MOB-044 |
+| MOB-048 | 双链路提交窄范围代码卫生收尾 | TODO | MOB-045/046/047 已全部合入 `dev`；前置已满足，可基于最新 `dev` 开始窄范围卫生检查；不启动 broad architecture refactor |
 
 ## Deferred Engineering Governance
 

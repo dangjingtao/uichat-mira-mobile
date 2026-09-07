@@ -1,6 +1,6 @@
 # MOB-047：Provider API Key 配置 UX 与凭据状态安全修复
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**PASS**（2026-09-07 PR #101 squash-merged as `75dc3fe5`；卡内自动化、自审与安全边界检查已收口；Android/iOS 原生安全存储真实读写继续归 MOB-044）
 
 范围：Mira Mobile Local Provider configuration
 
@@ -85,3 +85,15 @@ None。
 ## Handoff
 
 施工前确认当前安全存储原生模块仍为既有 `MiraSecureCredentialStore`。如平台实现发生变化，先报告，不得回退到 AsyncStorage 保存 Key。
+
+## Completion Evidence
+
+- PR #101 已 squash merge 到 `dev`，merge commit：`75dc3fe5`。
+- 最终实现移除可编辑 `********` sentinel；`hasStoredKey` 与 `apiKeyDraft` 独立。
+- 未输入新 Key 的普通配置保存不会调用 credential save，因此保留旧 Key；仅非空新 Key 才替换安全存储值。
+- “清除 API Key”是独立 destructive confirmation；Provider 切换、保存、清除期间使用 selection/request guard，避免异步结果串 Provider。
+- 保存/清除进行中锁定 Provider 切换、增删与配置输入，避免持久化完成时覆盖用户后续选择或草稿。
+- 配置页保存/清除错误统一使用不含凭据内容的固定文案；“新建本地对话”在该页仅创建本地 session，不发 Provider 请求、不读取或展示 API Key。
+- CodeRabbit 两项 functional findings（保存后覆盖新 Provider 选择、异步保存吞掉后续输入）均已修复；维护者最终自审未发现新的 P0–P2 阻断。
+- final head `e7cb2964`：Typecheck、Lint、全量 Jest 通过；Android debug APK 已完成构建并进入 artifact upload 阶段。
+- Android/iOS 原生 `MiraSecureCredentialStore` 真实读写与真机矩阵按任务边界继续留 MOB-044。
