@@ -71,6 +71,33 @@ describe('remoteHostV1 protocol', () => {
     });
   });
 
+  it('keeps Remote V1 compatible when an older Host does not advertise tool routes', () => {
+    expect(
+      parseRemoteManifest({
+        protocolVersion: 1,
+        device: {
+          id: 'device-legacy',
+          name: 'Legacy phone',
+          platform: 'android',
+          scopes: ['threads:read'],
+        },
+        routes: {
+          threads: ['GET /threads'],
+          messages: [],
+          agent: [],
+          artifacts: [],
+        },
+        reconnect: {
+          mode: 'canonical-state-replay',
+          eventCursor: false,
+        },
+        serverTime: '2026-09-07T00:00:00.000Z',
+      }),
+    ).toMatchObject({
+      routes: { tools: [] },
+    });
+  });
+
   it('parses the mobile-safe remote tool manifest', () => {
     expect(
       parseRemoteToolManifest({
