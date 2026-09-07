@@ -48,8 +48,7 @@ const makeRemote = (run: RemoteAgentRun) => {
       scopes: ['agent:read', 'agent:approve', 'agent:control'] as const,
     },
     routes: {
-      workspaces: [],
-      threads: [],
+        threads: [],
       messages: [],
       agent: [
         'GET /agent/runs/:runId',
