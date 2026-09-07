@@ -140,6 +140,20 @@ describe('remoteHostV1 protocol', () => {
     });
   });
 
+  it('parses a safe terminal tool gateway error event', () => {
+    expect(
+      parseRemoteToolGatewayStreamEvent({
+        type: 'tool:error',
+        code: 'REMOTE_TOOL_REQUEST_FAILED',
+        message: 'Remote tool request failed',
+      }),
+    ).toEqual({
+      type: 'tool:error',
+      code: 'REMOTE_TOOL_REQUEST_FAILED',
+      message: 'Remote tool request failed',
+    });
+  });
+
   it('rejects unsupported remote tool invocation statuses', () => {
     expect(() =>
       parseRemoteToolInvocationProjection({
