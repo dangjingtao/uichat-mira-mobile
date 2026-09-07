@@ -17,6 +17,9 @@
 - 远程 Host / 本地 Provider 来源菜单、Drawer、聊天头部和空状态。
 - 本地流式输出、弱网、网络切换、取消、超时、失败重试和幂等 transcript。
 - App 前后台切换、挂起恢复和本地 Agent 状态解释。
+- 使用 MOB-041 的真实 `ToolGatewayClient` Adapter 验证工具发现、真实调用、取消、错误映射与审批 envelope，不以 Mock Gateway 代替。
+- 使用 MOB-042 的真实审批 UI 验证 approval-required -> 批准/拒绝 -> Agent 继续/终止闭环。
+- 如 MOB-043 已具备可用持久运行时，验证真实 Host / Pi durable run 的创建、状态恢复、取消以及 App 重启后的服务端事实重载。
 - 真实 Provider 的 401、403、404、429、5xx 和不兼容 SSE 响应。
 - 既有 Remote Host 配对、流式消息和 Agent 审批回归。
 - 发布构建、日志脱敏、崩溃路径和安装升级检查。
@@ -31,6 +34,7 @@
 
 - Android 与 iOS 核心矩阵均有可复现记录、截图或录屏和设备信息。
 - 关键失败路径有用户可执行的下一步，不只留下日志。
+- Local Provider 文本链路、真实 Tool Gateway、审批 UI 与可用的 Host/Pi 持久运行路径按对应前置卡实际能力完成联调验收；不能用局部链路通过替代整套闭环结论。
 - 未发现 Provider Key、Host 凭据、Tool Gateway 凭据或完整敏感消息泄漏。
 - 通过后才能将 MOB-037 以及 MOB-038、MOB-039、MOB-040、MOB-042、MOB-043 按实际证据升为 `PASS`；未通过项必须回流到对应卡。
 
