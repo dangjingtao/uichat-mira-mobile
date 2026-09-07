@@ -1,3 +1,4 @@
+import { RemoteHostError } from '../api/remoteHttp';
 import {
   ToolApprovalRequiredError,
   type ToolCallRequest,
@@ -170,6 +171,34 @@ describe('RemoteToolGatewayClient', () => {
       toolId: tool.id,
       args: { query: 'mira' },
       signal: undefined,
+    });
+  });
+
+  it('projects an uncertain approval dispatch as a ToolGatewayError', async () => {
+    const remote = host();
+    remote.resolveToolApproval.mockRejectedValue(
+      new RemoteHostError(
+        'TOOL_APPROVAL_UNCERTAIN',
+        'Mira Host may have accepted the approval',
+      ),
+    );
+    const client = new RemoteToolGatewayClient(remote as never);
+    await client.listTools();
+
+    await expect(
+      client.resolveApproval(
+        {
+          invocationId: 'inv-uncertain',
+          callId: request.callId,
+          name: request.name,
+          arguments: request.arguments,
+          message: 'Approval required',
+        },
+        'approved',
+      ),
+    ).rejects.toMatchObject({
+      name: 'ToolGatewayError',
+      code: 'TOOL_APPROVAL_UNCERTAIN',
     });
   });
 
