@@ -144,6 +144,8 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
           }
         } else if (event.type === 'tool:approval_required') {
           invocationId = event.invocationId;
+        } else if (event.type === 'tool:error') {
+          throw new ToolGatewayError(event.code, event.message);
         } else if (event.type === 'tool:complete') {
           completion = event.invocation;
           invocationId = event.invocation.invocationId;
