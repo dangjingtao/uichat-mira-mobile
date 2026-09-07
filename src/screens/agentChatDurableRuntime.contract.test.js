@@ -17,7 +17,8 @@ describe('MOB-043 durable Agent observation lifecycle', () => {
 
   it('restarts same-run observation after a successful retry', () => {
     expect(source).toContain('observationGeneration');
-    expect(source).toContain('setObservationGeneration(current => current + 1)');
+    expect(source).toContain('observationGenerationRef.current += 1');
+    expect(source).toContain('generation !== observationGenerationRef.current');
     expect(source).toContain('[appActive, observationGeneration, runId, sessionId]');
   });
 });

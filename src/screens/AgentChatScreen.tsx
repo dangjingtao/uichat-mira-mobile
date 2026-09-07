@@ -49,6 +49,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
   const [actionInFlight, setActionInFlight] = useState<AgentRunAction | null>(null);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [observationGeneration, setObservationGeneration] = useState(0);
+  const observationGenerationRef = useRef(0);
   const requestSequenceRef = useRef(0);
   const actionLockRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
@@ -173,6 +174,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
     useCallback(() => {
       if (!appActive || !runId) return undefined;
 
+      const generation = observationGeneration;
       const controller = new AbortController();
       let active = true;
 
@@ -183,14 +185,18 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
             runId,
             controller.signal,
           )) {
-            if (!active) return;
+            if (!active || generation !== observationGenerationRef.current) return;
             runRef.current = nextRun;
             setRun(nextRun);
             setLoading(false);
             setError(null);
           }
 
-          if (active && !controller.signal.aborted) {
+          if (
+            active &&
+            !controller.signal.aborted &&
+            generation === observationGenerationRef.current
+          ) {
             await miraHostClient.getMessages(sessionId);
           }
         } catch (observeError) {
@@ -212,7 +218,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
     void miraHostClient
       .getMessages(sessionId)
       .then(() => {
-        setObservationGeneration(current => current + 1);
+        observationGenerationRef.current += 1;
+        setObservationGeneration(observationGenerationRef.current);
       })
       .catch(retryError => {
         setLoading(false);
