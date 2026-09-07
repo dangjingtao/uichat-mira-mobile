@@ -129,12 +129,19 @@ type RemoteToolGatewayStreamEvent =
       scope?: string;
     }
   | {
+      type: "tool:error";
+      code: string;
+      message: string;
+    }
+  | {
       type: "tool:complete";
       invocation: RemoteToolInvocationProjection;
     };
 ```
 
 Host 内部 stdout、trace、credential、MCP transport detail 和未经裁剪的 artifact 不直接进入 Mobile Agent context。
+
+`tool:error` 是终止性安全错误事件：用于已经提交 SSE 响应后、但还未获得可投影 invocation 终态的失败。事件不得携带 raw secret-bearing error；发送后该 SSE 流结束。不可用 `toolId` 等可在提交 SSE 前确认的错误应继续使用普通 HTTP 4xx，而不是伪造 `tool:error`。
 
 ## 5. Result envelope
 
@@ -246,7 +253,7 @@ Discovery / manifest 等幂等读取可继续使用当前 Direct -> Relay fallba
 
 可能真正执行工具的 mutation 不允许在“请求已发送但响应丢失”后盲目换 transport 重放：
 
-- Tool invocation SSE：先用 manifest probe 选择可达 transport，再只在该 transport dispatch；
+- Tool invocation SSE：先用 manifest probe 选择可达 transport，再只在该 transport dispatch；Mobile 关闭 SSE 时 Host 必须把连接关闭绑定到该 invocation 的 Harness AbortSignal；
 - Approval：先 probe，再单次 dispatch；响应不确定时返回 `TOOL_APPROVAL_UNCERTAIN`；
 - Cancel：是针对同一 invocation 的幂等控制请求，可沿用 Remote JSON fallback。
 
