@@ -44,10 +44,92 @@
 - 版本、设备、网络条件和服务端合同版本。
 - 已知问题、复现步骤、修复卡关联和发布说明。
 
-
 ## 2026-09-07 验收记录
 
-- 基线：Mobile `dev@bc200bae`，包含 MOB-043 合并结果。
-- 自动化基线：同 commit 的 `Mobile CI` 已完成并成功；质量门禁、Android debug、Android signed release、iOS simulator + unsigned device build、dev prerelease publish 均已通过。
-- 发布链异常：同 commit 的 `R2 Release Truth` 在“Publish versioned assets and latest manifest to R2”失败，待定位；在修复前不得把发布加固判定为 PASS。
-- 真机矩阵：尚未登记 Android / iOS 真实设备证据；不得以 CI、模拟器或 unsigned device build 代替。
+当前验收基线：Mobile `dev@260fbb56`。MOB-044 仍为 **DOING**，以下只把已有证据记为通过，不把 CI / 模拟器结果冒充真机验收。
+
+### A. 自动化 / 静态证据：已通过
+
+- `dev@bc200bae` 的完整 Mobile CI 已成功：
+  - Typecheck / Lint 通过；
+  - Jest：69/69 suites、428/428 tests；
+  - Android debug build 通过；
+  - Android arm64-v8a signed release APK 构建与签名校验通过；
+  - iOS Simulator build 通过；
+  - iOS Release unsigned device build 通过，设备二进制为 arm64；
+  - dev prerelease publish job 通过。
+- Local Provider 自动回归已覆盖：
+  - Provider URL root / `/v1` / `/api/v1`；
+  - SSE `[DONE]` 与 `finish_reason`；
+  - tool-call 分片、交错分片、缺 index fallback；
+  - 用户取消与 Provider timeout 区分。
+- Local Agent 自动回归已覆盖：
+  - tool result 回灌；
+  - approval-required -> approve / reject；
+  - approval timeout；
+  - tool result truncation；
+  - app suspension；
+  - uncertain approval 不误报为取消。
+- Remote Tool Gateway 自动回归已覆盖：
+  - model-safe alias -> canonical Host tool id；
+  - approval envelope；
+  - frozen invocation approve；
+  - uncertain approval；
+  - real invocation cancel；
+  - delayed `tool:start`；
+  - alias collision；
+  - 非对象参数拒绝。
+- Durable Host 自动回归已覆盖：
+  - canonical replay；
+  - terminal run 后继续发现新 run；
+  - Retry 重启 same-run observer；
+  - serialized polling；
+  - stale observer 隔离；
+  - 前后台仅停止本地观察，不取消 Host run。
+- 凭据静态审计：
+  - Android：AndroidKeyStore + AES/GCM；应用 `allowBackup=false`；
+  - iOS：Keychain + `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`；
+  - Provider Key / Remote device credential 使用独立 service namespace；
+  - 未发现业务代码把 API Key、device credential 或 Authorization header 写入日志。
+- iOS release hygiene：验收发现并已删除未使用且为空的 `NSLocationWhenInUseUsageDescription`；补合同测试防止回归。
+
+### B. 发布链：门禁正常，但尚未可发布
+
+- `R2 Release Truth` 对 `dev@bc200bae` 失败原因已定位：
+  - 当前版本仍为 `0.2.14`；
+  - R2 已存在不可变 `dev/0.2.14` release；
+  - 新 APK 字节不同，脚本按设计拒绝覆盖并要求 bump version。
+- 结论：这是**版本不可变门禁正常工作**，不是 R2 权限/上传故障。
+- MOB-044 未通过前不提前 bump 版本；总验收通过后再升版本并重新发布。
+- 当前 iOS target 声明 `TARGETED_DEVICE_FAMILY = "1,2"`，即同时支持 iPhone / iPad，但 AppIcon catalog 缺 iPad 152x152 与 167x167 尺寸，Xcode Release build 有明确 warning。此项在发布 PASS 前必须二选一：
+  1. 补齐 iPad AppIcon；或
+  2. 明确产品改为 iPhone-only，并同步 target family。
+  当前不在验收中擅自改变产品支持范围。
+
+### C. 真机 / 真实服务硬门槛：待验收
+
+以下项目必须分别在 Android 与 iOS 真实设备记录结果，CI、模拟器和 Mock 不可替代：
+
+1. Provider API Key：保存 -> 杀 App -> 重开 -> 读取状态 -> 掩码 -> 清除；确认日志/界面不出现完整 Key。
+2. 多 Provider：至少两个真实 OpenAI-compatible Provider 配置，切换后新建会话归属正确，不串 Key / model / transcript。
+3. 双入口 UI：Remote Host / Local Provider 来源菜单、Drawer、聊天头部、空状态与删除后状态。
+4. Local Provider 文本链路：真实流式输出、取消、超时、失败重试；弱网/断网恢复后 transcript 不重复。
+5. Provider 错误：真实或可控服务返回 401 / 403 / 404 / 429 / 5xx / 不兼容 SSE，UI 有可执行下一步。
+6. Remote Host 回归：既有扫码配对、Direct/Relay、会话读取、流式消息保持正常。
+7. Real Tool Gateway：真实工具 discover -> invoke -> approval-required -> 手机批准 / 拒绝 -> 继续 / 终止；真实 cancel 生效。
+8. Durable Host：长任务运行中切后台、返回前台、杀 App / 重开后从 Host 读取同一 Run；cancel 后不继续误写终态。
+9. 会话生命周期：删除 Local 会话后 pin/unread 清理，最后一个该 Provider 会话删除后 Provider 可删除。
+10. 安装 / 升级：release build 覆盖安装旧版本后，Provider 配置、secure-store credential、Remote pairing 不丢失。
+11. 崩溃 / 前后台：核心路径无崩溃；后台不伪装持续执行本地 Agent；Remote durable run 可恢复解释。
+
+### D. 当前判定
+
+- 自动化 / 静态层：**PASS**
+- Android 真机：**PENDING**
+- iOS 真机：**PENDING**
+- 真实 Provider：**PENDING**
+- 真实 Host / Tool Gateway / Durable Run：**PENDING**
+- 发布：**BLOCKED BY ACCEPTANCE + VERSION BUMP**
+- iPad release hygiene：**OPEN DECISION / FIX**
+
+因此 MOB-044 当前保持 **DOING**，不能升 PASS。
