@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Animated,
+  AppState,
   Easing,
   FlatList,
   KeyboardAvoidingView,
@@ -23,6 +24,7 @@ import {
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  Bot,
   ChevronLeft,
   MoreVertical,
   Send,
@@ -43,6 +45,14 @@ import { AssistantMarkdown } from '../components/AssistantMarkdown';
 import { ConversationMenu } from '../components/ConversationMenu';
 import { ConversationSearchBar } from '../components/ConversationSearchBar';
 import { MessageAttachments } from '../components/MessageAttachments';
+import {
+  LocalAgentRunCard,
+  type LocalAgentActivity,
+  type LocalAgentApprovalView,
+  type LocalAgentPauseReason,
+  type LocalAgentRunPhase,
+} from '../components/LocalAgentRunCard';
+import type { ToolApprovalDecision } from '../tools/toolGatewayClient';
 import {
   getChatHistoryErrorMessage,
   getChatSendErrorMessage,
@@ -211,6 +221,17 @@ export function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const [agentEnabled, setAgentEnabled] = useState(false);
+  const [agentModeLoading, setAgentModeLoading] = useState(false);
+  const [agentPhase, setAgentPhase] = useState<LocalAgentRunPhase>('idle');
+  const [agentActivities, setAgentActivities] = useState<LocalAgentActivity[]>([]);
+  const [agentPauseReason, setAgentPauseReason] =
+    useState<LocalAgentPauseReason | null>(null);
+  const [pendingAgentApproval, setPendingAgentApproval] =
+    useState<LocalAgentApprovalView | null>(null);
+  const [approvalAction, setApprovalAction] =
+    useState<ToolApprovalDecision | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchFocusMessageId, setSearchFocusMessageId] = useState<string | null>(
@@ -231,11 +252,61 @@ export function ChatScreen() {
     [sessionId, source],
   );
   const isLocalProvider = runtime.kind === 'local-provider';
+  const supportsLocalAgent = isLocalProvider && runtime.supportsAgent === true;
 
   useEffect(() => {
     setIsSearchVisible(false);
     setSearchFocusMessageId(null);
   }, [sessionId]);
+
+  useEffect(() => {
+    let active = true;
+    setAgentActivities([]);
+    setPendingAgentApproval(null);
+    setApprovalAction(null);
+    setAgentPhase('idle');
+    setAgentPauseReason(null);
+    setAgentError(null);
+
+    if (!supportsLocalAgent || !runtime.getAgentEnabled) {
+      setAgentEnabled(false);
+      setAgentModeLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setAgentModeLoading(true);
+    void runtime
+      .getAgentEnabled(sessionId)
+      .then(enabled => {
+        if (active) setAgentEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setAgentEnabled(false);
+      })
+      .finally(() => {
+        if (active) setAgentModeLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [runtime, sessionId, supportsLocalAgent]);
+
+  useEffect(() => {
+    if (!isLocalProvider || !runtime.setExecutionSuspended) return undefined;
+
+    const syncExecutionState = (state: string) => {
+      runtime.setExecutionSuspended?.(state !== 'active');
+    };
+    syncExecutionState(AppState.currentState);
+    const subscription = AppState.addEventListener('change', syncExecutionState);
+    return () => {
+      subscription.remove();
+      runtime.setExecutionSuspended?.(false);
+    };
+  }, [isLocalProvider, runtime]);
 
   const refreshSessionTitle = useCallback(async () => {
     if (isLocalProvider) return;
@@ -325,6 +396,86 @@ export function ChatScreen() {
     setSearchFocusMessageId(null);
   }, []);
 
+  const upsertAgentActivity = useCallback(
+    (
+      callId: string,
+      name: string,
+      status: LocalAgentActivity['status'],
+      detail?: string,
+    ) => {
+      setAgentActivities(prev => {
+        const index = prev.findIndex(item => item.callId === callId);
+        const next: LocalAgentActivity = {
+          callId,
+          name,
+          status,
+          ...(detail ? { detail } : {}),
+        };
+        if (index < 0) return [...prev, next];
+        return [
+          ...prev.slice(0, index),
+          { ...prev[index], ...next },
+          ...prev.slice(index + 1),
+        ];
+      });
+    },
+    [],
+  );
+
+  const toggleAgentMode = useCallback(async () => {
+    if (
+      !supportsLocalAgent ||
+      !runtime.setAgentEnabled ||
+      agentModeLoading ||
+      isLoading
+    ) {
+      return;
+    }
+    const next = !agentEnabled;
+    setAgentModeLoading(true);
+    try {
+      await runtime.setAgentEnabled(sessionId, next);
+      setAgentEnabled(next);
+      if (!next) {
+        setAgentActivities([]);
+        setPendingAgentApproval(null);
+        setApprovalAction(null);
+        setAgentPhase('idle');
+        setAgentPauseReason(null);
+        setAgentError(null);
+      }
+    } catch {
+      Alert.alert('Agent 模式', '暂时无法保存 Agent 模式状态，请稍后重试。');
+    } finally {
+      setAgentModeLoading(false);
+    }
+  }, [
+    agentEnabled,
+    agentModeLoading,
+    isLoading,
+    runtime,
+    sessionId,
+    supportsLocalAgent,
+  ]);
+
+  const handleAgentApproval = useCallback(
+    (decision: ToolApprovalDecision) => {
+      if (
+        !pendingAgentApproval ||
+        approvalAction ||
+        !runtime.resolveToolApproval
+      ) {
+        return;
+      }
+      setApprovalAction(decision);
+      runtime.resolveToolApproval(
+        pendingAgentApproval.invocationId,
+        decision,
+      );
+    },
+    [approvalAction, pendingAgentApproval, runtime],
+  );
+
   const focusSearchMatch = useCallback((match: ConversationMatch) => {
     setSearchFocusMessageId(match.messageId);
     flatListRef.current?.scrollToIndex({
@@ -360,18 +511,108 @@ export function ChatScreen() {
       setIsLoading(true);
       setStreamingText('');
       abortRef.current = false;
+      const useLocalAgent = supportsLocalAgent && agentEnabled;
+      if (useLocalAgent) {
+        setAgentActivities([]);
+        setPendingAgentApproval(null);
+        setApprovalAction(null);
+        setAgentPauseReason(null);
+        setAgentError(null);
+        setAgentPhase('thinking');
+      }
 
       try {
         // Reuse the same user-message id on retry. Remote Host V1 requires a
         // stable messageId so an uncertain reconnect cannot duplicate a user message.
-        const stream = await runtime.sendMessage(sessionId, content, { messageId: userMsg.id });
+        const stream = await runtime.sendMessage(sessionId, content, {
+          messageId: userMsg.id,
+          agentEnabled: useLocalAgent,
+        });
         let fullReply = '';
+        let agentPaused = false;
+        let sawToolResult = false;
         for await (const event of stream) {
           if (abortRef.current) break;
-          if (event.type === 'text-delta') fullReply += event.delta;
-          if (event.type === 'error') throw new Error(event.message);
+          if (event.type === 'text-delta') {
+            fullReply += event.delta;
+            if (useLocalAgent && sawToolResult) {
+              setAgentPhase('continuing');
+            }
+          }
+          if (useLocalAgent && event.type === 'tool-call') {
+            upsertAgentActivity(
+              event.callId,
+              event.name,
+              'requested',
+            );
+          }
+          if (useLocalAgent && event.type === 'tool-running') {
+            upsertAgentActivity(
+              event.callId,
+              event.name,
+              'running',
+            );
+            setAgentPhase('running-tool');
+          }
+          if (useLocalAgent && event.type === 'approval-required') {
+            upsertAgentActivity(
+              event.callId,
+              event.name,
+              'awaiting-approval',
+            );
+            setPendingAgentApproval({
+              invocationId: event.invocationId,
+              callId: event.callId,
+              name: event.name,
+              message: event.message,
+              ...(event.scope ? { scope: event.scope } : {}),
+            });
+            setApprovalAction(null);
+            setAgentPhase('waiting-approval');
+          }
+          if (useLocalAgent && event.type === 'approval-resolved') {
+            upsertAgentActivity(
+              event.callId,
+              event.name,
+              event.decision === 'approved' ? 'approved' : 'rejected',
+            );
+            setPendingAgentApproval(null);
+            setApprovalAction(null);
+            setAgentPhase(
+              event.decision === 'approved' ? 'running-tool' : 'paused',
+            );
+          }
+          if (useLocalAgent && event.type === 'tool-result') {
+            sawToolResult = true;
+            upsertAgentActivity(
+              event.callId,
+              event.name,
+              'completed',
+              event.content,
+            );
+            setAgentPhase('continuing');
+          }
+          if (useLocalAgent && event.type === 'run-paused') {
+            agentPaused = true;
+            setPendingAgentApproval(null);
+            setApprovalAction(null);
+            setAgentPauseReason(event.reason);
+            setAgentPhase('paused');
+          }
+          if (useLocalAgent && event.type === 'finish') {
+            if (event.reason !== 'tool_calls' && !agentPaused) {
+              setAgentPhase('completed');
+            }
+          }
+          if (event.type === 'error') {
+            if (useLocalAgent) setAgentPhase('error');
+            throw new Error(event.message);
+          }
           setStreamingText(fullReply);
           scrollToBottom();
+        }
+        if (useLocalAgent && !agentPaused && !abortRef.current) {
+          setAgentPhase('completed');
         }
 
         // The stream is a delivery channel only. Re-read canonical Thread /
@@ -390,6 +631,12 @@ export function ChatScreen() {
         );
         if (!abortRef.current && !hasCanonicalAssistant) {
           const message = getChatSendErrorMessage(error, runtime.kind);
+          if (useLocalAgent) {
+            setPendingAgentApproval(null);
+            setApprovalAction(null);
+            setAgentError(message);
+            setAgentPhase('error');
+          }
           setFailedMessages((prev) =>
             new Map(prev).set(userMsg.id, message),
           );
@@ -399,6 +646,7 @@ export function ChatScreen() {
       }
     },
     [
+      agentEnabled,
       inputText,
       isLoading,
       loadMessages,
@@ -406,13 +654,21 @@ export function ChatScreen() {
       scrollToBottom,
       runtime,
       sessionId,
+      supportsLocalAgent,
+      upsertAgentActivity,
     ],
   );
 
   const handleStop = useCallback(() => {
     abortRef.current = true;
     runtime.cancelActiveRun();
-  }, [runtime]);
+    if (supportsLocalAgent && agentEnabled) {
+      setPendingAgentApproval(null);
+      setApprovalAction(null);
+      setAgentPauseReason('cancelled');
+      setAgentPhase('paused');
+    }
+  }, [agentEnabled, runtime, supportsLocalAgent]);
 
   const openMenu = useCallback(() => {
     menuButtonRef.current?.measureInWindow((x, y, width, height) => {
@@ -503,19 +759,55 @@ export function ChatScreen() {
   );
 
   const renderFooter = useCallback(() => {
-    if (!streamingText && !isLoading) return null;
+    const showAgentState =
+      supportsLocalAgent &&
+      agentEnabled &&
+      (agentPhase !== 'idle' ||
+        agentActivities.length > 0 ||
+        pendingAgentApproval !== null ||
+        agentError !== null);
+    if (!streamingText && !isLoading && !showAgentState) return null;
+
     return (
-      <View style={[styles.messageRow, styles.messageRowLeft]}>
-        <View style={[styles.bubble, styles.assistantBubble]}>
-          {streamingText ? (
-            <AssistantMarkdown content={streamingText} />
-          ) : (
-            <ThinkingIndicator color={colors.text.soft} />
-          )}
-        </View>
+      <View>
+        {showAgentState ? (
+          <LocalAgentRunCard
+            phase={agentPhase}
+            pauseReason={agentPauseReason}
+            activities={agentActivities}
+            approval={pendingAgentApproval}
+            approvalAction={approvalAction}
+            error={agentError}
+            onApproval={handleAgentApproval}
+          />
+        ) : null}
+        {streamingText || isLoading ? (
+          <View style={[styles.messageRow, styles.messageRowLeft]}>
+            <View style={[styles.bubble, styles.assistantBubble]}>
+              {streamingText ? (
+                <AssistantMarkdown content={streamingText} />
+              ) : (
+                <ThinkingIndicator color={colors.text.soft} />
+              )}
+            </View>
+          </View>
+        ) : null}
       </View>
     );
-  }, [colors.text.soft, isLoading, streamingText]);
+  }, [
+    agentActivities,
+    agentEnabled,
+    agentError,
+    agentPauseReason,
+    agentPhase,
+    approvalAction,
+    colors.text.soft,
+    handleAgentApproval,
+    isLoading,
+    pendingAgentApproval,
+    streamingText,
+    supportsLocalAgent,
+  ]);
 
   return (
     <SafeAreaView
@@ -670,6 +962,54 @@ export function ChatScreen() {
           }
           ListFooterComponent={renderFooter}
         />
+
+        {supportsLocalAgent ? (
+          <View style={styles.agentModeRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                agentEnabled ? '关闭本地 Agent 模式' : '开启本地 Agent 模式'
+              }
+              disabled={agentModeLoading || isLoading}
+              onPress={() => void toggleAgentMode()}
+              style={({ pressed }) => [
+                styles.agentModeButton,
+                {
+                  backgroundColor: agentEnabled
+                    ? colors.bg.soft
+                    : colors.bg.card,
+                  borderColor: agentEnabled
+                    ? colors.primary
+                    : colors.border.default,
+                },
+                pressed && { opacity: 0.72 },
+                (agentModeLoading || isLoading) && { opacity: 0.5 },
+              ]}
+            >
+              <Bot
+                size={16}
+                color={agentEnabled ? colors.primary : colors.text.muted}
+                strokeWidth={2}
+              />
+              <Text
+                style={[
+                  styles.agentModeText,
+                  {
+                    color: agentEnabled
+                      ? colors.text.ink
+                      : colors.text.muted,
+                  },
+                ]}
+              >
+                {agentModeLoading
+                  ? 'Agent…'
+                  : agentEnabled
+                    ? 'Agent 已开启'
+                    : 'Agent'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -904,6 +1244,24 @@ const styles = StyleSheet.create({
   },
   retryText: { fontSize: fontSize.sm },
   failureText: { fontSize: fontSize.sm, lineHeight: 18, marginTop: 6 },
+  agentModeRow: {
+    paddingHorizontal: 14,
+    paddingBottom: spacing.xs,
+    alignItems: 'flex-start',
+  },
+  agentModeButton: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.full,
+  },
+  agentModeText: {
+    fontSize: fontSize.caption,
+    fontWeight: '600',
+  },
   inputBar: {
     paddingHorizontal: 14,
     paddingTop: spacing.sm,
