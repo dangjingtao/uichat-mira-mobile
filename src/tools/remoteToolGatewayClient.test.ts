@@ -176,7 +176,7 @@ describe('RemoteToolGatewayClient', () => {
   it('cancels the real remote invocation after tool:start is consumed', async () => {
     const remote = host();
     let release: (() => void) | null = null;
-    let markStartConsumed: (() => void) | null = null;
+    let markStartConsumed!: () => void;
     const startConsumed = new Promise<void>(resolve => {
       markStartConsumed = resolve;
     });
@@ -189,7 +189,7 @@ describe('RemoteToolGatewayClient', () => {
           invocationId: 'inv-running',
           toolId: tool.id,
         };
-        markStartConsumed?.();
+        markStartConsumed();
         await new Promise<void>(resolve => {
           release = resolve;
         });
@@ -215,12 +215,15 @@ describe('RemoteToolGatewayClient', () => {
     const sessionOpened = new Promise<void>(resolve => {
       markSessionOpened = resolve;
     });
-    let releaseStart: (() => void) | null = null;
+    let releaseStart!: () => void;
     const startGate = new Promise<void>(resolve => {
       releaseStart = resolve;
     });
-    let releaseAfterStart: (() => void) | null = null;
-    const abort = jest.fn(() => releaseAfterStart?.());
+    let rejectAfterStart!: (error: Error) => void;
+    const afterStart = new Promise<void>((_resolve, reject) => {
+      rejectAfterStart = reject;
+    });
+    const abort = jest.fn(() => rejectAfterStart(new Error('aborted')));
     remote.openToolInvocation.mockImplementation(async () => {
       markSessionOpened?.();
       return {
@@ -232,9 +235,7 @@ describe('RemoteToolGatewayClient', () => {
             invocationId: 'inv-delayed',
             toolId: tool.id,
           };
-          await new Promise<void>(resolve => {
-            releaseAfterStart = resolve;
-          });
+          await afterStart;
         })(),
       };
     });
@@ -247,7 +248,7 @@ describe('RemoteToolGatewayClient', () => {
     expect(abort).not.toHaveBeenCalled();
     expect(remote.cancelToolInvocation).not.toHaveBeenCalled();
 
-    releaseStart?.();
+    releaseStart();
 
     await expect(promise).rejects.toMatchObject({
       code: 'TOOL_CANCELLED',
