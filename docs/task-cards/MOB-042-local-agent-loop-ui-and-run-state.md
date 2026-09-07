@@ -1,6 +1,6 @@
 # MOB-042：本地 Agent Loop UI 与运行状态呈现
 
-状态：**DOING**（2026-09-07 开工）
+状态：**PASS**（2026-09-07 完成）
 
 范围：Mira Mobile
 
@@ -39,6 +39,16 @@
 - 取消、超时、挂起、工具失败和 Provider 失败均有可操作提示。
 - 重试不会重复写入用户消息，也不会把工具结果重复追加到上下文。
 - Remote Host 聊天和审批回归不受影响。
+
+## 验收结果
+
+- Mobile PR #104 已 squash merge，merge commit `2af3099af3a83e66722c76029bf012fa52aa7e16`。
+- 本地会话 Agent 开关按 session 持久化，普通本地聊天与 Local Agent 仍复用同一 `ChatScreen`；本地 Agent 会话重新打开时不会误套 Remote Agent 的 Workspace 约束。
+- `RuntimeEvent` 已形成 protocol-neutral 的 tool requested/running/result、approval-required/resolved、run-paused 与结果截断状态；手机端批准/拒绝恢复的是 MOB-041 冻结的同一 invocation。
+- 用户取消、App 挂起/离开前台、总体超时、审批等待/审批请求超时、Gateway/Policy failure 与 approval uncertain 均有明确终态；App 挂起不会误显示为用户取消。
+- 连续 Local Agent run 通过 run token 隔离审批状态，并在替换 run 时先取消旧 Provider client，避免旧请求继续消耗 Provider 配额。
+- 最终 head `026f58ac`：Typecheck / Lint 全绿，Jest **67/67 suites、416/416 tests** 全绿；维护者最终自审无遗留 P0–P2。
+- Android / iOS 真机长文本、键盘、滚动、真实 Host / Provider / Gateway 及网络矩阵继续由 MOB-044 汇总验收；本卡 PASS 不表示 MOB-044 已通过。
 
 ## 验证要求
 
