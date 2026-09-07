@@ -30,7 +30,6 @@ const manifest = (
     scopes,
   },
   routes: {
-    workspaces: [],
     threads: [],
     messages: [],
     agent: [
