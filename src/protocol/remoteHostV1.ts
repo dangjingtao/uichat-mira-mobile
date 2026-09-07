@@ -224,6 +224,11 @@ export type RemoteToolGatewayStreamEvent =
       scope?: string;
     }
   | {
+      type: 'tool:error';
+      code: string;
+      message: string;
+    }
+  | {
       type: 'tool:complete';
       invocation: RemoteToolInvocationProjection;
     };
@@ -551,6 +556,13 @@ export const parseRemoteToolGatewayStreamEvent = (
       invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
       message: requiredString(value, 'message', 'remoteToolEvent'),
       ...(typeof value.scope === 'string' && value.scope ? { scope: value.scope } : {}),
+    };
+  }
+  if (type === 'tool:error') {
+    return {
+      type,
+      code: requiredString(value, 'code', 'remoteToolEvent'),
+      message: requiredString(value, 'message', 'remoteToolEvent'),
     };
   }
   if (type === 'tool:complete') {
