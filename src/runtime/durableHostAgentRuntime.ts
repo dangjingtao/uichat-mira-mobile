@@ -44,15 +44,18 @@ const waitForPoll = (delayMs: number, signal?: AbortSignal) =>
       return;
     }
 
-    const timer = setTimeout(resolve, delayMs);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener('abort', finish);
+      resolve();
+    };
+
+    timer = setTimeout(finish, delayMs);
+    signal?.addEventListener('abort', finish, { once: true });
   });
 
 const fingerprintRun = (run: RemoteAgentRun) =>
