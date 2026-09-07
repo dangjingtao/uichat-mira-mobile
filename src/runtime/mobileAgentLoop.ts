@@ -2,6 +2,7 @@ import type { OpenAiCompatibleMessage, OpenAiCompatibleTool } from '../provider/
 import type { RuntimeEvent } from './conversationRuntime';
 import {
   ToolApprovalRequiredError,
+  ToolGatewayError,
   type ToolApprovalDecision,
   type ToolApprovalRequest,
   type ToolGatewayClient,
@@ -213,6 +214,12 @@ export class MobileAgentLoop {
                   { signal },
                 );
               } catch (approvalError) {
+                if (
+                  approvalError instanceof ToolGatewayError &&
+                  approvalError.code === 'TOOL_APPROVAL_UNCERTAIN'
+                ) {
+                  throw approvalError;
+                }
                 if (shouldPause()) {
                   yield {
                     type: 'run-paused' as const,
