@@ -67,6 +67,7 @@ describe('remoteHostV1 protocol', () => {
     ).toMatchObject({
       protocolVersion: 1,
       device: { id: 'device-1' },
+      routes: { tools: ['GET /remote/v1/tools'] },
       reconnect: { eventCursor: false },
     });
   });
@@ -142,101 +143,7 @@ describe('remoteHostV1 protocol', () => {
           destructive: false,
           requiresApproval: false,
         }),
-      ).toThrow('Remote tool name must match ^[A-Za-z0-9_-]{1,64}
-    expect(
-      parseRemoteToolGatewayStreamEvent({
-        type: 'tool:approval_required',
-        invocationId: 'inv-1',
-        message: 'Approval required',
-        scope: 'terminal',
-      }),
-    ).toEqual({
-      type: 'tool:approval_required',
-      invocationId: 'inv-1',
-      message: 'Approval required',
-      scope: 'terminal',
-    });
-
-    expect(
-      parseRemoteToolGatewayStreamEvent({
-        type: 'tool:complete',
-        invocation: {
-          invocationId: 'inv-2',
-          toolId: 'web_search',
-          status: 'completed',
-          content: 'done',
-        },
-      }),
-    ).toEqual({
-      type: 'tool:complete',
-      invocation: {
-        invocationId: 'inv-2',
-        toolId: 'web_search',
-        status: 'completed',
-        content: 'done',
-      },
-    });
-  });
-
-  it('parses a safe terminal tool gateway error event', () => {
-    expect(
-      parseRemoteToolGatewayStreamEvent({
-        type: 'tool:error',
-        code: 'REMOTE_TOOL_REQUEST_FAILED',
-        message: 'Remote tool request failed',
-      }),
-    ).toEqual({
-      type: 'tool:error',
-      code: 'REMOTE_TOOL_REQUEST_FAILED',
-      message: 'Remote tool request failed',
-    });
-  });
-
-  it('rejects unsupported remote tool invocation statuses', () => {
-    expect(() =>
-      parseRemoteToolInvocationProjection({
-        invocationId: 'inv-1',
-        toolId: 'web_search',
-        status: 'running',
-      }),
-    ).toThrow('Unsupported remote tool invocation status');
-  });
-
-  it('normalizes canonical thread timestamps as strings', () => {
-    expect(
-      parseRemoteThread({
-        id: 'thread-1',
-        title: 'Mira',
-        modelName: null,
-        workspaceId: null,
-        status: 'active',
-        createdAt: '2026-08-01T09:00:00.000Z',
-        updatedAt: '2026-08-01T10:00:00.000Z',
-        messageCount: 2,
-        lastMessage: 'hello',
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        id: 'thread-1',
-        updatedAt: '2026-08-01T10:00:00.000Z',
-        messageCount: 2,
-      }),
-    );
-  });
-
-  it('unwraps only successful Mira API envelopes', () => {
-    expect(
-      unwrapApiEnvelope({ success: true, data: { value: 1 } }, (data) => data),
-    ).toEqual({ value: 1 });
-    expect(() =>
-      unwrapApiEnvelope(
-        { success: false, message: 'denied', code: 'FORBIDDEN' },
-        (data) => data,
-      ),
-    ).toThrow('denied');
-  });
-});
-);
+      ).toThrow('Remote tool name must match ^[A-Za-z0-9_-]{1,64}$');
     }
   });
 
@@ -324,12 +231,12 @@ describe('remoteHostV1 protocol', () => {
 
   it('unwraps only successful Mira API envelopes', () => {
     expect(
-      unwrapApiEnvelope({ success: true, data: { value: 1 } }, (data) => data),
+      unwrapApiEnvelope({ success: true, data: { value: 1 } }, data => data),
     ).toEqual({ value: 1 });
     expect(() =>
       unwrapApiEnvelope(
         { success: false, message: 'denied', code: 'FORBIDDEN' },
-        (data) => data,
+        data => data,
       ),
     ).toThrow('denied');
   });
