@@ -97,6 +97,7 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
         description: tool.description,
         parameters: tool.parameters,
         destructive: tool.destructive,
+        requiresApproval: tool.requiresApproval,
       };
     });
   }
