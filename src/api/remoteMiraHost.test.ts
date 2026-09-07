@@ -578,11 +578,15 @@ describe('RemoteMiraHostClient tool gateway', () => {
       scopes: ['tools:control'],
       savedAt: '2026-09-07T00:00:00.000Z',
     });
-    const json: JsonTransport = async request =>
-      request.parse({
+    const json: JsonTransport = async request => {
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(toolManifestPayload);
+      }
+      return request.parse({
         invocationId: 'inv-1',
         status: 'cancelling',
       });
+    };
     const client = new RemoteMiraHostClient(store, json);
 
     await expect(client.cancelToolInvocation('inv-1')).rejects.toThrow(
