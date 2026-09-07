@@ -6,6 +6,7 @@ interface StoredLocalSession {
   providerId: string;
   title: string;
   updatedAt: string;
+  agentEnabled?: boolean;
   messages: Array<{
     id: string;
     role: ChatMessage['role'];
@@ -22,6 +23,7 @@ const toSession = (value: StoredLocalSession): Session => ({
   title: value.title,
   updatedAt: new Date(value.updatedAt),
   source: 'local-provider',
+  agentEnabled: value.agentEnabled === true,
   status: 'local',
 });
 
@@ -71,6 +73,7 @@ const parseStored = (value: unknown): StoredLocalSession => {
     providerId: record.providerId,
     title: record.title,
     updatedAt: record.updatedAt,
+    agentEnabled: record.agentEnabled === true,
     messages,
   };
 };
@@ -114,6 +117,7 @@ export class LocalSessionRepository {
         providerId,
         title: title.trim() || 'New local conversation',
         updatedAt: now,
+        agentEnabled: false,
         messages: [],
       };
       await this.saveStored([value, ...values]);
@@ -131,6 +135,25 @@ export class LocalSessionRepository {
     const value = (await this.loadStored()).find((item) => item.id === sessionId);
     if (!value) throw new Error('Local session was not found');
     return value.providerId;
+  }
+
+  async getAgentEnabled(sessionId: string): Promise<boolean> {
+    const value = (await this.loadStored()).find((item) => item.id === sessionId);
+    if (!value) throw new Error('Local session was not found');
+    return value.agentEnabled === true;
+  }
+
+  setAgentEnabled(sessionId: string, enabled: boolean): Promise<void> {
+    return this.enqueueWrite(async () => {
+      const values = await this.loadStored();
+      const index = values.findIndex((item) => item.id === sessionId);
+      if (index < 0) throw new Error('Local session was not found');
+      values[index] = {
+        ...values[index],
+        agentEnabled: enabled,
+      };
+      await this.saveStored(values);
+    });
   }
 
   async getMessages(sessionId: string): Promise<ChatMessage[]> {
