@@ -426,11 +426,12 @@ describe('MobileAgentLoop', () => {
   });
 
   it('reports app suspension when the run signal is also aborted', async () => {
+    const callTool = jest.fn(async () => ({ content: 'unused' }));
     const gateway: ToolGatewayClient = {
       listTools: async () => [
         { name: 'search', parameters: { type: 'object' } },
       ],
-      callTool: async () => ({ content: 'unused' }),
+      callTool,
     };
     const controller = new AbortController();
     let suspended = false;
@@ -461,7 +462,7 @@ describe('MobileAgentLoop', () => {
       type: 'run-paused',
       reason: 'app-suspended',
     });
-    expect(gateway.callTool).toBeDefined();
+    expect(callTool).not.toHaveBeenCalled();
   });
 
   it('reports an app suspension boundary instead of claiming background continuation', async () => {
