@@ -1,6 +1,6 @@
 # MOB-042：本地 Agent Loop UI 与运行状态呈现
 
-状态：**TODO**（2026-09-06 已派卡）
+状态：**DOING**（2026-09-07 开工）
 
 范围：Mira Mobile
 
