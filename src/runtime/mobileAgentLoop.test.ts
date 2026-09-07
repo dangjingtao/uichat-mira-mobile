@@ -289,6 +289,57 @@ describe('MobileAgentLoop', () => {
     });
   });
 
+  it('does not misreport an uncertain approval dispatch as cancellation', async () => {
+    const approval: ToolApprovalRequest = {
+      invocationId: 'inv-uncertain',
+      callId: 'c1',
+      name: 'terminal_session',
+      arguments: '{}',
+      message: 'Approval required',
+    };
+    const controller = new AbortController();
+    const gateway: ToolGatewayClient = {
+      listTools: async () => [
+        { name: 'terminal_session', parameters: { type: 'object' } },
+      ],
+      callTool: async () => {
+        throw new ToolApprovalRequiredError(approval);
+      },
+      resolveApproval: async () => {
+        controller.abort();
+        throw new ToolGatewayError(
+          'TOOL_APPROVAL_UNCERTAIN',
+          'Mira Host may have accepted the approval',
+        );
+      },
+    };
+    const loop = new MobileAgentLoop(gateway);
+
+    await expect(
+      collect(
+        await loop.run(
+          [],
+          async () =>
+            (async function* () {
+              yield {
+                type: 'tool-call' as const,
+                callId: 'c1',
+                name: 'terminal_session',
+                arguments: '{}',
+              };
+              yield { type: 'finish' as const, reason: 'tool_calls' };
+            })(),
+          {
+            signal: controller.signal,
+            requestApproval: async () => 'approved',
+          },
+        ),
+      ),
+    ).rejects.toMatchObject({
+      code: 'TOOL_APPROVAL_UNCERTAIN',
+    });
+  });
+
   it('stops at the configured round limit', async () => {
     const gateway: ToolGatewayClient = {
       listTools: async () => [{ name: 'search', parameters: { type: 'object' } }],
