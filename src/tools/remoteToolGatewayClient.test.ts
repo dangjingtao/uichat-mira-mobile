@@ -103,6 +103,39 @@ describe('RemoteToolGatewayClient', () => {
     });
   });
 
+  it('preserves Host approval details when the final projection omits them', async () => {
+    const remote = host();
+    remote.openToolInvocation.mockResolvedValue({
+      abort: jest.fn(),
+      events: (async function* () {
+        yield {
+          type: 'tool:approval_required' as const,
+          invocationId: 'inv-approval-fallback',
+          message: 'Run command outside workspace',
+          scope: 'terminal',
+        };
+        yield {
+          type: 'tool:complete' as const,
+          invocation: {
+            invocationId: 'inv-approval-fallback',
+            toolId: tool.id,
+            status: 'awaiting_approval' as const,
+          },
+        };
+      })(),
+    });
+    const client = new RemoteToolGatewayClient(remote as never);
+
+    await expect(client.callTool(request)).rejects.toMatchObject({
+      name: 'ToolApprovalRequiredError',
+      approval: {
+        invocationId: 'inv-approval-fallback',
+        message: 'Run command outside workspace',
+        scope: 'terminal',
+      },
+    });
+  });
+
   it('resolves the same frozen tool call after mobile approval', async () => {
     const remote = host();
     remote.resolveToolApproval.mockResolvedValue({
