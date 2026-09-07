@@ -349,9 +349,9 @@ export class RemoteMiraHostClient {
     closeRelayConnections();
   }
 
-  async getManifest(): Promise<RemoteManifest> {
+  async getManifest(signal?: AbortSignal): Promise<RemoteManifest> {
     const credential = await this.requireCredential();
-    return this.getManifestWithCredential(credential);
+    return this.getManifestWithCredential(credential, signal);
   }
 
   async listThreads(): Promise<RemoteThread[]> {
@@ -672,8 +672,8 @@ export class RemoteMiraHostClient {
     });
   }
 
-  async getAgentRun(runId: string): Promise<RemoteAgentRun> {
-    return this.agentRequest(runId, 'GET', '');
+  async getAgentRun(runId: string, signal?: AbortSignal): Promise<RemoteAgentRun> {
+    return this.agentRequest(runId, 'GET', '', signal);
   }
 
   async approveAgentRun(runId: string): Promise<RemoteAgentRun> {
@@ -762,10 +762,12 @@ export class RemoteMiraHostClient {
 
   private async getManifestWithCredential(
     credential: StoredDeviceCredential,
+    signal?: AbortSignal,
   ): Promise<RemoteManifest> {
     return this.requestCredentialJson(credential, {
       path: '/remote/v1/manifest',
       credential: credential.credential,
+      signal,
       parse: parseRemoteManifest,
     });
   }
@@ -774,12 +776,14 @@ export class RemoteMiraHostClient {
     runId: string,
     method: 'GET' | 'POST',
     suffix: string,
+    signal?: AbortSignal,
   ): Promise<RemoteAgentRun> {
     return this.withCredential(credential =>
       this.requestCredentialJson(credential, {
         path: `/agent/runs/${encodeURIComponent(runId)}${suffix}`,
         method,
         credential: credential.credential,
+        signal,
         parse: parseRemoteAgentRun,
       }),
     );

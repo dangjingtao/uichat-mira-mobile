@@ -814,3 +814,50 @@ describe('RemoteMiraHostClient chat request', () => {
     );
   });
 });
+
+
+describe('RemoteMiraHostClient abortable durable reads', () => {
+  it('forwards AbortSignal to manifest and Agent Run JSON requests', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['agent:read'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+    const requests: RemoteJsonRequest<unknown>[] = [];
+    const json: JsonTransport = async request => {
+      requests.push(request as RemoteJsonRequest<unknown>);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse({
+          ...manifestPayload,
+          device: { ...manifestPayload.device, scopes: ['agent:read'] },
+          routes: {
+            ...manifestPayload.routes,
+            agent: ['GET /agent/runs/:runId'],
+          },
+        });
+      }
+      return request.parse({
+        id: 'run-1',
+        threadId: 'thread-1',
+        userId: 1,
+        status: 'running',
+        traceId: 'trace-1',
+        createdAt: '2026-09-07T00:00:00.000Z',
+        updatedAt: '2026-09-07T00:00:01.000Z',
+      });
+    };
+    const client = new RemoteMiraHostClient(store, json);
+    const controller = new AbortController();
+
+    await client.getManifest(controller.signal);
+    await client.getAgentRun('run-1', controller.signal);
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]?.signal).toBe(controller.signal);
+    expect(requests[1]?.signal).toBe(controller.signal);
+  });
+});

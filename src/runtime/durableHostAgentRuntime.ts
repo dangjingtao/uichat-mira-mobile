@@ -146,22 +146,35 @@ export class DurableHostAgentRuntimeAdapter {
     runId: string,
     signal?: AbortSignal,
   ): AsyncIterable<RemoteAgentRun> {
-    const manifest = await this.remote.getManifest();
-    this.assertCapability(manifest, 'read');
+    try {
+      const manifest = await this.remote.getManifest(signal);
+      if (signal?.aborted) return;
+      this.assertCapability(manifest, 'read');
 
-    let lastFingerprint: string | null = null;
-    while (!signal?.aborted) {
-      const run = assertDurableHostRunBelongsToThread(
-        await this.remote.getAgentRun(runId),
-        threadId,
-      );
-      const fingerprint = fingerprintRun(run);
-      if (fingerprint !== lastFingerprint) {
-        lastFingerprint = fingerprint;
-        yield run;
+      let lastFingerprint: string | null = null;
+      while (!signal?.aborted) {
+        const run = assertDurableHostRunBelongsToThread(
+          await this.remote.getAgentRun(runId, signal),
+          threadId,
+        );
+        if (signal?.aborted) return;
+        const fingerprint = fingerprintRun(run);
+        if (fingerprint !== lastFingerprint) {
+          lastFingerprint = fingerprint;
+          yield run;
+        }
+        if (TERMINAL_STATUSES.has(run.status)) return;
+        await waitForPoll(this.pollIntervalMs, signal);
       }
-      if (TERMINAL_STATUSES.has(run.status)) return;
-      await waitForPoll(this.pollIntervalMs, signal);
+    } catch (error) {
+      if (
+        signal?.aborted &&
+        error instanceof RemoteHostError &&
+        error.code === 'REQUEST_ABORTED'
+      ) {
+        return;
+      }
+      throw error;
     }
   }
 }

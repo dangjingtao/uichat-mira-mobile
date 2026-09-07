@@ -1,3 +1,4 @@
+import { RemoteHostError } from '../api/remoteHttp';
 import type { RemoteMiraHostClient } from '../api/remoteMiraHost';
 import type { RemoteAgentRun, RemoteManifest } from '../protocol/remoteHostV1';
 import { DurableHostAgentRuntimeAdapter } from './durableHostAgentRuntime';
@@ -119,6 +120,45 @@ describe('DurableHostAgentRuntimeAdapter', () => {
     controller.abort();
     await expect(iterator.next()).resolves.toMatchObject({ done: true });
     expect(fake.cancelAgentRun).not.toHaveBeenCalled();
+  });
+
+  test('aborts an in-flight Host read without cancelling the durable run', async () => {
+    const controller = new AbortController();
+    const getManifest = jest.fn(async (_signal?: AbortSignal) => manifest());
+    const getAgentRun = jest.fn(
+      (_runId: string, signal?: AbortSignal) =>
+        new Promise<RemoteAgentRun>((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new RemoteHostError('REQUEST_ABORTED', 'cancelled'));
+            return;
+          }
+          signal?.addEventListener(
+            'abort',
+            () => reject(new RemoteHostError('REQUEST_ABORTED', 'cancelled')),
+            { once: true },
+          );
+        }),
+    );
+    const cancelAgentRun = jest.fn();
+    const remote = {
+      getManifest,
+      getAgentRun,
+      cancelAgentRun,
+    } as unknown as RemoteMiraHostClient;
+    const runtime = new DurableHostAgentRuntimeAdapter(remote, 10_000);
+    const iterator = runtime.observeRun('thread-1', 'run-1', controller.signal)[
+      Symbol.asyncIterator
+    ]();
+
+    const pending = iterator.next();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getManifest).toHaveBeenCalledWith(controller.signal);
+    expect(getAgentRun).toHaveBeenCalledWith('run-1', controller.signal);
+
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ done: true });
+    expect(cancelAgentRun).not.toHaveBeenCalled();
   });
 
   test('requires advertised Agent scope and route before reading', async () => {
