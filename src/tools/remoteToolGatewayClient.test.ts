@@ -289,15 +289,16 @@ describe('RemoteToolGatewayClient', () => {
       const controller = new AbortController();
 
       const promise = client.callTool(request, { signal: controller.signal });
+      const cancelled = expect(promise).rejects.toMatchObject({
+        code: 'TOOL_CANCELLED',
+      });
       await sessionOpened;
       controller.abort();
       expect(abort).not.toHaveBeenCalled();
 
       await jest.advanceTimersByTimeAsync(750);
 
-      await expect(promise).rejects.toMatchObject({
-        code: 'TOOL_CANCELLED',
-      });
+      await cancelled;
       expect(abort).toHaveBeenCalledTimes(1);
       expect(remote.cancelToolInvocation).not.toHaveBeenCalled();
     } finally {
