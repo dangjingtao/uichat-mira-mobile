@@ -74,7 +74,7 @@ const approvalFrom = (
   });
 
 export class RemoteToolGatewayClient implements ToolGatewayClient {
-  private readonly canonicalToolIds = new Map<string, string>();
+  private canonicalToolIds = new Map<string, string>();
 
   constructor(
     private readonly hostClient: RemoteToolHostClient = remoteMiraHostClient,
@@ -82,16 +82,16 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
 
   async listTools(): Promise<readonly ToolManifest[]> {
     const remoteTools = await this.hostClient.listRemoteTools();
-    this.canonicalToolIds.clear();
+    const nextToolIds = new Map<string, string>();
 
-    return remoteTools.map(tool => {
-      if (this.canonicalToolIds.has(tool.name)) {
+    const manifests = remoteTools.map(tool => {
+      if (nextToolIds.has(tool.name)) {
         throw new ToolGatewayError(
           'TOOL_ALIAS_CONFLICT',
           'Remote tool alias is not unique: ' + tool.name,
         );
       }
-      this.canonicalToolIds.set(tool.name, tool.id);
+      nextToolIds.set(tool.name, tool.id);
       return {
         name: tool.name,
         description: tool.description,
@@ -100,6 +100,9 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
         requiresApproval: tool.requiresApproval,
       };
     });
+
+    this.canonicalToolIds = nextToolIds;
+    return manifests;
   }
 
   async callTool(
@@ -108,39 +111,65 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
   ): Promise<ToolCallResult> {
     const toolId = await this.resolveCanonicalToolId(request.name);
     const args = parseArguments(request.arguments);
-    const session = await this.hostClient.openToolInvocation({ toolId, args });
-    let invocationId: string | null = null;
-    let completion: RemoteToolInvocationProjection | null = null;
-    let cancellationRequested = false;
-
-    const requestRemoteCancellation = () => {
-      if (cancellationRequested || !invocationId) return;
-      cancellationRequested = true;
-      void this.hostClient.cancelToolInvocation(invocationId).catch(() => {
-        // Cancellation is best effort here; the local stream is still aborted.
-      });
-    };
-
-    const abort = () => {
-      requestRemoteCancellation();
-      session.abort();
-    };
-
     if (options.signal?.aborted) {
-      abort();
       throw new ToolGatewayError(
         'TOOL_CANCELLED',
         'Remote tool invocation was cancelled',
       );
     }
+
+    const session = await this.hostClient.openToolInvocation({ toolId, args });
+    let invocationId: string | null = null;
+    let completion: RemoteToolInvocationProjection | null = null;
+    let cancellationRequested = false;
+    let abortRequested = false;
+    let fallbackAbortTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearFallbackAbort = () => {
+      if (!fallbackAbortTimer) return;
+      clearTimeout(fallbackAbortTimer);
+      fallbackAbortTimer = null;
+    };
+
+    const requestRemoteCancellation = () => {
+      if (cancellationRequested || !invocationId) return false;
+      cancellationRequested = true;
+      void this.hostClient.cancelToolInvocation(invocationId).catch(() => {
+        // The Host also binds SSE disconnect to Harness cancellation.
+      });
+      return true;
+    };
+
+    const closeLocalStream = () => {
+      clearFallbackAbort();
+      session.abort();
+    };
+
+    const abort = () => {
+      abortRequested = true;
+      if (requestRemoteCancellation()) {
+        closeLocalStream();
+        return;
+      }
+
+      if (!fallbackAbortTimer) {
+        fallbackAbortTimer = setTimeout(() => {
+          // If tool:start never arrives, closing SSE is the bounded fallback.
+          // Host V1 binds that disconnect to the running Harness AbortSignal.
+          session.abort();
+        }, 750);
+      }
+    };
+
     options.signal?.addEventListener('abort', abort, { once: true });
 
     try {
       for await (const event of session.events) {
         if (event.type === 'tool:start') {
           invocationId = event.invocationId;
-          if (options.signal?.aborted) {
+          if (abortRequested || options.signal?.aborted) {
             requestRemoteCancellation();
+            closeLocalStream();
           }
         } else if (event.type === 'tool:approval_required') {
           invocationId = event.invocationId;
@@ -149,6 +178,9 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
         } else if (event.type === 'tool:complete') {
           completion = event.invocation;
           invocationId = event.invocation.invocationId;
+          if (abortRequested || options.signal?.aborted) {
+            requestRemoteCancellation();
+          }
         }
       }
     } catch (error) {
@@ -160,6 +192,7 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
       }
       throw error;
     } finally {
+      clearFallbackAbort();
       options.signal?.removeEventListener('abort', abort);
     }
 
