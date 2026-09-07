@@ -2,6 +2,7 @@ import type { Session, SessionSource } from '../types';
 import { LocalProviderRuntime } from './localProviderRuntime';
 import { RemoteHostRuntime } from './remoteHostRuntime';
 import type { ConversationRuntime } from './conversationRuntime';
+import { remoteToolGatewayClient } from '../tools/remoteToolGatewayClient';
 
 export type SessionSourceFilter = 'all' | SessionSource;
 
@@ -9,7 +10,10 @@ export class RuntimeRegistry {
   readonly remote: RemoteHostRuntime;
   readonly local: LocalProviderRuntime;
 
-  constructor(local = new LocalProviderRuntime(), remote = new RemoteHostRuntime()) {
+  constructor(
+    local = new LocalProviderRuntime({ toolGateway: remoteToolGatewayClient }),
+    remote = new RemoteHostRuntime(),
+  ) {
     this.local = local;
     this.remote = remote;
   }
