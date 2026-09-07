@@ -608,11 +608,17 @@ describe('RemoteMiraHostClient tool gateway', () => {
     const directMock = jest.fn();
     const direct: JsonTransport = async request => {
       directMock(request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(toolManifestPayload);
+      }
       throw new RemoteHostError('NETWORK_ERROR', 'tailnet unavailable');
     };
     const relayJsonMock = jest.fn();
     const relayJson: RelayJsonTransport = async (_relay, request) => {
       relayJsonMock(_relay, request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(toolManifestPayload);
+      }
       return request.parse({
         invocationId: 'inv-1',
         accepted: true,
@@ -631,12 +637,10 @@ describe('RemoteMiraHostClient tool gateway', () => {
       accepted: true,
       status: 'cancelling',
     });
-    expect(directMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/remote/v1/tool-invocations/inv-1/cancel',
-        method: 'POST',
-      }),
-    );
+    expect(directMock.mock.calls.map(call => call[0].path)).toEqual([
+      '/remote/v1/manifest',
+      '/remote/v1/tool-invocations/inv-1/cancel',
+    ]);
     expect(relayJsonMock).toHaveBeenCalledWith(
       relay,
       expect.objectContaining({
