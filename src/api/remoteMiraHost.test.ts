@@ -51,6 +51,7 @@ const manifestPayload = {
     threads: ['GET /threads'],
     messages: [],
     agent: [],
+    tools: [],
     artifacts: [],
   },
   reconnect: {
