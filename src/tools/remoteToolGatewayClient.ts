@@ -162,6 +162,9 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
     };
 
     options.signal?.addEventListener('abort', abort, { once: true });
+    if (options.signal?.aborted) {
+      abort();
+    }
 
     try {
       for await (const event of session.events) {
