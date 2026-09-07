@@ -124,6 +124,7 @@ export class DurableHostAgentRuntimeAdapter {
     action: DurableHostAgentAction,
   ): Promise<RemoteAgentRun> {
     const manifest = await this.remote.getManifest();
+    this.assertCapability(manifest, 'read');
     this.assertCapability(manifest, action);
 
     const current = assertDurableHostRunBelongsToThread(

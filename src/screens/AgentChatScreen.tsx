@@ -18,6 +18,17 @@ import type { RootStackParamList } from '../types/navigation';
 import { ChatScreen } from './ChatScreen';
 
 const DISCOVERY_POLL_MS = 1_500;
+const TERMINAL_AGENT_RUN_STATUSES = new Set<RemoteAgentRun['status']>([
+  'completed',
+  'failed',
+  'blocked',
+  'cancelled',
+]);
+
+const shouldDiscoverAgentRun = (
+  runId: string | null,
+  run: RemoteAgentRun | null,
+) => !runId || !run || TERMINAL_AGENT_RUN_STATUSES.has(run.status);
 
 export function AgentChatScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
@@ -37,13 +48,19 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<AgentRunAction | null>(null);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  const [observationGeneration, setObservationGeneration] = useState(0);
   const requestSequenceRef = useRef(0);
   const actionLockRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
+  const runRef = useRef<RemoteAgentRun | null>(null);
 
   useEffect(() => {
     runIdRef.current = runId;
   }, [runId]);
+
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -59,6 +76,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
       requestSequenceRef.current = sequence;
 
       if (!nextRunId) {
+        runIdRef.current = null;
+        runRef.current = null;
         setRunId(null);
         setRun(null);
         setError(null);
@@ -66,12 +85,14 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
         return;
       }
 
+      runIdRef.current = nextRunId;
       setRunId(nextRunId);
       setLoading(true);
       setError(null);
       try {
         const nextRun = await loadAgentRunForMessages(sessionId, messages);
         if (requestSequenceRef.current !== sequence) return;
+        runRef.current = nextRun;
         setRun(nextRun);
       } catch (syncError) {
         if (requestSequenceRef.current !== sequence) return;
@@ -100,24 +121,39 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
       if (!appActive) return undefined;
 
       let active = true;
-      let discoveryTimer: ReturnType<typeof setInterval> | null = null;
+      let discoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
-      const refreshMessages = () =>
-        miraHostClient.getMessages(sessionId).catch(refreshError => {
+      const refreshMessages = async () => {
+        try {
+          await miraHostClient.getMessages(sessionId);
+        } catch (refreshError) {
           if (!active || !runIdRef.current) return;
           setError(getAgentRunErrorMessage(refreshError));
-        });
+        }
+      };
+
+      const runDiscovery = async () => {
+        if (!active) return;
+        if (shouldDiscoverAgentRun(runIdRef.current, runRef.current)) {
+          await refreshMessages();
+        }
+        if (active) {
+          discoveryTimer = setTimeout(() => {
+            void runDiscovery();
+          }, DISCOVERY_POLL_MS);
+        }
+      };
 
       void miraHostClient
         .getSession(sessionId)
-        .then(session => {
+        .then(async session => {
           if (!active || !session.agentEnabled) return;
-          void refreshMessages();
-          discoveryTimer = setInterval(() => {
-            if (active && !runIdRef.current) {
-              void refreshMessages();
-            }
-          }, DISCOVERY_POLL_MS);
+          await refreshMessages();
+          if (active) {
+            discoveryTimer = setTimeout(() => {
+              void runDiscovery();
+            }, DISCOVERY_POLL_MS);
+          }
         })
         .catch(focusError => {
           if (!active || !runIdRef.current) return;
@@ -126,7 +162,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
 
       return () => {
         active = false;
-        if (discoveryTimer) clearInterval(discoveryTimer);
+        if (discoveryTimer) clearTimeout(discoveryTimer);
         requestSequenceRef.current += 1;
       };
     }, [appActive, sessionId]),
@@ -147,6 +183,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
             controller.signal,
           )) {
             if (!active) return;
+            runRef.current = nextRun;
             setRun(nextRun);
             setLoading(false);
             setError(null);
@@ -165,16 +202,21 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
         active = false;
         controller.abort();
       };
-    }, [appActive, runId, sessionId]),
+    }, [appActive, observationGeneration, runId, sessionId]),
   );
 
   const retry = useCallback(() => {
     setError(null);
     setLoading(true);
-    void miraHostClient.getMessages(sessionId).catch(retryError => {
-      setLoading(false);
-      if (runIdRef.current) setError(getAgentRunErrorMessage(retryError));
-    });
+    void miraHostClient
+      .getMessages(sessionId)
+      .then(() => {
+        setObservationGeneration(current => current + 1);
+      })
+      .catch(retryError => {
+        setLoading(false);
+        if (runIdRef.current) setError(getAgentRunErrorMessage(retryError));
+      });
   }, [sessionId]);
 
   const handleAction = useCallback(
@@ -187,6 +229,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
 
       try {
         const updated = await applyAgentRunAction(sessionId, run.id, action);
+        runIdRef.current = updated.id;
+        runRef.current = updated;
         setRunId(updated.id);
         setRun(updated);
 

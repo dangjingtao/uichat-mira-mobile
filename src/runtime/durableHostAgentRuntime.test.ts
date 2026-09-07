@@ -144,6 +144,19 @@ describe('DurableHostAgentRuntimeAdapter', () => {
     });
   });
 
+  test('requires read capability before resolving an Agent action', async () => {
+    const fake = makeRemote([makeRun('running', '2026-09-07T00:00:00.000Z')]);
+    fake.getManifest.mockResolvedValue(manifest(['agent:control']));
+    const runtime = new DurableHostAgentRuntimeAdapter(fake.remote, 0);
+
+    await expect(runtime.resolve('thread-1', 'run-1', 'cancel')).rejects.toMatchObject({
+      code: 'REMOTE_SCOPE_REQUIRED',
+      status: 403,
+    });
+    expect(fake.getAgentRun).not.toHaveBeenCalled();
+    expect(fake.cancelAgentRun).not.toHaveBeenCalled();
+  });
+
   test('uses the Host control route for cancellation', async () => {
     const fake = makeRemote([makeRun('running', '2026-09-07T00:00:00.000Z')]);
     const runtime = new DurableHostAgentRuntimeAdapter(fake.remote, 0);

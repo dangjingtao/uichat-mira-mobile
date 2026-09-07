@@ -1,6 +1,6 @@
 # MOB-043：Host / Pi 持久运行时适配
 
-状态：**REVIEW**（2026-09-07 代码与合同已落地，等待 CI / PR 自审收口）
+状态：**REVIEW**（2026-09-07 维护者自审发现 durable lifecycle / Host correctness 问题，修复已进入 PR，等待 CI 与最终自审）
 
 范围：Mira Mobile + Mira Host / Pi Runtime 协作
 
