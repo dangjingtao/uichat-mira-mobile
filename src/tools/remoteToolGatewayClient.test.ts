@@ -293,7 +293,7 @@ describe('RemoteToolGatewayClient', () => {
       controller.abort();
       expect(abort).not.toHaveBeenCalled();
 
-      jest.advanceTimersByTime(750);
+      await jest.advanceTimersByTimeAsync(750);
 
       await expect(promise).rejects.toMatchObject({
         code: 'TOOL_CANCELLED',
