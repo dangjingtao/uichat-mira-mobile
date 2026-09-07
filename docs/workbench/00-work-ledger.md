@@ -48,12 +48,12 @@
 | MOB-034 | 拾言低频入口 / Share / Delivery / Token 收口 | REVIEW | **待真机/真实服务验证**；PR #91 squash-merged as `eb5f90a`; current-head Typecheck/Lint/Jest, Android debug, iOS simulator/unsigned iPhone/IPA build all green; OpenCode review was cancelled without verdict; verify Android/iOS More Sheet + system Share Sheet, real GitHub Delivery/canonical URL, retention changes, and light/dark UI before PASS |
 | MOB-035 | 远程连接状态诊断与会话错误分层 | REVIEW | **待真机验证**；PR #92 squash-merged as `0d5f2c6e`; final-head Mobile CI fully green; OpenCode review cancelled without verdict after prior Codex P2 was fixed and resolved; Android state matrix + iOS equivalent smoke required before PASS |
 | MOB-036 | 桌面配对入口与授权 Bottom Sheet 收口 | PASS | PR #90 squash-merged as `40a57227`; product owner completed real-device acceptance on 2026-09-04: all 5 acceptance paths (扫码→Sheet→关闭 / 扫码→提交→批准→Toast→首页 / 粘贴→Sheet→提交 / Desktop 拒绝 / 请求过期) passed; 与 MOB-009 同批次升 PASS，两卡真机 5 路径互为佐证 |
-| MOB-037 | Mobile 双入口与 Local Provider Agent Runtime | DOING | 阶段 A + 阶段 1 + 阶段 B 基础及 MOB-041 真实 Tool Gateway 合同/Adapter 已完成；剩余为 MOB-042 Loop UI、MOB-043 持久运行时与 MOB-044 真机/真实服务验收 |
+| MOB-037 | Mobile 双入口与 Local Provider Agent Runtime | DOING | 阶段 A + 阶段 1 + 阶段 B 基础、MOB-041 真实 Tool Gateway 合同/Adapter 与 MOB-042 Local Agent Loop UI/手机审批闭环已完成；剩余为 MOB-043 持久运行时与 MOB-044 真机/真实服务验收 |
 | MOB-038 | Local Provider 多配置与选定 Provider 新建对话 | REVIEW | 2026-09-06 代码完成；多 Provider upsert/remove、独立 Key、选定 Provider 创建会话、聊天头部来源展示与删除保护已自动化验证；Android arm64-v8a debug 构建通过；待 Android / iOS 功能验收 |
 | MOB-039 | 双入口来源选择与统一新建会话 | REVIEW | 2026-09-06 代码与自动化验证完成；主列表来源菜单、Drawer 双来源展示与统一新建入口待 Android / iOS 功能验收 |
 | MOB-040 | 本地对话可靠发送与重试 | REVIEW | 2026-09-06 代码与自动化验证完成；本地消息幂等写入、取消/超时语义与失败重试待 Android / iOS 功能验收 |
 | MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | PASS | Host PR #117 squash-merged as `576f9cb2`；Mobile PR #103 squash-merged as `c7288610`；paired Mira Host Remote Gateway -> Harness / External MCP 合同、独立 `tools:*` scope、Agent exposure、owner + exact inputHash 审批、真实 cancel、旧设备不静默扩权、Provider Key 隔离与真实 `RemoteToolGatewayClient` Adapter 已落地；Host review/Branch Policy 通过，Mobile final-head Typecheck/Lint/Jest 400/400 通过；真实设备/服务矩阵归 MOB-044 |
-| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | DOING | 2026-09-07 开工；基于 MOB-041 真实 Gateway 合同接入同一 ChatScreen：本地会话 Agent 开关持久化、工具 requested/running/result、approval-required/resolved、取消/挂起/超时/结果截断状态与手机 approve/reject 闭环施工中 |
+| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | PASS | PR #104 squash-merged as `2af3099a`；同一 ChatScreen 已完成本地会话 Agent 开关持久化、tool requested/running/result、approval-required/resolved、手机 approve/reject、取消/App 挂起/离开前台/超时/结果截断与错误状态；补齐 local/remote 路由区分、run-token 审批隔离、旧 Provider client 取消及 approval uncertain 语义；final-head Typecheck/Lint + Jest 67/67 suites、416/416 tests 全绿，维护者自审无 P0-P2；Android/iOS 真机与真实 Host/Provider/Gateway 矩阵集中归 MOB-044 |
 | MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
 | MOB-045 | Local Provider 会话生命周期闭环 | REVIEW | PR #99 squash-merged as `1062e0c2`；单会话本地删除、RuntimeRegistry Local/Remote 路由、设备本地 pin/read 清理及 Provider 删除解锁已落地；CodeRabbit 两项数据完整性/路由问题已修复并确认；Typecheck/Lint/Jest + Android debug build 通过；Android/iOS 真机删除与 Provider 解锁验收挂 MOB-044 |
@@ -69,9 +69,9 @@
 
 - [MOB-037：Mobile 双入口与 Local Provider Agent Runtime](../task-cards/MOB-037-mobile-dual-entry-local-provider-agent-runtime.md)：**DOING**（阶段 A + 阶段 1 最小 UI 接线）。
 - 设计附件：[Mobile Dual-Entry and Local Provider Agent Runtime Design](../remote-access/local-provider-agent-runtime-design.md)。
-- 阶段 A、阶段 1 最小 UI 接线和阶段 B 基础 Loop 已落地；MOB-041 已补齐真实 Tool Gateway / MCP 合同与 Mobile Adapter。当前剩余缺口是 MOB-042 Loop UI 状态、MOB-043 持久 Host / Pi Runtime 适配及 MOB-044 跨端真实验收证据。
+- 阶段 A、阶段 1 最小 UI 接线和阶段 B 基础 Loop 已落地；MOB-041 已补齐真实 Tool Gateway / MCP 合同与 Mobile Adapter，MOB-042 已补齐 Local Agent Loop UI、手机审批和前台运行状态闭环。当前剩余缺口是 MOB-043 持久 Host / Pi Runtime 适配及 MOB-044 跨端真实验收证据。
 
-后续正式任务卡中，MOB-041 已 PASS；MOB-042 负责本地 Agent Loop UI，MOB-043 负责 Host / Pi 持久运行时适配，MOB-044 负责 Android / iOS 真机验收与发布加固。后续仍不得在移动端猜测未确认的 Host / Pi Runtime 字段。
+后续正式任务卡中，MOB-041、MOB-042 已 PASS；MOB-043 负责 Host / Pi 持久运行时适配，MOB-044 负责 Android / iOS 真机验收与发布加固。后续仍不得在移动端猜测未确认的 Host / Pi Runtime 字段。
 
 2026-09-06 维护者在双链路基础提交 `7bc3556` 代码审查后，明确授权立即派出一张**窄范围**卫生卡 MOB-048，用于清理本次提交及直接相邻代码中的死代码、token 违例与明显边界残留。该决定不等于启动此前候选的 Conversation orchestration / Host gateway / App composition broad refactor；后者继续 deferred。
 
