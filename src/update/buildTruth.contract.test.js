@@ -157,6 +157,12 @@ describe('MOB-028A release truth', () => {
     expect(manifestUploadIndex).toBeGreaterThan(mirrorVerifyIndex);
   });
 
+  it('does not ship an unused empty iOS location permission description', () => {
+    const plist = readSource('ios/UIChatMira/Info.plist');
+
+    expect(plist).not.toContain('NSLocationWhenInUseUsageDescription');
+  });
+
   it('keeps the iOS installed marketing version aligned with package.json', () => {
     const packageVersion = JSON.parse(readSource('package.json')).version;
     const plist = readSource('ios/UIChatMira/Info.plist');
