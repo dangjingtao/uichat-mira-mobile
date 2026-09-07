@@ -504,6 +504,46 @@ describe('RemoteMiraHostClient tool gateway', () => {
     );
   });
 
+  it('does not call tool routes that the Host manifest does not advertise', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['tools:read', 'tools:invoke'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+    const jsonMock = jest.fn();
+    const json: JsonTransport = async request => {
+      jsonMock(request);
+      return request.parse(manifestPayload);
+    };
+    const sseMock = jest.fn();
+    const sse = <T>(request: PostSseRequest<T>): PostSseSession<T> => {
+      sseMock(request);
+      return {
+        abort: jest.fn(),
+        events: (async function* () {})(),
+      };
+    };
+    const client = new RemoteMiraHostClient(store, json, sse);
+
+    await expect(client.listRemoteTools()).rejects.toMatchObject({
+      code: 'REMOTE_TOOL_ROUTE_UNAVAILABLE',
+    });
+    expect(jsonMock.mock.calls.map(call => call[0].path)).toEqual([
+      '/remote/v1/manifest',
+    ]);
+
+    await expect(
+      client.openToolInvocation({ toolId: 'web_search', args: {} }),
+    ).rejects.toMatchObject({
+      code: 'REMOTE_TOOL_ROUTE_UNAVAILABLE',
+    });
+    expect(sseMock).not.toHaveBeenCalled();
+  });
+
   it('probes a reachable transport before opening the side-effecting tool stream', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
