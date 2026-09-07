@@ -13,7 +13,13 @@ export type RuntimeEvent =
     }
   | { type: 'finish'; reason: string | null }
   | { type: 'tool-running'; callId: string; name: string }
-  | { type: 'tool-result'; callId: string; name: string; content: string }
+  | {
+      type: 'tool-result';
+      callId: string;
+      name: string;
+      content: string;
+      truncated?: boolean;
+    }
   | {
       type: 'approval-required';
       invocationId: string;
