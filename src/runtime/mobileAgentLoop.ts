@@ -153,8 +153,28 @@ export class MobileAgentLoop {
               };
 
               let decision: ToolApprovalDecision;
+              let approvalTimeout: ReturnType<typeof setTimeout> | null = null;
               try {
-                decision = await options.requestApproval(approval);
+                const remainingMs = deadline - Date.now();
+                if (remainingMs <= 0) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'timeout' as const,
+                  };
+                  return;
+                }
+                const timeoutPromise = new Promise<ToolApprovalDecision>(
+                  (_resolve, reject) => {
+                    approvalTimeout = setTimeout(
+                      () => reject(new Error('MOBILE_AGENT_APPROVAL_TIMEOUT')),
+                      remainingMs,
+                    );
+                  },
+                );
+                decision = await Promise.race([
+                  options.requestApproval(approval),
+                  timeoutPromise,
+                ]);
               } catch (approvalWaitError) {
                 if (shouldPause()) {
                   yield {
@@ -170,14 +190,45 @@ export class MobileAgentLoop {
                   };
                   return;
                 }
+                if (
+                  approvalWaitError instanceof Error &&
+                  approvalWaitError.message === 'MOBILE_AGENT_APPROVAL_TIMEOUT'
+                ) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'timeout' as const,
+                  };
+                  return;
+                }
                 throw approvalWaitError;
+              } finally {
+                if (approvalTimeout) clearTimeout(approvalTimeout);
               }
 
-              const resolution = await gateway.resolveApproval(
-                approval,
-                decision,
-                { signal },
-              );
+              let resolution;
+              try {
+                resolution = await gateway.resolveApproval(
+                  approval,
+                  decision,
+                  { signal },
+                );
+              } catch (approvalError) {
+                if (shouldPause()) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'app-suspended' as const,
+                  };
+                  return;
+                }
+                if (signal?.aborted) {
+                  yield {
+                    type: 'run-paused' as const,
+                    reason: 'cancelled' as const,
+                  };
+                  return;
+                }
+                throw approvalError;
+              }
               yield {
                 type: 'approval-resolved' as const,
                 invocationId: approval.invocationId,
@@ -201,13 +252,18 @@ export class MobileAgentLoop {
               throw error;
             }
           }
-          const content = limitToolResult(result.content, maxToolResultBytes);
+          const content = limitToolResult(
+            result.content,
+            maxToolResultBytes,
+          );
+          const truncated = content !== result.content;
           messages.push({ role: 'tool', content, tool_call_id: call.callId });
           yield {
             type: 'tool-result' as const,
             callId: call.callId,
             name: call.name,
             content,
+            ...(truncated ? { truncated: true } : {}),
           };
         }
       }
