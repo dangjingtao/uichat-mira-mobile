@@ -2,6 +2,7 @@ import type { RuntimeEvent } from './conversationRuntime';
 import { MobileAgentLoop } from './mobileAgentLoop';
 import {
   ToolApprovalRequiredError,
+  type ToolApprovalDecision,
   type ToolApprovalRequest,
   type ToolGatewayClient,
 } from '../tools/toolGatewayClient';
@@ -235,6 +236,7 @@ describe('MobileAgentLoop', () => {
         },
       );
       const collected = collect(stream);
+      await Promise.resolve();
       await jest.advanceTimersByTimeAsync(50);
       await expect(collected).resolves.toContainEqual({
         type: 'run-paused',
