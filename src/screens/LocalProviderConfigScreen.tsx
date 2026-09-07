@@ -223,13 +223,13 @@ export function LocalProviderConfigScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.providerHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text.ink }]}>Provider 配置</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="新增 Provider" onPress={addProvider} style={styles.iconAction}>
+          <Pressable accessibilityRole="button" accessibilityLabel="新增 Provider" disabled={saving || clearingKey} onPress={addProvider} style={[styles.iconAction, (saving || clearingKey) && styles.disabledButton]}>
             <Plus size={18} color={colors.primary} />
           </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerTabs}>
           {configs.map((item) => (
-            <Pressable key={item.id} accessibilityRole="button" onPress={() => void selectProvider(item)} style={[styles.providerTab, { borderColor: item.id === config.id ? colors.primary : colors.border.default, backgroundColor: item.id === config.id ? colors.bg.soft : colors.bg.card }]}>
+            <Pressable key={item.id} accessibilityRole="button" disabled={saving || clearingKey} onPress={() => void selectProvider(item)} style={[styles.providerTab, { borderColor: item.id === config.id ? colors.primary : colors.border.default, backgroundColor: item.id === config.id ? colors.bg.soft : colors.bg.card }, (saving || clearingKey) && styles.disabledButton]}>
               <Text numberOfLines={1} style={[styles.providerTabText, { color: item.id === config.id ? colors.primary : colors.text.base }]}>{item.name || item.id}</Text>
             </Pressable>
           ))}
@@ -263,7 +263,7 @@ export function LocalProviderConfigScreen() {
           <Plus size={18} color={colors.primary} />
           <Text style={[styles.buttonText, { color: colors.primary }]}>新建本地对话</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => void removeProvider()} style={styles.removeButton}>
+        <Pressable accessibilityRole="button" disabled={saving || clearingKey} onPress={() => void removeProvider()} style={[styles.removeButton, (saving || clearingKey) && styles.disabledButton]}>
           <Trash2 size={17} color={colors.status.error} />
           <Text style={[styles.buttonText, { color: colors.status.error }]}>删除当前配置</Text>
         </Pressable>
