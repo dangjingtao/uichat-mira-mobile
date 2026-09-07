@@ -30,6 +30,7 @@ export function LocalProviderConfigScreen() {
   const credentialLoadRequestRef = useRef(0);
   const selectedProviderIdRef = useRef(config.id);
   const [saving, setSaving] = useState(false);
+  const [clearingKey, setClearingKey] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -159,7 +160,7 @@ export function LocalProviderConfigScreen() {
   }, [config.id, configs, selectProvider]);
 
   const clearApiKey = useCallback(() => {
-    if (!hasStoredKey) return;
+    if (!hasStoredKey || saving || clearingKey) return;
     const providerId = config.id;
     Alert.alert(
       '清除 API Key？',
@@ -171,6 +172,7 @@ export function LocalProviderConfigScreen() {
           style: 'destructive',
           onPress: () => {
             const requestId = ++credentialLoadRequestRef.current;
+            setClearingKey(true);
             void providerCredentialStore
               .clear(providerId)
               .then(() => {
@@ -178,19 +180,21 @@ export function LocalProviderConfigScreen() {
                   credentialLoadRequestRef.current === requestId &&
                   selectedProviderIdRef.current === providerId
                 ) {
-                  setApiKeyDraft('');
                   setHasStoredKey(false);
                 }
                 Alert.alert('已清除', 'API Key 已清除。');
               })
               .catch(() => {
                 Alert.alert('清除失败', '无法清除当前 Provider 的 API Key，请稍后重试。');
+              })
+              .finally(() => {
+                setClearingKey(false);
               });
           },
         },
       ],
     );
-  }, [config.id, hasStoredKey]);
+  }, [clearingKey, config.id, hasStoredKey, saving]);
 
   const createSession = useCallback(async () => {
     try {
@@ -247,11 +251,11 @@ export function LocalProviderConfigScreen() {
           {hasStoredKey ? '已在设备安全存储中保存。留空并保存配置会继续使用原 Key。' : '尚未保存 API Key。'}
         </Text>
         {hasStoredKey ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="清除 API Key" onPress={clearApiKey} style={styles.credentialClearButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="清除 API Key" disabled={saving || clearingKey} onPress={clearApiKey} style={[styles.credentialClearButton, (saving || clearingKey) && styles.disabledButton]}>
             <Text style={[styles.buttonText, { color: colors.status.error }]}>清除 API Key</Text>
           </Pressable>
         ) : null}
-        <Pressable accessibilityRole="button" disabled={saving || loading} onPress={() => void save()} style={[styles.primaryButton, { backgroundColor: colors.primary }, (saving || loading) && styles.disabledButton]}>
+        <Pressable accessibilityRole="button" disabled={saving || loading || clearingKey} onPress={() => void save()} style={[styles.primaryButton, { backgroundColor: colors.primary }, (saving || loading || clearingKey) && styles.disabledButton]}>
           <Save size={18} color={colors.onPrimary} />
           <Text style={[styles.buttonText, { color: colors.onPrimary }]}>{saving ? '保存中' : '保存配置'}</Text>
         </Pressable>
