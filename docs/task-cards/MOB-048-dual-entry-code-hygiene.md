@@ -1,6 +1,6 @@
 # MOB-048：双链路提交窄范围代码卫生收尾
 
-状态：**DOING**（2026-09-07 已基于 MOB-045/046/047 合入后的最新 `dev` 开始 targeted cleanup）
+状态：**PASS**（2026-09-07 PR #102 squash-merged as `1f3b7938`；targeted cleanup、自审与卡内机器验收已收口；broad refactor 继续 deferred）
 
 范围：Mira Mobile；仅针对 2026-09-06 双链路基础提交及其相邻收尾
 
@@ -94,3 +94,17 @@ None。若施工中发现需要启动 Conversation orchestration / Host gateway 
 ## Handoff
 
 这张卡的关键词是“收干净”，不是“重构漂亮”。任何会显著扩大 diff 的动作默认不做。
+
+
+## Completion Evidence
+
+- 施工基线为 MOB-045/046/047 全部合入后的最新 `dev`，未复用旧 `7bc3556` 工作树。
+- 对 `7bc3556` touched source 做窄范围机械扫描；确认仍存活的明确卫生问题为 Shiyan 死 JSX 与新增 `#ddd` tab border，均已清理。
+- `ShiyanTaskDetailScreen` 删除无效 `condition ? null : null` JSX，并将 tab border 改用 `colors.border.default`；未重设计 Shiyan 行为。
+- `ConversationRuntime` 显式声明两个既有 Runtime 都已经实现的 `deleteSession`，`RuntimeRegistry` 直接委派给已选 runtime，删除重复 kind 分支。
+- 新增 RuntimeRegistry 行为测试，验证显式 Local / Remote filter 只查询对应来源；原有删除路由、降级与排序行为测试继续通过。
+- source-string contract tests 经复核后仅保留 UI wiring 类断言；当前没有现成 render-level harness，因此没有为“消灭字符串测试”扩大组件重构。
+- PR #102 最终 diff 为 7 files、+50/-9；无目录搬迁、协议变化、无关格式化或新增依赖。新增 patch 无 trailing whitespace、无新增硬编码 hex / debug 残留。
+- Mobile CI：Typecheck、Lint、全量 Jest 通过；Android unsigned-release guard、Android debug build 与 APK upload 通过；iOS simulator build/upload 亦通过。MOB-048 未触及 iOS/native 文件，因此 unsigned-device build 不作为本卡 PASS 前置。
+- 维护者最终自审未发现新的 P0–P2。Codex Review 因额度不可用，不作为本卡验收依赖。
+- Conversation orchestration、Host gateway、App/navigation composition 的 broad refactor 继续 deferred，需未来单独决策与派卡。

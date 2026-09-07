@@ -130,3 +130,5 @@ The execution scope is:
 - retain source-string contract tests only where they still verify UI wiring without an existing render-level behavior harness; store/runtime behavior continues to be covered by executable tests.
 
 The broader Conversation orchestration, Host gateway, and App/navigation composition refactors remain **deferred**. MOB-048 does not authorize them.
+
+MOB-048 completed via PR #102, squash-merged as `1f3b7938`. Its final scope stayed within the targeted cleanup above; no broad refactor was started.
