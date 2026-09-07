@@ -10,8 +10,27 @@ describe('MOB-038 Local Provider configuration', () => {
   it('supports multiple Provider profiles without mixing API keys into config JSON', () => {
     expect(source).toContain('configs.map((item) =>');
     expect(source).toContain('providerCredentialStore.load(next.id)');
-    expect(source).toContain('providerCredentialStore.save(next.id, apiKey)');
+    expect(source).toContain('providerCredentialStore.save(next.id, nextApiKey)');
     expect(source).toContain('new ProviderConfigStore().upsert(next)');
+  });
+
+  it('keeps stored credentials out of the editable field and preserves them unless replaced', () => {
+    expect(source).toContain("const [apiKeyDraft, setApiKeyDraft] = useState('')");
+    expect(source).toContain('const [hasStoredKey, setHasStoredKey] = useState(false)');
+    expect(source).toContain('value={apiKeyDraft}');
+    expect(source).toContain("placeholder={hasStoredKey ? '已保存；输入新 Key 可替换' : '请输入 API Key'}");
+    expect(source).toContain('const nextApiKey = apiKeyDraft.trim()');
+    expect(source).toContain('if (nextApiKey)');
+    expect(source).not.toContain('********');
+  });
+
+  it('clears only the selected Provider credential and ignores stale credential loads', () => {
+    expect(source).toContain('credentialLoadRequestRef.current');
+    expect(source).toContain('credentialLoadRequestRef.current === requestId');
+    expect(source).toContain('providerCredentialStore.clear(providerId)');
+    expect(source).toContain('accessibilityLabel="清除 API Key"');
+    expect(source).toContain("setApiKeyDraft('')");
+    expect(source).toContain('setHasStoredKey(false)');
   });
 
   it('creates a local conversation with the selected Provider', () => {
