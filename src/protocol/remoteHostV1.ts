@@ -196,10 +196,7 @@ export interface RemoteToolInvocationProjection {
   toolId: string;
   status: RemoteToolInvocationStatus;
   content?: string;
-  approval?: {
-    message: string;
-    scope?: string;
-  };
+  approval?: { message: string; scope?: string };
   error?: {
     code: string;
     message: string;
@@ -209,32 +206,16 @@ export interface RemoteToolInvocationProjection {
 }
 
 export type RemoteToolGatewayStreamEvent =
-  | {
-      type: 'tool:start';
-      invocationId: string;
-      toolId: string;
-    }
-  | {
-      type: 'tool:progress';
-      invocationId: string;
-      message: string;
-    }
+  | { type: 'tool:start'; invocationId: string; toolId: string }
+  | { type: 'tool:progress'; invocationId: string; message: string }
   | {
       type: 'tool:approval_required';
       invocationId: string;
       message: string;
       scope?: string;
     }
-  | {
-      type: 'tool:error';
-      code: string;
-      message: string;
-    }
-  | {
-      type: 'tool:complete';
-      invocation: RemoteToolInvocationProjection;
-    };
-
+  | { type: 'tool:error'; code: string; message: string }
+  | { type: 'tool:complete'; invocation: RemoteToolInvocationProjection };
 export type RemoteChatStreamEvent =
   | { type: 'start'; messageId?: string }
   | { type: 'start-step' }
@@ -469,141 +450,17 @@ export const parseRemoteManifest = (value: unknown): RemoteManifest => {
 };
 
 export const parseRemoteToolManifest = (value: unknown): RemoteToolManifest => {
-  if (!isRecord(value)) {
-    throw new Error('Remote tool manifest must be an object');
-  }
+  if (!isRecord(value)) throw new Error('Remote tool manifest must be an object');
   if (!isRecord(value.parameters)) {
     throw new Error('Remote tool manifest parameters must be an object');
   }
-  if (
-    typeof value.destructive !== 'boolean' ||
-    typeof value.requiresApproval !== 'boolean'
-  ) {
+  if (typeof value.destructive !== 'boolean' || typeof value.requiresApproval !== 'boolean') {
     throw new Error('Remote tool manifest capability flags must be booleans');
   }
-
   const name = requiredString(value, 'name', 'remoteTool');
   if (!MODEL_SAFE_TOOL_NAME_PATTERN.test(name)) {
-    throw new Error('Remote tool name must match ^[A-Za-z0-9_-]{1,64}
-  if (!isRecord(value)) {
-    throw new Error('Thread must be an object');
+    throw new Error('Remote tool name must match ^[A-Za-z0-9_-]{1,64}$');
   }
-
-  return {
-    id: requiredString(value, 'id', 'thread'),
-    title: requiredString(value, 'title', 'thread'),
-    modelName: nullableString(value.modelName),
-    workspaceId: nullableString(value.workspaceId),
-    knowledgeBaseId: nullableString(value.knowledgeBaseId),
-    roleId: nullableString(value.roleId),
-    agentEnabled: optionalBoolean(value.agentEnabled),
-    status: requiredString(value, 'status', 'thread'),
-    createdAt: requiredString(value, 'createdAt', 'thread'),
-    updatedAt: requiredString(value, 'updatedAt', 'thread'),
-    messageCount:
-      typeof value.messageCount === 'number' && Number.isFinite(value.messageCount)
-        ? value.messageCount
-        : 0,
-    ...(typeof value.lastMessage === 'string' ? { lastMessage: value.lastMessage } : {}),
-  };
-};
-
-const parseRemoteMessagePart = (value: unknown): RemoteMessagePart | null => {
-  if (!isRecord(value) || typeof value.type !== 'string') {
-    return null;
-  }
-
-  if (value.type === 'text') {
-    return { type: 'text', text: requiredString(value, 'text', 'message.part') };
-  }
-  if (value.type === 'image') {
-    return {
-      type: 'image',
-      image: requiredString(value, 'image', 'message.part'),
-      ...(typeof value.filename === 'string' ? { filename: value.filename } : {}),
-      ...(typeof value.fileId === 'string' ? { fileId: value.fileId } : {}),
-      ...(typeof value.mediaType === 'string' ? { mediaType: value.mediaType } : {}),
-    };
-  }
-  if (value.type === 'file') {
-    return {
-      type: 'file',
-      data: requiredString(value, 'data', 'message.part'),
-      filename: requiredString(value, 'filename', 'message.part'),
-      ...(typeof value.fileId === 'string' ? { fileId: value.fileId } : {}),
-      mimeType: requiredString(value, 'mimeType', 'message.part'),
-    };
-  }
-  if (value.type === 'data') {
-    return {
-      type: 'data',
-      name: requiredString(value, 'name', 'message.part'),
-      value: value.value,
-    };
-  }
-
-  return null;
-};
-
-export const parseRemoteMessage = (value: unknown): RemoteMessage => {
-  if (!isRecord(value)) {
-    throw new Error('Message must be an object');
-  }
-  const role = requiredString(value, 'role', 'message') as RemoteMessageRole;
-  if (!['user', 'assistant', 'system', 'tool'].includes(role)) {
-    throw new Error(`Unsupported message role: ${role}`);
-  }
-
-  const parts = Array.isArray(value.parts)
-    ? value.parts
-        .map(parseRemoteMessagePart)
-        .filter((part): part is RemoteMessagePart => part !== null)
-    : [];
-
-  return {
-    id: requiredString(value, 'id', 'message'),
-    threadId: requiredString(value, 'threadId', 'message'),
-    role,
-    content: typeof value.content === 'string' ? value.content : '',
-    parts,
-    ...(isRecord(value.metadata) ? { metadata: value.metadata } : {}),
-    createdAt: requiredString(value, 'createdAt', 'message'),
-  };
-};
-
-export const parseRemoteAgentRun = (value: unknown): RemoteAgentRun => {
-  if (!isRecord(value)) {
-    throw new Error('Agent run must be an object');
-  }
-
-  return {
-    ...value,
-    id: requiredString(value, 'id', 'agentRun'),
-    threadId: requiredString(value, 'threadId', 'agentRun'),
-    userId: typeof value.userId === 'number' ? value.userId : 0,
-    status: requiredString(value, 'status', 'agentRun') as RemoteAgentRunStatus,
-    traceId: requiredString(value, 'traceId', 'agentRun'),
-    createdAt: requiredString(value, 'createdAt', 'agentRun'),
-    updatedAt: requiredString(value, 'updatedAt', 'agentRun'),
-  };
-};
-
-export const parseRemoteChatStreamEvent = (value: unknown): RemoteChatStreamEvent => {
-  if (!isRecord(value) || typeof value.type !== 'string') {
-    throw new Error('Chat stream event must contain a type');
-  }
-
-  if (value.type === 'text-delta' && typeof value.delta !== 'string') {
-    throw new Error('text-delta event must contain delta text');
-  }
-  if (value.type === 'error' && typeof value.errorText !== 'string') {
-    throw new Error('error event must contain errorText');
-  }
-
-  return value as RemoteChatStreamEvent;
-};);
-  }
-
   return {
     id: requiredString(value, 'id', 'remoteTool'),
     name,
@@ -617,49 +474,29 @@ export const parseRemoteChatStreamEvent = (value: unknown): RemoteChatStreamEven
 export const parseRemoteToolInvocationProjection = (
   value: unknown,
 ): RemoteToolInvocationProjection => {
-  if (!isRecord(value)) {
-    throw new Error('Remote tool invocation must be an object');
-  }
-  const status = requiredString(
-    value,
-    'status',
-    'remoteToolInvocation',
-  ) as RemoteToolInvocationStatus;
+  if (!isRecord(value)) throw new Error('Remote tool invocation must be an object');
+  const status = requiredString(value, 'status', 'remoteToolInvocation') as RemoteToolInvocationStatus;
   if (!['completed', 'awaiting_approval', 'failed', 'cancelled'].includes(status)) {
-    throw new Error(`Unsupported remote tool invocation status: ${status}`);
+    throw new Error('Unsupported remote tool invocation status: ' + status);
   }
-
   const approval = isRecord(value.approval)
     ? {
-        message: requiredString(
-          value.approval,
-          'message',
-          'remoteToolInvocation.approval',
-        ),
+        message: requiredString(value.approval, 'message', 'remoteToolInvocation.approval'),
         ...(typeof value.approval.scope === 'string' && value.approval.scope
           ? { scope: value.approval.scope }
           : {}),
       }
     : undefined;
-
   const error = isRecord(value.error)
     ? {
         code: requiredString(value.error, 'code', 'remoteToolInvocation.error'),
-        message: requiredString(
-          value.error,
-          'message',
-          'remoteToolInvocation.error',
-        ),
-        ...(typeof value.error.retryable === 'boolean'
-          ? { retryable: value.error.retryable }
-          : {}),
-        ...(typeof value.error.suggestedAction === 'string' ||
-        value.error.suggestedAction === null
+        message: requiredString(value.error, 'message', 'remoteToolInvocation.error'),
+        ...(typeof value.error.retryable === 'boolean' ? { retryable: value.error.retryable } : {}),
+        ...(typeof value.error.suggestedAction === 'string' || value.error.suggestedAction === null
           ? { suggestedAction: value.error.suggestedAction }
           : {}),
       }
     : undefined;
-
   return {
     invocationId: requiredString(value, 'invocationId', 'remoteToolInvocation'),
     toolId: requiredString(value, 'toolId', 'remoteToolInvocation'),
@@ -673,50 +510,25 @@ export const parseRemoteToolInvocationProjection = (
 export const parseRemoteToolGatewayStreamEvent = (
   value: unknown,
 ): RemoteToolGatewayStreamEvent => {
-  if (!isRecord(value)) {
-    throw new Error('Remote tool stream event must be an object');
-  }
+  if (!isRecord(value)) throw new Error('Remote tool stream event must be an object');
   const type = requiredString(value, 'type', 'remoteToolEvent');
-
   if (type === 'tool:start') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      toolId: requiredString(value, 'toolId', 'remoteToolEvent'),
-    };
+    return { type, invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'), toolId: requiredString(value, 'toolId', 'remoteToolEvent') };
   }
   if (type === 'tool:progress') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-    };
+    return { type, invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'), message: requiredString(value, 'message', 'remoteToolEvent') };
   }
   if (type === 'tool:approval_required') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-      ...(typeof value.scope === 'string' && value.scope ? { scope: value.scope } : {}),
-    };
+    return { type, invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'), message: requiredString(value, 'message', 'remoteToolEvent'), ...(typeof value.scope === 'string' && value.scope ? { scope: value.scope } : {}) };
   }
   if (type === 'tool:error') {
-    return {
-      type,
-      code: requiredString(value, 'code', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-    };
+    return { type, code: requiredString(value, 'code', 'remoteToolEvent'), message: requiredString(value, 'message', 'remoteToolEvent') };
   }
   if (type === 'tool:complete') {
-    return {
-      type,
-      invocation: parseRemoteToolInvocationProjection(value.invocation),
-    };
+    return { type, invocation: parseRemoteToolInvocationProjection(value.invocation) };
   }
-
-  throw new Error(`Unsupported remote tool stream event: ${type}`);
+  throw new Error('Unsupported remote tool stream event: ' + type);
 };
-
 export const parseRemoteThread = (value: unknown): RemoteThread => {
   if (!isRecord(value)) {
     throw new Error('Thread must be an object');
