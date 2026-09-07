@@ -1,4 +1,5 @@
 import type { ChatMessage, Session } from '../types';
+import type { ToolApprovalDecision } from '../tools/toolGatewayClient';
 
 export type RuntimeKind = 'remote-host' | 'local-provider';
 
@@ -11,8 +12,27 @@ export type RuntimeEvent =
       arguments: string;
     }
   | { type: 'finish'; reason: string | null }
+  | { type: 'tool-running'; callId: string; name: string }
   | { type: 'tool-result'; callId: string; name: string; content: string }
-  | { type: 'run-paused'; reason: 'app-suspended' | 'timeout' | 'cancelled' }
+  | {
+      type: 'approval-required';
+      invocationId: string;
+      callId: string;
+      name: string;
+      message: string;
+      scope?: string;
+    }
+  | {
+      type: 'approval-resolved';
+      invocationId: string;
+      callId: string;
+      name: string;
+      decision: ToolApprovalDecision;
+    }
+  | {
+      type: 'run-paused';
+      reason: 'app-suspended' | 'timeout' | 'cancelled' | 'approval-rejected';
+    }
   | { type: 'error'; message: string };
 
 export interface ConversationRuntime {
@@ -28,4 +48,11 @@ export interface ConversationRuntime {
     options?: { agentEnabled?: boolean; messageId?: string },
   ): Promise<AsyncIterable<RuntimeEvent>>;
   cancelActiveRun(): void;
+  getAgentEnabled?(sessionId: string): Promise<boolean>;
+  setAgentEnabled?(sessionId: string, enabled: boolean): Promise<void>;
+  resolveToolApproval?(
+    invocationId: string,
+    decision: ToolApprovalDecision,
+  ): void;
+  setExecutionSuspended?(suspended: boolean): void;
 }
