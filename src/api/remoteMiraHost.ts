@@ -178,6 +178,13 @@ const attachTransportAttempts = (
   });
 };
 
+const REMOTE_TOOL_ROUTES = {
+  list: 'GET /remote/v1/tools',
+  invoke: 'POST /remote/v1/tool-invocations/stream',
+  approval: 'POST /remote/v1/tool-invocations/:invocationId/approval',
+  cancel: 'POST /remote/v1/tool-invocations/:invocationId/cancel',
+} as const;
+
 export class RemoteMiraHostClient {
   private activeCredential: StoredDeviceCredential | null = null;
   private directRetryAfter = 0;
@@ -552,13 +559,15 @@ export class RemoteMiraHostClient {
   }
 
   async listRemoteTools(): Promise<RemoteToolManifest[]> {
-    return this.withCredentialScope('tools:read', credential =>
-      this.requestCredentialJson(credential, {
+    return this.withCredentialScope('tools:read', async credential => {
+      const manifest = await this.getManifestWithCredential(credential);
+      this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.list);
+      return this.requestCredentialJson(credential, {
         path: '/remote/v1/tools',
         credential: credential.credential,
         parse: value => parseArray(value, parseRemoteToolManifest, 'remoteTools'),
-      }),
-    );
+      });
+    });
   }
 
   async openToolInvocation(
@@ -584,11 +593,12 @@ export class RemoteMiraHostClient {
       for (let index = 0; index < order.length; index += 1) {
         const transport = order[index];
         try {
-          await this.requestJsonOnTransport(credential, transport, {
+          const manifest = await this.requestJsonOnTransport(credential, transport, {
             path: '/remote/v1/manifest',
             credential: credential.credential,
             parse: parseRemoteManifest,
           });
+          this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.invoke);
           if (transport === 'direct') this.directRetryAfter = 0;
           return this.openSseOnTransport(credential, transport, operation);
         } catch (error) {
@@ -626,15 +636,17 @@ export class RemoteMiraHostClient {
           args: input.args ?? {},
         },
         parse: parseRemoteToolInvocationProjection,
-      }, 'TOOL_APPROVAL_UNCERTAIN'),
+      }, 'TOOL_APPROVAL_UNCERTAIN', REMOTE_TOOL_ROUTES.approval),
     );
   }
 
   async cancelToolInvocation(
     invocationId: string,
   ): Promise<{ invocationId: string; accepted: boolean; status: string }> {
-    return this.withCredentialScope('tools:control', credential =>
-      this.requestCredentialJson(credential, {
+    return this.withCredentialScope('tools:control', async credential => {
+      const manifest = await this.getManifestWithCredential(credential);
+      this.assertRemoteToolRoute(manifest, REMOTE_TOOL_ROUTES.cancel);
+      return this.requestCredentialJson(credential, {
         path: `/remote/v1/tool-invocations/${encodeURIComponent(invocationId)}/cancel`,
         method: 'POST',
         credential: credential.credential,
@@ -656,8 +668,8 @@ export class RemoteMiraHostClient {
             status: record.status,
           };
         },
-      }),
-    );
+      });
+    });
   }
 
   async getAgentRun(runId: string): Promise<RemoteAgentRun> {
@@ -773,6 +785,20 @@ export class RemoteMiraHostClient {
     );
   }
 
+  private assertRemoteToolRoute(
+    manifest: RemoteManifest,
+    route: string,
+  ) {
+    if (!manifest.routes.tools.includes(route)) {
+      throw new RemoteHostError(
+        'REMOTE_TOOL_ROUTE_UNAVAILABLE',
+        `Mira Host does not advertise required tool route: ${route}`,
+        undefined,
+        { route },
+      );
+    }
+  }
+
   private async withCredentialScope<T>(
     scope: RemoteDeviceScope,
     operation: (credential: StoredDeviceCredential) => Promise<T>,
@@ -805,6 +831,7 @@ export class RemoteMiraHostClient {
     credential: StoredDeviceCredential,
     operation: JsonOperation<T>,
     uncertainCode: string,
+    requiredToolRoute?: string,
   ): Promise<T> {
     const order = this.transportOrder(credential);
     let lastError: unknown = new RemoteHostError(
@@ -815,11 +842,14 @@ export class RemoteMiraHostClient {
     for (let index = 0; index < order.length; index += 1) {
       const transport = order[index];
       try {
-        await this.requestJsonOnTransport(credential, transport, {
+        const manifest = await this.requestJsonOnTransport(credential, transport, {
           path: '/remote/v1/manifest',
           credential: credential.credential,
           parse: parseRemoteManifest,
         });
+        if (requiredToolRoute) {
+          this.assertRemoteToolRoute(manifest, requiredToolRoute);
+        }
         if (transport === 'direct') this.directRetryAfter = 0;
       } catch (error) {
         lastError = error;
