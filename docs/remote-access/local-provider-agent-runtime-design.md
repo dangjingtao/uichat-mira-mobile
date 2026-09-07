@@ -151,6 +151,26 @@ Durable execution is the required placement for long-running work, approval
 pauses, background continuation, queueing, retry orchestration, or recovery
 after the app is killed.
 
+For Remote Host V1, MOB-043 freezes the durable wire contract as follows:
+
+- Agent Run creation stays inside the existing persisted `POST /proxy/chat/default`
+  flow. There is no standalone Mobile run-creation endpoint.
+- The Host persists an Assistant Message with `metadata.agent.runId` as soon as
+  the Run starts, then keeps the canonical Assistant Message and AgentRun state
+  updated independently from the phone's SSE connection.
+- Mobile reads and controls the Run through the manifest-advertised
+  `GET /agent/runs/:runId`, `approve`, `reject`, and `cancel` routes.
+- V1 reconnect is canonical-state replay. Because the manifest advertises
+  `eventCursor: false`, Mobile observes durable Run changes by bounded polling;
+  it must not claim lossless event replay.
+- Leaving the foreground stops only Mobile observation. It does not cancel the
+  Host Run. Returning to the app re-reads canonical Messages, recovers the
+  stable Run id, then reloads Host state.
+- A Local Provider session is not silently migrated into this path. Until a
+  transcript/provider handoff contract exists, durable work must use an explicit
+  Remote Host session. Mobile Provider keys stay on Mobile; Host Provider and
+  Tool/MCP credentials stay on Host.
+
 ## 7. Mobile Agent Runtime Contract
 
 The screen layer must depend on a runtime-neutral contract rather than directly
