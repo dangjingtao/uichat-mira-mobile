@@ -17,9 +17,20 @@ describe('MOB-043 durable Agent observation lifecycle', () => {
 
   it('restarts same-run observation after a successful retry', () => {
     expect(source).toContain('observationGeneration');
+    expect(source).toContain('nextRunId === previousRunId && !existingRun');
     expect(source).toContain('observationGenerationRef.current += 1');
     expect(source).toContain('generation !== observationGenerationRef.current');
     expect(source).toContain('runRef.current = null');
     expect(source).toContain('[appActive, observationGeneration, runId, sessionId]');
+  });
+});
+
+
+describe('MOB-043 durable discovery race guards', () => {
+  it('does not let a duplicate snapshot invalidate an in-flight new-run read', () => {
+    expect(source).toContain("existingRun?.id === nextRunId");
+    expect(source.indexOf('const sequence = requestSequenceRef.current + 1;')).toBeGreaterThan(
+      source.indexOf('existingRun?.id === nextRunId'),
+    );
   });
 });
