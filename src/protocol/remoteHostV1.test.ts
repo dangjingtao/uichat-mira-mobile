@@ -3,6 +3,9 @@ import {
   parsePairingUri,
   parseRemoteManifest,
   parseRemoteThread,
+  parseRemoteToolGatewayStreamEvent,
+  parseRemoteToolInvocationProjection,
+  parseRemoteToolManifest,
   unwrapApiEnvelope,
 } from './remoteHostV1';
 
@@ -52,6 +55,7 @@ describe('remoteHostV1 protocol', () => {
           threads: ['GET /threads'],
           messages: ['GET /threads/:id/messages'],
           agent: [],
+          tools: ['GET /remote/v1/tools'],
           artifacts: [],
         },
         reconnect: {
@@ -65,6 +69,85 @@ describe('remoteHostV1 protocol', () => {
       device: { id: 'device-1' },
       reconnect: { eventCursor: false },
     });
+  });
+
+  it('parses the mobile-safe remote tool manifest', () => {
+    expect(
+      parseRemoteToolManifest({
+        id: 'web_search',
+        name: 'web_search',
+        description: 'Search the public web',
+        parameters: {
+          type: 'object',
+          properties: { query: { type: 'string' } },
+        },
+        destructive: false,
+        requiresApproval: false,
+      }),
+    ).toMatchObject({
+      id: 'web_search',
+      name: 'web_search',
+      requiresApproval: false,
+    });
+  });
+
+  it('rejects malformed remote tool capability flags', () => {
+    expect(() =>
+      parseRemoteToolManifest({
+        id: 'terminal_session',
+        name: 'terminal_session',
+        description: 'Run a command',
+        parameters: { type: 'object' },
+        destructive: 'yes',
+        requiresApproval: true,
+      }),
+    ).toThrow('capability flags must be booleans');
+  });
+
+  it('parses approval and completed tool stream events', () => {
+    expect(
+      parseRemoteToolGatewayStreamEvent({
+        type: 'tool:approval_required',
+        invocationId: 'inv-1',
+        message: 'Approval required',
+        scope: 'terminal',
+      }),
+    ).toEqual({
+      type: 'tool:approval_required',
+      invocationId: 'inv-1',
+      message: 'Approval required',
+      scope: 'terminal',
+    });
+
+    expect(
+      parseRemoteToolGatewayStreamEvent({
+        type: 'tool:complete',
+        invocation: {
+          invocationId: 'inv-2',
+          toolId: 'web_search',
+          status: 'completed',
+          content: 'done',
+        },
+      }),
+    ).toEqual({
+      type: 'tool:complete',
+      invocation: {
+        invocationId: 'inv-2',
+        toolId: 'web_search',
+        status: 'completed',
+        content: 'done',
+      },
+    });
+  });
+
+  it('rejects unsupported remote tool invocation statuses', () => {
+    expect(() =>
+      parseRemoteToolInvocationProjection({
+        invocationId: 'inv-1',
+        toolId: 'web_search',
+        status: 'running',
+      }),
+    ).toThrow('Unsupported remote tool invocation status');
   });
 
   it('normalizes canonical thread timestamps as strings', () => {
