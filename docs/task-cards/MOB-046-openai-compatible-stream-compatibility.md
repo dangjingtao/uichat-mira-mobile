@@ -1,6 +1,6 @@
 # MOB-046：OpenAI-compatible URL / SSE / Tool Call 兼容性修复
 
-状态：**REVIEW**（2026-09-07 PR #100 已合入 `dev`；自动化与 CodeRabbit Review 收口，真实 Provider / 真机矩阵挂 MOB-044）
+状态：**PASS**（2026-09-07 PR #100 已合入 `dev`；自动化、CodeRabbit Review 与卡内验收已收口；真实 Provider / 真机矩阵独立归 MOB-044）
 
 范围：Mira Mobile Local Provider adapter
 
@@ -115,4 +115,4 @@ None。本卡不决定 Tool Gateway 协议。
 - CodeRabbit identified one valid protocol edge case (dropping `id`-only tool-call fragments). It was fixed in `aa470112`, confirmed as addressed by CodeRabbit, and the review thread is resolved.
 - Final head `aa470112`: Typecheck, Lint, full Jest, and Android debug APK build/upload all passed.
 - `RuntimeEvent`, Tool Gateway / MCP contracts, HTTPS policy, embedded-credential rejection, and Provider-to-UI boundaries were not broadened.
-- Real OpenAI-compatible Provider coverage and Android/iOS device matrix remain under MOB-044, so this card stays `REVIEW` rather than `PASS`.
+- Real OpenAI-compatible Provider coverage and Android/iOS device matrix remain independently tracked under MOB-044 and do not block this card's PASS status.
