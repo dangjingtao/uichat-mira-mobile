@@ -10,7 +10,8 @@ export type LocalAgentActivityStatus =
   | 'awaiting-approval'
   | 'approved'
   | 'rejected'
-  | 'completed';
+  | 'completed'
+  | 'truncated';
 
 export interface LocalAgentActivity {
   callId: string;
@@ -71,6 +72,7 @@ const activityLabel: Record<LocalAgentActivityStatus, string> = {
   approved: '已批准',
   rejected: '已拒绝',
   completed: '已完成',
+  truncated: '结果已截断',
 };
 
 const pauseLabel: Record<LocalAgentPauseReason, string> = {
