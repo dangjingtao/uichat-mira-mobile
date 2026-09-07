@@ -96,6 +96,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
         setRun(nextRun);
       } catch (syncError) {
         if (requestSequenceRef.current !== sequence) return;
+        runRef.current = null;
         setRun(null);
         setError(getAgentRunErrorMessage(syncError));
       } finally {
