@@ -1,6 +1,6 @@
 # MOB-041：Tool Gateway / MCP 协议与凭据合同确认
 
-状态：**DOING**（2026-09-07 开工）
+状态：**PASS**（2026-09-07 完成）
 
 范围：Mira Mobile + Mira Host / Tool Gateway 协议协作
 
@@ -62,6 +62,14 @@
 - Host approval 绑定原 invocation owner、toolId 和 inputHash；Mobile 改参数后旧批准无效。
 - Mobile 真实 `RemoteToolGatewayClient` 已接入现有 `ToolGatewayClient` 抽象，批准交互本身继续由 MOB-042 接入 RuntimeEvent/UI。
 
+## 验收结果
+
+- Mira Host PR #117 已 squash merge，merge commit `576f9cb29a85f49e2c7ebf9936b72b90aad90182`。
+- Mira Mobile PR #103 已 squash merge，merge commit `c7288610129ebd02a205a3ad88137b7c59ccde36`。
+- Host 侧 Branch Policy 与 CodeRabbit 均通过；并发审批一次性消费、owner 绑定、SSE 断线取消、旧设备不静默扩权、External MCP exposure 等高优先级审查项已收口。
+- Mobile final-head Typecheck / Lint / Jest 全绿（400 tests）；model-safe alias、manifest capability guard、pending cancel、approval detail fallback、Provider Key / paired credential 隔离均有合同或行为覆盖。
+- 本卡不承担真实 Android/iOS + Host/Provider 端到端验收；该证据继续集中到 MOB-044，因此不阻塞本卡 PASS。
+
 ## 阻塞关系
 
-MOB-042 的真实工具状态 UI、MOB-043 的持久运行时工具适配以及 MOB-044 的真实工具验收，均以本卡合同完成为前提。合同未确认时只能继续使用当前协议无关接口和测试替身。
+MOB-041 的合同与最小真实 Adapter 已完成，MOB-042 的真实工具状态 UI 与后续运行时接线可基于本合同继续实施。MOB-043 的持久 Host / Pi Runtime 仍需其自身稳定运行时协议；MOB-044 继续负责真实 Android/iOS、Host、Provider、凭据与网络矩阵验收。
