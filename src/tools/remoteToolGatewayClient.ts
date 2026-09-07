@@ -121,6 +121,9 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
     const session = await this.hostClient.openToolInvocation({ toolId, args });
     let invocationId: string | null = null;
     let completion: RemoteToolInvocationProjection | null = null;
+    let approvalEvent:
+      | { message: string; scope?: string }
+      | null = null;
     let cancellationRequested = false;
     let abortRequested = false;
     let fallbackAbortTimer: ReturnType<typeof setTimeout> | null = null;
@@ -176,6 +179,10 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
           }
         } else if (event.type === 'tool:approval_required') {
           invocationId = event.invocationId;
+          approvalEvent = {
+            message: event.message,
+            ...(event.scope ? { scope: event.scope } : {}),
+          };
           if (abortRequested || options.signal?.aborted) {
             requestRemoteCancellation();
             closeLocalStream();
@@ -183,7 +190,12 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
         } else if (event.type === 'tool:error') {
           throw new ToolGatewayError(event.code, event.message);
         } else if (event.type === 'tool:complete') {
-          completion = event.invocation;
+          completion =
+            event.invocation.status === 'awaiting_approval' &&
+            !event.invocation.approval &&
+            approvalEvent
+              ? { ...event.invocation, approval: approvalEvent }
+              : event.invocation;
           invocationId = event.invocation.invocationId;
           if (abortRequested || options.signal?.aborted) {
             requestRemoteCancellation();
