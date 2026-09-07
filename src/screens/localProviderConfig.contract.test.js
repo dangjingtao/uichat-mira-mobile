@@ -36,6 +36,12 @@ describe('MOB-038 Local Provider configuration', () => {
     expect(source).toContain('setHasStoredKey(false)');
   });
 
+  it('locks Provider fields while credential mutations are in flight', () => {
+    expect(source.match(/editable=\{!saving && !clearingKey\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(source).toContain('editable={editable}');
+    expect(source).toContain('!editable && styles.disabledButton');
+  });
+
   it('creates a local conversation with the selected Provider', () => {
     expect(source).toContain('runtimeRegistry.createLocalSession(undefined, config.id)');
     expect(source).toContain("source: 'local-provider'");
