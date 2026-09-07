@@ -121,27 +121,40 @@ export class LocalProviderRuntime implements ConversationRuntime {
       this.activeAbortController = abortController;
     }
 
-    const stream =
-      options?.agentEnabled && this.toolGateway
-        ? await new MobileAgentLoop(this.toolGateway).run(
-            requestMessages,
-            (messages, tools) =>
-              client.streamChat({
-                model: config.model,
-                messages: [...messages],
-                tools: [...tools],
-              }),
-            {
-              shouldPause: () => this.executionSuspended,
-              signal: abortController?.signal,
-              requestApproval: (approval) =>
-                this.waitForApprovalDecision(approval),
-            },
-          )
-        : await client.streamChat({
-            model: config.model,
-            messages: requestMessages,
-          });
+    let stream: AsyncIterable<RuntimeEvent>;
+    try {
+      stream =
+        options?.agentEnabled && this.toolGateway
+          ? await new MobileAgentLoop(this.toolGateway).run(
+              requestMessages,
+              (messages, tools) =>
+                client.streamChat({
+                  model: config.model,
+                  messages: [...messages],
+                  tools: [...tools],
+                }),
+              {
+                shouldPause: () => this.executionSuspended,
+                signal: abortController?.signal,
+                requestApproval: (approval) =>
+                  this.waitForApprovalDecision(approval),
+              },
+            )
+          : await client.streamChat({
+              model: config.model,
+              messages: requestMessages,
+            });
+    } catch (error) {
+      if (this.activeClient === client) this.activeClient = null;
+      if (this.activeAbortController === abortController) {
+        this.activeAbortController = null;
+      }
+      abortController?.abort();
+      this.rejectPendingApproval(
+        new Error('Local Agent setup failed before the run started'),
+      );
+      throw error;
+    }
     const repository = this.sessionRepository;
     const runtime = this;
     const assistantId = createMessageId();
