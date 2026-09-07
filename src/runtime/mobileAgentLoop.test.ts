@@ -2,6 +2,7 @@ import type { RuntimeEvent } from './conversationRuntime';
 import { MobileAgentLoop } from './mobileAgentLoop';
 import {
   ToolApprovalRequiredError,
+  ToolGatewayError,
   type ToolApprovalDecision,
   type ToolApprovalRequest,
   type ToolGatewayClient,
