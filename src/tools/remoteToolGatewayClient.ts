@@ -2,6 +2,7 @@ import {
   remoteMiraHostClient,
   type RemoteMiraHostClient,
 } from '../api/remoteMiraHost';
+import { RemoteHostError } from '../api/remoteHttp';
 import type { RemoteToolInvocationProjection } from '../protocol/remoteHostV1';
 import {
   ToolApprovalRequiredError,
@@ -238,13 +239,24 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
   ): Promise<ToolApprovalResolution> {
     const toolId = await this.resolveCanonicalToolId(approval.name);
     const args = parseArguments(approval.arguments);
-    const invocation = await this.hostClient.resolveToolApproval({
-      invocationId: approval.invocationId,
-      decision,
-      toolId,
-      args,
-      signal: options.signal,
-    });
+    let invocation: RemoteToolInvocationProjection;
+    try {
+      invocation = await this.hostClient.resolveToolApproval({
+        invocationId: approval.invocationId,
+        decision,
+        toolId,
+        args,
+        signal: options.signal,
+      });
+    } catch (error) {
+      if (
+        error instanceof RemoteHostError &&
+        error.code === 'TOOL_APPROVAL_UNCERTAIN'
+      ) {
+        throw new ToolGatewayError(error.code, error.message);
+      }
+      throw error;
+    }
 
     if (decision === 'rejected' && invocation.status === 'cancelled') {
       return { status: 'rejected' };
