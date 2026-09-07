@@ -792,7 +792,7 @@ export class RemoteMiraHostClient {
     } catch (error) {
       if (
         error instanceof RemoteHostError &&
-        (error.status === 401 || error.status === 403)
+        error.status === 401
       ) {
         this.activeCredential = null;
         await this.credentialStore.clear();
