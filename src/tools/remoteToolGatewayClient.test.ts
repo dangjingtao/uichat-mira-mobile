@@ -140,9 +140,13 @@ describe('RemoteToolGatewayClient', () => {
     });
   });
 
-  it('cancels the real remote invocation when the caller aborts', async () => {
+  it('cancels the real remote invocation after tool:start is consumed', async () => {
     const remote = host();
     let release: (() => void) | null = null;
+    let markStartConsumed: (() => void) | null = null;
+    const startConsumed = new Promise<void>(resolve => {
+      markStartConsumed = resolve;
+    });
     const abort = jest.fn(() => release?.());
     remote.openToolInvocation.mockResolvedValue({
       abort,
@@ -152,6 +156,7 @@ describe('RemoteToolGatewayClient', () => {
           invocationId: 'inv-running',
           toolId: tool.id,
         };
+        markStartConsumed?.();
         await new Promise<void>(resolve => {
           release = resolve;
         });
@@ -161,8 +166,7 @@ describe('RemoteToolGatewayClient', () => {
     const controller = new AbortController();
 
     const promise = client.callTool(request, { signal: controller.signal });
-    await Promise.resolve();
-    await Promise.resolve();
+    await startConsumed;
     controller.abort();
 
     await expect(promise).rejects.toMatchObject({
@@ -170,6 +174,124 @@ describe('RemoteToolGatewayClient', () => {
     });
     expect(abort).toHaveBeenCalled();
     expect(remote.cancelToolInvocation).toHaveBeenCalledWith('inv-running');
+  });
+
+  it('keeps cancellation pending until a delayed tool:start reveals the invocation id', async () => {
+    const remote = host();
+    let releaseStart: (() => void) | null = null;
+    const startGate = new Promise<void>(resolve => {
+      releaseStart = resolve;
+    });
+    let releaseAfterStart: (() => void) | null = null;
+    const abort = jest.fn(() => releaseAfterStart?.());
+    remote.openToolInvocation.mockResolvedValue({
+      abort,
+      events: (async function* () {
+        await startGate;
+        yield {
+          type: 'tool:start' as const,
+          invocationId: 'inv-delayed',
+          toolId: tool.id,
+        };
+        await new Promise<void>(resolve => {
+          releaseAfterStart = resolve;
+        });
+      })(),
+    });
+    const client = new RemoteToolGatewayClient(remote as never);
+    const controller = new AbortController();
+
+    const promise = client.callTool(request, { signal: controller.signal });
+    controller.abort();
+    expect(abort).not.toHaveBeenCalled();
+    expect(remote.cancelToolInvocation).not.toHaveBeenCalled();
+
+    releaseStart?.();
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'TOOL_CANCELLED',
+    });
+    expect(remote.cancelToolInvocation).toHaveBeenCalledWith('inv-delayed');
+    expect(abort).toHaveBeenCalled();
+  });
+
+  it('uses bounded SSE disconnect fallback when tool:start never arrives', async () => {
+    jest.useFakeTimers();
+    try {
+      const remote = host();
+      let rejectEvents: ((error: unknown) => void) | null = null;
+      const eventFailure = new Promise<never>((_resolve, reject) => {
+        rejectEvents = reject;
+      });
+      const abort = jest.fn(() => {
+        rejectEvents?.(new Error('aborted'));
+      });
+      remote.openToolInvocation.mockResolvedValue({
+        abort,
+        events: {
+          [Symbol.asyncIterator]() {
+            return {
+              next: () => eventFailure,
+            };
+          },
+        },
+      });
+      const client = new RemoteToolGatewayClient(remote as never);
+      const controller = new AbortController();
+
+      const promise = client.callTool(request, { signal: controller.signal });
+      await Promise.resolve();
+      controller.abort();
+      expect(abort).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(750);
+
+      await expect(promise).rejects.toMatchObject({
+        code: 'TOOL_CANCELLED',
+      });
+      expect(abort).toHaveBeenCalledTimes(1);
+      expect(remote.cancelToolInvocation).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the previous alias map when a refresh contains duplicate aliases', async () => {
+    const remote = host();
+    const client = new RemoteToolGatewayClient(remote as never);
+    await client.listTools();
+
+    remote.listRemoteTools.mockResolvedValueOnce([
+      tool,
+      { ...tool, id: 'other-tool' },
+    ]);
+
+    await expect(client.listTools()).rejects.toMatchObject({
+      code: 'TOOL_ALIAS_CONFLICT',
+    });
+
+    remote.openToolInvocation.mockResolvedValue({
+      abort: jest.fn(),
+      events: (async function* () {
+        yield {
+          type: 'tool:complete' as const,
+          invocation: {
+            invocationId: 'inv-old-map',
+            toolId: tool.id,
+            status: 'completed' as const,
+            content: 'still mapped',
+          },
+        };
+      })(),
+    });
+
+    await expect(client.callTool(request)).resolves.toEqual({
+      content: 'still mapped',
+    });
+    expect(remote.openToolInvocation).toHaveBeenCalledWith({
+      toolId: tool.id,
+      args: { query: 'mira' },
+    });
   });
 
   it('rejects non-object arguments before any remote invocation', async () => {
