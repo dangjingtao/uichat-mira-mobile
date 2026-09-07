@@ -194,6 +194,99 @@ describe('MobileAgentLoop', () => {
     expect(events.some(event => event.type === 'tool-result')).toBe(false);
   });
 
+  it('times out while waiting for mobile approval', async () => {
+    jest.useFakeTimers();
+    try {
+      const approval: ToolApprovalRequest = {
+        invocationId: 'inv-timeout',
+        callId: 'c1',
+        name: 'terminal_session',
+        arguments: '{}',
+        message: 'Approval required',
+      };
+      const gateway: ToolGatewayClient = {
+        listTools: async () => [
+          { name: 'terminal_session', parameters: { type: 'object' } },
+        ],
+        callTool: async () => {
+          throw new ToolApprovalRequiredError(approval);
+        },
+        resolveApproval: async () => ({
+          status: 'completed',
+          result: { content: 'should not run' },
+        }),
+      };
+      const loop = new MobileAgentLoop(gateway);
+      const stream = await loop.run(
+        [],
+        async () =>
+          (async function* () {
+            yield {
+              type: 'tool-call' as const,
+              callId: 'c1',
+              name: 'terminal_session',
+              arguments: '{}',
+            };
+            yield { type: 'finish' as const, reason: 'tool_calls' };
+          })(),
+        {
+          overallTimeoutMs: 50,
+          requestApproval: async () => new Promise<ToolApprovalDecision>(() => undefined),
+        },
+      );
+      const collected = collect(stream);
+      await jest.advanceTimersByTimeAsync(50);
+      await expect(collected).resolves.toContainEqual({
+        type: 'run-paused',
+        reason: 'timeout',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('marks oversized tool results as truncated before the next model round', async () => {
+    const gateway: ToolGatewayClient = {
+      listTools: async () => [
+        { name: 'search', parameters: { type: 'object' } },
+      ],
+      callTool: async () => ({ content: 'abcdefghij' }),
+    };
+    let round = 0;
+    const loop = new MobileAgentLoop(gateway);
+    const events = await collect(
+      await loop.run(
+        [],
+        async () => {
+          round += 1;
+          if (round === 1) {
+            return (async function* () {
+              yield {
+                type: 'tool-call' as const,
+                callId: 'c1',
+                name: 'search',
+                arguments: '{}',
+              };
+              yield { type: 'finish' as const, reason: 'tool_calls' };
+            })();
+          }
+          return (async function* () {
+            yield { type: 'finish' as const, reason: 'stop' };
+          })();
+        },
+        { maxToolResultBytes: 4 },
+      ),
+    );
+
+    expect(events).toContainEqual({
+      type: 'tool-result',
+      callId: 'c1',
+      name: 'search',
+      content: 'abcd',
+      truncated: true,
+    });
+  });
+
   it('stops at the configured round limit', async () => {
     const gateway: ToolGatewayClient = {
       listTools: async () => [{ name: 'search', parameters: { type: 'object' } }],
