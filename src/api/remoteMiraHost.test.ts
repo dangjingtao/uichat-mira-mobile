@@ -477,6 +477,9 @@ describe('RemoteMiraHostClient tool gateway', () => {
     const jsonMock = jest.fn();
     const json: JsonTransport = async request => {
       jsonMock(request);
+      if (request.path === '/remote/v1/manifest') {
+        return request.parse(toolManifestPayload);
+      }
       return request.parse([
         {
           id: 'web_search',
