@@ -178,30 +178,38 @@ describe('RemoteToolGatewayClient', () => {
 
   it('keeps cancellation pending until a delayed tool:start reveals the invocation id', async () => {
     const remote = host();
+    let markSessionOpened: (() => void) | null = null;
+    const sessionOpened = new Promise<void>(resolve => {
+      markSessionOpened = resolve;
+    });
     let releaseStart: (() => void) | null = null;
     const startGate = new Promise<void>(resolve => {
       releaseStart = resolve;
     });
     let releaseAfterStart: (() => void) | null = null;
     const abort = jest.fn(() => releaseAfterStart?.());
-    remote.openToolInvocation.mockResolvedValue({
-      abort,
-      events: (async function* () {
-        await startGate;
-        yield {
-          type: 'tool:start' as const,
-          invocationId: 'inv-delayed',
-          toolId: tool.id,
-        };
-        await new Promise<void>(resolve => {
-          releaseAfterStart = resolve;
-        });
-      })(),
+    remote.openToolInvocation.mockImplementation(async () => {
+      markSessionOpened?.();
+      return {
+        abort,
+        events: (async function* () {
+          await startGate;
+          yield {
+            type: 'tool:start' as const,
+            invocationId: 'inv-delayed',
+            toolId: tool.id,
+          };
+          await new Promise<void>(resolve => {
+            releaseAfterStart = resolve;
+          });
+        })(),
+      };
     });
     const client = new RemoteToolGatewayClient(remote as never);
     const controller = new AbortController();
 
     const promise = client.callTool(request, { signal: controller.signal });
+    await sessionOpened;
     controller.abort();
     expect(abort).not.toHaveBeenCalled();
     expect(remote.cancelToolInvocation).not.toHaveBeenCalled();
@@ -219,6 +227,10 @@ describe('RemoteToolGatewayClient', () => {
     jest.useFakeTimers();
     try {
       const remote = host();
+      let markSessionOpened: (() => void) | null = null;
+      const sessionOpened = new Promise<void>(resolve => {
+        markSessionOpened = resolve;
+      });
       let rejectEvents: ((error: unknown) => void) | null = null;
       const eventFailure = new Promise<never>((_resolve, reject) => {
         rejectEvents = reject;
@@ -226,21 +238,24 @@ describe('RemoteToolGatewayClient', () => {
       const abort = jest.fn(() => {
         rejectEvents?.(new Error('aborted'));
       });
-      remote.openToolInvocation.mockResolvedValue({
-        abort,
-        events: {
-          [Symbol.asyncIterator]() {
-            return {
-              next: () => eventFailure,
-            };
+      remote.openToolInvocation.mockImplementation(async () => {
+        markSessionOpened?.();
+        return {
+          abort,
+          events: {
+            [Symbol.asyncIterator]() {
+              return {
+                next: () => eventFailure,
+              };
+            },
           },
-        },
+        };
       });
       const client = new RemoteToolGatewayClient(remote as never);
       const controller = new AbortController();
 
       const promise = client.callTool(request, { signal: controller.signal });
-      await Promise.resolve();
+      await sessionOpened;
       controller.abort();
       expect(abort).not.toHaveBeenCalled();
 
