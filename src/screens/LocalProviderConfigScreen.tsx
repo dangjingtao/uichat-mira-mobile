@@ -28,6 +28,7 @@ export function LocalProviderConfigScreen() {
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const credentialLoadRequestRef = useRef(0);
+  const selectedProviderIdRef = useRef(config.id);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -41,6 +42,7 @@ export function LocalProviderConfigScreen() {
         if (active) setLoading(false);
         return;
       }
+      selectedProviderIdRef.current = first.id;
       setConfig(first);
       const requestId = ++credentialLoadRequestRef.current;
       setApiKeyDraft('');
@@ -75,8 +77,10 @@ export function LocalProviderConfigScreen() {
       const nextApiKey = apiKeyDraft.trim();
       if (nextApiKey) {
         await providerCredentialStore.save(next.id, nextApiKey);
+        if (selectedProviderIdRef.current === next.id) {
+          credentialLoadRequestRef.current += 1;
+        }
       }
-      setConfig(next);
       setConfigs((current) => {
         const index = current.findIndex((item) => item.id === next.id);
         if (index < 0) return [...current, next];
@@ -84,8 +88,11 @@ export function LocalProviderConfigScreen() {
         updated[index] = next;
         return updated;
       });
-      setApiKeyDraft('');
-      if (nextApiKey) setHasStoredKey(true);
+      if (selectedProviderIdRef.current === next.id) {
+        setConfig(next);
+        setApiKeyDraft('');
+        if (nextApiKey) setHasStoredKey(true);
+      }
       Alert.alert('已保存', 'Local Provider 配置已保存。');
     } catch {
       Alert.alert('保存失败', '无法保存 Local Provider 配置，请检查输入后重试。');
@@ -95,6 +102,7 @@ export function LocalProviderConfigScreen() {
   }, [apiKeyDraft, config, saving]);
 
   const selectProvider = useCallback(async (next: LocalProviderConfig) => {
+    selectedProviderIdRef.current = next.id;
     const requestId = ++credentialLoadRequestRef.current;
     setConfig(next);
     setApiKeyDraft('');
@@ -116,6 +124,7 @@ export function LocalProviderConfigScreen() {
       protocol: 'chat-completions',
     };
     setConfigs((current) => [...current, next]);
+    selectedProviderIdRef.current = next.id;
     setConfig(next);
     setApiKeyDraft('');
     setHasStoredKey(false);
@@ -142,6 +151,7 @@ export function LocalProviderConfigScreen() {
         protocol: 'chat-completions',
       };
       credentialLoadRequestRef.current += 1;
+      selectedProviderIdRef.current = empty.id;
       setConfig(empty);
       setApiKeyDraft('');
       setHasStoredKey(false);
@@ -164,11 +174,14 @@ export function LocalProviderConfigScreen() {
             void providerCredentialStore
               .clear(providerId)
               .then(() => {
-                if (credentialLoadRequestRef.current === requestId) {
+                if (
+                  credentialLoadRequestRef.current === requestId &&
+                  selectedProviderIdRef.current === providerId
+                ) {
                   setApiKeyDraft('');
                   setHasStoredKey(false);
                 }
-                Alert.alert('已清除', '当前 Provider 的 API Key 已清除。');
+                Alert.alert('已清除', 'API Key 已清除。');
               })
               .catch(() => {
                 Alert.alert('清除失败', '无法清除当前 Provider 的 API Key，请稍后重试。');

@@ -21,12 +21,15 @@ describe('MOB-038 Local Provider configuration', () => {
     expect(source).toContain("placeholder={hasStoredKey ? '已保存；输入新 Key 可替换' : '请输入 API Key'}");
     expect(source).toContain('const nextApiKey = apiKeyDraft.trim()');
     expect(source).toContain('if (nextApiKey)');
+    expect(source).toContain('if (selectedProviderIdRef.current === next.id)');
     expect(source).not.toContain('********');
   });
 
   it('clears only the selected Provider credential and ignores stale credential loads', () => {
     expect(source).toContain('credentialLoadRequestRef.current');
     expect(source).toContain('credentialLoadRequestRef.current === requestId');
+    expect(source).toContain('const selectedProviderIdRef = useRef(config.id)');
+    expect(source).toContain('selectedProviderIdRef.current === providerId');
     expect(source).toContain('providerCredentialStore.clear(providerId)');
     expect(source).toContain('accessibilityLabel="清除 API Key"');
     expect(source).toContain("setApiKeyDraft('')");
