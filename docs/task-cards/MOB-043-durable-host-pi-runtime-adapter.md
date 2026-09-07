@@ -4,7 +4,7 @@
 
 范围：Mira Mobile + Mira Host / Pi Runtime 协作
 
-依赖：MOB-037 运行时抽象；MOB-041 Tool Gateway 协议合同；Host 或 Pi Runtime 提供稳定 RPC / HTTP / WebSocket 合同
+依赖：MOB-037 运行时抽象；MOB-041 Tool Gateway 协议合同。Host / Pi Runtime 的现有稳定能力核实与可依赖合同确认属于本卡施工内容，不另设隐含前置卡。
 
 ## 目标
 
@@ -12,7 +12,8 @@
 
 ## 功能范围
 
-- 增加 Host / Pi Runtime Adapter，实现运行创建、状态查询、事件订阅、取消和恢复。
+- 先核实现有 Mira Host / Pi Runtime 的真实能力，冻结本卡可依赖的 RPC / HTTP / WebSocket 合同与状态语义；如现状不足，明确记录缺口，不由 Mobile 猜测协议。
+- 基于已确认合同增加 Host / Pi Runtime Adapter，实现运行创建、状态查询、事件订阅、取消和恢复。
 - 同步运行状态、审批状态、工具状态、暂停原因、失败原因和完成结果。
 - App 进入后台、被系统终止或重新打开后，能够重新加载服务端运行事实。
 - 复用现有 `ConversationRuntime` 事件模型和聊天 UI。
@@ -34,4 +35,4 @@
 
 ## 阻塞关系
 
-Host/Pi Runtime 的稳定协议和凭据授权未确认前，本卡只能完成 Adapter 接口、测试替身和状态映射设计，不能声称持久运行已接通。
+本卡负责核实并确认 Host / Pi Runtime 的稳定协议和凭据授权，再据此完成真实 Adapter。若核实后确认服务端能力尚不存在或不足，必须把该事实登记为明确阻塞并回流对应实现，不得把“等待未知前置”当作本卡完成，也不得由 Mobile 猜测路由或状态字段。
