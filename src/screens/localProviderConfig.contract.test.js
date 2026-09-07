@@ -30,7 +30,7 @@ describe('MOB-038 Local Provider configuration', () => {
     expect(source).toContain('credentialLoadRequestRef.current === requestId');
     expect(source).toContain('const selectedProviderIdRef = useRef(config.id)');
     expect(source).toContain('selectedProviderIdRef.current === providerId');
-    expect(source).toContain('providerCredentialStore.clear(providerId)');
+    expect(source).toMatch(/providerCredentialStore\s*\.clear\(providerId\)/);
     expect(source).toContain('accessibilityLabel="清除 API Key"');
     expect(source).toContain("setApiKeyDraft('')");
     expect(source).toContain('setHasStoredKey(false)');
