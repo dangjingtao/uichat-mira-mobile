@@ -85,6 +85,7 @@ export interface RemoteToolApprovalInput {
   decision: 'approved' | 'rejected';
   toolId: string;
   args?: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 export interface SendRemoteMessageInput {
@@ -618,6 +619,7 @@ export class RemoteMiraHostClient {
         path: `/remote/v1/tool-invocations/${encodeURIComponent(input.invocationId)}/approval`,
         method: 'POST',
         credential: credential.credential,
+        signal: input.signal,
         body: {
           decision: input.decision,
           toolId: input.toolId,
