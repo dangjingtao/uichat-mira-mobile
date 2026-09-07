@@ -12,8 +12,10 @@ const cardSource = readFileSync(
 
 describe('MOB-042 local Agent Loop UI contract', () => {
   it('keeps local Agent mode inside the existing ChatScreen and persists it per session', () => {
-    expect(chatSource).toContain('runtime.getAgentEnabled(sessionId)');
-    expect(chatSource).toContain('runtime.setAgentEnabled(sessionId, next)');
+    expect(chatSource).toMatch(/runtime\s*\.\s*getAgentEnabled\(sessionId\)/);
+    expect(chatSource).toMatch(
+      /runtime\s*\.\s*setAgentEnabled\(sessionId,\s*next\)/,
+    );
     expect(chatSource).toContain('agentEnabled: useLocalAgent');
     expect(chatSource).toContain('Agent 已开启');
     expect(chatSource).toContain('<Bot');
