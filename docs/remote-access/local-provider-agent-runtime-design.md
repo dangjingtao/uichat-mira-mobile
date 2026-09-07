@@ -18,9 +18,12 @@ Mira Mobile will expose two conversation sources behind one stable task-list UI:
 that a large language model, a desktop shell, or the complete Mira Host runtime
 is installed on the phone.
 
-External tools for the Local Provider path are remote-only. The mobile client
-must call a Mira-approved Tool Gateway or another explicitly agreed remote MCP
-adapter. It must not spawn arbitrary local MCP processes, shells, or scripts.
+External tools for the Local Provider path are remote-first in V1. The mobile
+client must call a Mira-approved Tool Gateway or another explicitly agreed remote
+MCP adapter. It must not spawn arbitrary local MCP processes, shells, or scripts.
+When a concrete remote invocation requires human approval, that approval interaction
+is completed on Mobile; the remote Gateway / Runtime remains authoritative for
+policy validation and actual execution.
 
 Long-running, background, approval-heavy, or resumable agent jobs remain owned by
 Mira Host or a Pi/agent sidecar. The phone can observe and control those jobs.
@@ -221,7 +224,7 @@ The V1 mobile policy is:
 - no local process tools;
 - no arbitrary URLs supplied by a model;
 - no tool credentials embedded in message metadata;
-- no silent approval for destructive operations;
+- no silent approval for destructive operations; approval-required invocations are presented on Mobile for explicit approve/reject;
 - tool calls are cancellable where the remote contract supports cancellation;
 - tool results are treated as untrusted data and are size-limited before being
   added to the next provider request.
@@ -396,6 +399,13 @@ which transport to use.
   are tested on real devices before the feature is considered complete.
 
 ## 16. Open Questions Requiring Maintainer Confirmation
+
+Resolved product decisions:
+
+- V1 tools are remote-first; Mobile does not add a local tool execution surface.
+- Human approval for approval-required remote tool invocations is completed on Mobile.
+
+Remaining questions:
 
 1. Is the first Tool Gateway a Mira Host endpoint, a standalone service, or both?
 2. Which authentication method does the Tool Gateway use for a local Provider
