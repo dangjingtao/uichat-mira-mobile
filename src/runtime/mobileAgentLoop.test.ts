@@ -425,6 +425,45 @@ describe('MobileAgentLoop', () => {
     expect(events.at(-1)).toEqual({ type: 'error', message: 'Tool round limit reached (1)' });
   });
 
+  it('reports app suspension when the run signal is also aborted', async () => {
+    const gateway: ToolGatewayClient = {
+      listTools: async () => [
+        { name: 'search', parameters: { type: 'object' } },
+      ],
+      callTool: async () => ({ content: 'unused' }),
+    };
+    const controller = new AbortController();
+    let suspended = false;
+    const loop = new MobileAgentLoop(gateway);
+    const events = await collect(
+      await loop.run(
+        [],
+        async () =>
+          (async function* () {
+            yield {
+              type: 'tool-call' as const,
+              callId: 'c1',
+              name: 'search',
+              arguments: '{}',
+            };
+            suspended = true;
+            controller.abort();
+            yield { type: 'finish' as const, reason: 'tool_calls' };
+          })(),
+        {
+          signal: controller.signal,
+          shouldPause: () => suspended,
+        },
+      ),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'run-paused',
+      reason: 'app-suspended',
+    });
+    expect(gateway.callTool).toBeDefined();
+  });
+
   it('reports an app suspension boundary instead of claiming background continuation', async () => {
     const gateway: ToolGatewayClient = {
       listTools: async () => [],
