@@ -475,14 +475,24 @@ export const parseRemoteToolManifest = (value: unknown): RemoteToolManifest => {
   if (!isRecord(value.parameters)) {
     throw new Error('Remote tool manifest parameters must be an object');
   }
-  if (typeof value.destructive !== 'boolean' || typeof value.requiresApproval !== 'boolean') {
+  if (
+    typeof value.destructive !== 'boolean' ||
+    typeof value.requiresApproval !== 'boolean'
+  ) {
     throw new Error('Remote tool manifest capability flags must be booleans');
   }
 
   const name = requiredString(value, 'name', 'remoteTool');
   if (!MODEL_SAFE_TOOL_NAME_PATTERN.test(name)) {
     throw new Error(
-      'Remote tool name must match ^[A-Za-z0-9_-]{1,64}
+      'Remote tool name must match ^[A-Za-z0-9_-]{1,64}$',
+    );
+  }
+
+  return {
+    id: requiredString(value, 'id', 'remoteTool'),
+    name,
+    description: requiredString(value, 'description', 'remoteTool'),
     parameters: value.parameters,
     destructive: value.destructive,
     requiresApproval: value.requiresApproval,
