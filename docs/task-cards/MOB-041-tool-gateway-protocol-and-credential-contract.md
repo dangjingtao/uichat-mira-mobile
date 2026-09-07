@@ -10,12 +10,17 @@
 
 把 Local Provider 使用远程工具所需的协议边界确认成可实现、可测试、可审计的合同，避免移动端根据页面需求猜测 endpoint、鉴权、工具发现或审批行为。合同确认后，本卡同时负责按该合同完成最小真实 `ToolGatewayClient` Adapter 接通，避免协议完成后留下无人负责的真实传输缺口。
 
+## 已确认的产品决定
+
+- V1 工具能力暂时以远程执行为主；Mobile 不建设本地 MCP / Shell / 任意进程工具执行面。
+- 需要人工确认的工具调用由手机端完成批准或拒绝；远程 Gateway / Runtime 负责真实 Policy 校验和工具执行，Mobile 只提交针对具体 invocation 的审批决定。
+
 ## 必须确认
 
 - Tool Gateway 属于 Mira Host endpoint、独立服务，还是两者兼容。
 - Local Provider 访问 Gateway 使用何种认证、设备授权和凭据轮换方式。
 - 工具发现清单、工具名称、描述和 JSON Schema 格式。
-- 工具调用请求、审批、取消、超时、结果和错误 envelope。
+- 工具调用请求、取消、超时、结果和错误 envelope，以及支持手机端批准/拒绝所需的 approval-required / approval-resolved 协议字段。
 - 工具结果大小、敏感字段和日志脱敏规则。
 - MCP 传输方式及其是否由 Gateway 代为承载。
 - Tool Gateway 凭据与 Remote Host 凭据、Provider API Key 的存储和清除边界。
