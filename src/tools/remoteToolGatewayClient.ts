@@ -176,6 +176,10 @@ export class RemoteToolGatewayClient implements ToolGatewayClient {
           }
         } else if (event.type === 'tool:approval_required') {
           invocationId = event.invocationId;
+          if (abortRequested || options.signal?.aborted) {
+            requestRemoteCancellation();
+            closeLocalStream();
+          }
         } else if (event.type === 'tool:error') {
           throw new ToolGatewayError(event.code, event.message);
         } else if (event.type === 'tool:complete') {
