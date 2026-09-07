@@ -32,7 +32,7 @@
 | MOB-020 | 拾言 LLM 整理与 AI 调整 | REVIEW | Cloud PR #6; CI/review/merge pending |
 | MOB-021 | 拾言 Mobile 结果 / Final Draft / 历史 | REVIEW | Mobile PR #63; real Cloud/device smoke |
 | MOB-022 | 拾言 GitHub Destination | REVIEW | Core merged; public route wiring pending |
-| MOB-023 | 拾言 E2E 验收与加固 | TODO | Blocked by MOB-020 and MOB-022 integration baseline |
+| MOB-023 | 拾言 E2E 验收与加固 | REVIEW | **验收中**；上游 MOB-016～022 的主要实现已落地，2026-09-07 启动三仓 E2E / Android+iOS 真机长录音 / 真实 Provider / 失败恢复 / GitHub Destination 验收；本卡不再承担新增产品功能，未通过项回流对应实现卡 |
 | MOB-024 | Mobile 新建会话与动态 Remote Capability | REVIEW | Desktop #88 / Mobile #65; cross-device smoke |
 | MOB-025 | 线程右滑操作与 Drawer 置顶分组修复 | PASS | PR #83 merged as `01fd9575`; PanResponder replaced by native horizontal ScrollView; final CI + OpenCode Review green; product owner completed Android real-device dogfood on 2026-09-05: all 8 acceptance items (左滑呼出置顶/删除 / 已置顶左滑取消置顶 / 收起不阻塞滚动与点击 / 删除确认取消成功失败 / Drawer 置顶独立分组在 Recent 上方 / 较旧置顶不被上限裁掉 / 取消置顶回 Recent / 重启 pin 持久化) passed |
 | MOB-026 | 全局搜索命中消息正文 | REVIEW | Code `e628d5a`; long-session/degraded smoke |
