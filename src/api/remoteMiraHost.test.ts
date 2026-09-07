@@ -521,6 +521,100 @@ describe('RemoteMiraHostClient tool gateway', () => {
     );
   });
 
+  it('requires tools:control before cancelling a remote tool invocation', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['tools:read'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+    const jsonMock = jest.fn();
+    const client = new RemoteMiraHostClient(store, jsonMock as JsonTransport);
+
+    await expect(client.cancelToolInvocation('inv-1')).rejects.toMatchObject({
+      code: 'REMOTE_SCOPE_REQUIRED',
+      status: 403,
+    });
+    expect(jsonMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed tool cancellation responses', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['tools:control'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+    const json: JsonTransport = async request =>
+      request.parse({
+        invocationId: 'inv-1',
+        status: 'cancelling',
+      });
+    const client = new RemoteMiraHostClient(store, json);
+
+    await expect(client.cancelToolInvocation('inv-1')).rejects.toThrow(
+      'Tool cancellation response is incomplete',
+    );
+  });
+
+  it('falls back from Direct to Relay for idempotent tool cancellation', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['tools:control'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+
+    const directMock = jest.fn();
+    const direct: JsonTransport = async request => {
+      directMock(request);
+      throw new RemoteHostError('NETWORK_ERROR', 'tailnet unavailable');
+    };
+    const relayJsonMock = jest.fn();
+    const relayJson: RelayJsonTransport = async (_relay, request) => {
+      relayJsonMock(_relay, request);
+      return request.parse({
+        invocationId: 'inv-1',
+        accepted: true,
+        status: 'cancelling',
+      });
+    };
+    const client = new RemoteMiraHostClient(
+      store,
+      direct,
+      undefined,
+      relayJson,
+    );
+
+    await expect(client.cancelToolInvocation('inv-1')).resolves.toEqual({
+      invocationId: 'inv-1',
+      accepted: true,
+      status: 'cancelling',
+    });
+    expect(directMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: '/remote/v1/tool-invocations/inv-1/cancel',
+        method: 'POST',
+      }),
+    );
+    expect(relayJsonMock).toHaveBeenCalledWith(
+      relay,
+      expect.objectContaining({
+        path: '/remote/v1/tool-invocations/inv-1/cancel',
+        method: 'POST',
+      }),
+    );
+  });
+
   it('does not replay an uncertain approved invocation through another transport', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
