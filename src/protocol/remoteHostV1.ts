@@ -484,113 +484,7 @@ export const parseRemoteToolManifest = (value: unknown): RemoteToolManifest => {
 
   const name = requiredString(value, 'name', 'remoteTool');
   if (!MODEL_SAFE_TOOL_NAME_PATTERN.test(name)) {
-    throw new Error(
-      'Remote tool name must match ^[A-Za-z0-9_-]{1,64}$',
-    );
-  }
-
-  return {
-    id: requiredString(value, 'id', 'remoteTool'),
-    name,
-    description: requiredString(value, 'description', 'remoteTool'),
-    parameters: value.parameters,
-    destructive: value.destructive,
-    requiresApproval: value.requiresApproval,
-  };
-};
-
-export const parseRemoteToolInvocationProjection = (
-  value: unknown,
-): RemoteToolInvocationProjection => {
-  if (!isRecord(value)) {
-    throw new Error('Remote tool invocation must be an object');
-  }
-  const status = requiredString(value, 'status', 'remoteToolInvocation') as RemoteToolInvocationStatus;
-  if (!['completed', 'awaiting_approval', 'failed', 'cancelled'].includes(status)) {
-    throw new Error(`Unsupported remote tool invocation status: ${status}`);
-  }
-
-  const approval = isRecord(value.approval)
-    ? {
-        message: requiredString(value.approval, 'message', 'remoteToolInvocation.approval'),
-        ...(typeof value.approval.scope === 'string' && value.approval.scope
-          ? { scope: value.approval.scope }
-          : {}),
-      }
-    : undefined;
-
-  const error = isRecord(value.error)
-    ? {
-        code: requiredString(value.error, 'code', 'remoteToolInvocation.error'),
-        message: requiredString(value.error, 'message', 'remoteToolInvocation.error'),
-        ...(typeof value.error.retryable === 'boolean'
-          ? { retryable: value.error.retryable }
-          : {}),
-        ...(typeof value.error.suggestedAction === 'string' ||
-        value.error.suggestedAction === null
-          ? { suggestedAction: value.error.suggestedAction }
-          : {}),
-      }
-    : undefined;
-
-  return {
-    invocationId: requiredString(value, 'invocationId', 'remoteToolInvocation'),
-    toolId: requiredString(value, 'toolId', 'remoteToolInvocation'),
-    status,
-    ...(typeof value.content === 'string' ? { content: value.content } : {}),
-    ...(approval ? { approval } : {}),
-    ...(error ? { error } : {}),
-  };
-};
-
-export const parseRemoteToolGatewayStreamEvent = (
-  value: unknown,
-): RemoteToolGatewayStreamEvent => {
-  if (!isRecord(value)) {
-    throw new Error('Remote tool stream event must be an object');
-  }
-  const type = requiredString(value, 'type', 'remoteToolEvent');
-
-  if (type === 'tool:start') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      toolId: requiredString(value, 'toolId', 'remoteToolEvent'),
-    };
-  }
-  if (type === 'tool:progress') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-    };
-  }
-  if (type === 'tool:approval_required') {
-    return {
-      type,
-      invocationId: requiredString(value, 'invocationId', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-      ...(typeof value.scope === 'string' && value.scope ? { scope: value.scope } : {}),
-    };
-  }
-  if (type === 'tool:error') {
-    return {
-      type,
-      code: requiredString(value, 'code', 'remoteToolEvent'),
-      message: requiredString(value, 'message', 'remoteToolEvent'),
-    };
-  }
-  if (type === 'tool:complete') {
-    return {
-      type,
-      invocation: parseRemoteToolInvocationProjection(value.invocation),
-    };
-  }
-
-  throw new Error(`Unsupported remote tool stream event: ${type}`);
-};
-
-export const parseRemoteThread = (value: unknown): RemoteThread => {
+    throw new Error('Remote tool name must match ^[A-Za-z0-9_-]{1,64}
   if (!isRecord(value)) {
     throw new Error('Thread must be an object');
   }
@@ -707,8 +601,7 @@ export const parseRemoteChatStreamEvent = (value: unknown): RemoteChatStreamEven
   }
 
   return value as RemoteChatStreamEvent;
-};,
-    );
+};);
   }
 
   return {
@@ -727,14 +620,22 @@ export const parseRemoteToolInvocationProjection = (
   if (!isRecord(value)) {
     throw new Error('Remote tool invocation must be an object');
   }
-  const status = requiredString(value, 'status', 'remoteToolInvocation') as RemoteToolInvocationStatus;
+  const status = requiredString(
+    value,
+    'status',
+    'remoteToolInvocation',
+  ) as RemoteToolInvocationStatus;
   if (!['completed', 'awaiting_approval', 'failed', 'cancelled'].includes(status)) {
     throw new Error(`Unsupported remote tool invocation status: ${status}`);
   }
 
   const approval = isRecord(value.approval)
     ? {
-        message: requiredString(value.approval, 'message', 'remoteToolInvocation.approval'),
+        message: requiredString(
+          value.approval,
+          'message',
+          'remoteToolInvocation.approval',
+        ),
         ...(typeof value.approval.scope === 'string' && value.approval.scope
           ? { scope: value.approval.scope }
           : {}),
@@ -744,7 +645,11 @@ export const parseRemoteToolInvocationProjection = (
   const error = isRecord(value.error)
     ? {
         code: requiredString(value.error, 'code', 'remoteToolInvocation.error'),
-        message: requiredString(value.error, 'message', 'remoteToolInvocation.error'),
+        message: requiredString(
+          value.error,
+          'message',
+          'remoteToolInvocation.error',
+        ),
         ...(typeof value.error.retryable === 'boolean'
           ? { retryable: value.error.retryable }
           : {}),
