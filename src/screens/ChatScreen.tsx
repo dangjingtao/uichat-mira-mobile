@@ -587,8 +587,10 @@ export function ChatScreen() {
             upsertAgentActivity(
               event.callId,
               event.name,
-              'completed',
-              event.content,
+              event.truncated ? 'truncated' : 'completed',
+              event.truncated
+                ? `结果超过上下文限制，已截断后继续：${event.content}`
+                : event.content,
             );
             setAgentPhase('continuing');
           }
