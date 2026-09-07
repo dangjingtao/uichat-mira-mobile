@@ -53,7 +53,7 @@
 | MOB-039 | 双入口来源选择与统一新建会话 | REVIEW | 2026-09-06 代码与自动化验证完成；主列表来源菜单、Drawer 双来源展示与统一新建入口待 Android / iOS 功能验收 |
 | MOB-040 | 本地对话可靠发送与重试 | REVIEW | 2026-09-06 代码与自动化验证完成；本地消息幂等写入、取消/超时语义与失败重试待 Android / iOS 功能验收 |
 | MOB-041 | Tool Gateway / MCP 协议与凭据合同确认 | PASS | Host PR #117 squash-merged as `576f9cb2`；Mobile PR #103 squash-merged as `c7288610`；paired Mira Host Remote Gateway -> Harness / External MCP 合同、独立 `tools:*` scope、Agent exposure、owner + exact inputHash 审批、真实 cancel、旧设备不静默扩权、Provider Key 隔离与真实 `RemoteToolGatewayClient` Adapter 已落地；Host review/Branch Policy 通过，Mobile final-head Typecheck/Lint/Jest 400/400 通过；真实设备/服务矩阵归 MOB-044 |
-| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | TODO | 2026-09-06 已派卡；MOB-041 前置已完成，现可基于真实 Tool Gateway 合同接入 Local Agent Loop UI / 状态呈现 |
+| MOB-042 | 本地 Agent Loop UI 与运行状态呈现 | DOING | 2026-09-07 开工；基于 MOB-041 真实 Gateway 合同接入同一 ChatScreen：本地会话 Agent 开关持久化、工具 requested/running/result、approval-required/resolved、取消/挂起/超时/结果截断状态与手机 approve/reject 闭环施工中 |
 | MOB-043 | Host / Pi 持久运行时适配 | TODO | 2026-09-06 已派卡；等待稳定 Host / Pi Runtime 协议，移动端不得猜测路由或状态字段 |
 | MOB-044 | 双入口真机验收与发布加固 | TODO | 2026-09-06 已派卡；汇总 Android/iOS、真实 Provider、Host、凭据、网络和发布验收 |
 | MOB-045 | Local Provider 会话生命周期闭环 | REVIEW | PR #99 squash-merged as `1062e0c2`；单会话本地删除、RuntimeRegistry Local/Remote 路由、设备本地 pin/read 清理及 Provider 删除解锁已落地；CodeRabbit 两项数据完整性/路由问题已修复并确认；Typecheck/Lint/Jest + Android debug build 通过；Android/iOS 真机删除与 Provider 解锁验收挂 MOB-044 |
