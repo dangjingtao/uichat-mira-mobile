@@ -452,7 +452,10 @@ export const parseRemoteManifest = (value: unknown): RemoteManifest => {
       threads: stringArray(value.routes.threads, 'manifest.routes.threads'),
       messages: stringArray(value.routes.messages, 'manifest.routes.messages'),
       agent: stringArray(value.routes.agent, 'manifest.routes.agent'),
-      tools: stringArray(value.routes.tools, 'manifest.routes.tools'),
+      tools:
+        typeof value.routes.tools === 'undefined'
+          ? []
+          : stringArray(value.routes.tools, 'manifest.routes.tools'),
       artifacts: stringArray(value.routes.artifacts, 'manifest.routes.artifacts'),
     },
     reconnect: {
