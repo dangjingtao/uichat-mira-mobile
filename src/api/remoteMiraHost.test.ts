@@ -440,6 +440,30 @@ describe('RemoteMiraHostClient tool gateway', () => {
     });
   });
 
+  it('keeps pairing when Host denies only the tool scope', async () => {
+    const store = new MemoryDeviceCredentialStore();
+    await store.save({
+      hostUrl: 'https://mira.example.ts.net',
+      relay: null,
+      credential: 'mira_device_device-1.secret',
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'tools:read'],
+      savedAt: '2026-09-07T00:00:00.000Z',
+    });
+    const json: JsonTransport = async _request => {
+      throw new RemoteHostError('HTTP_403', 'forbidden', 403);
+    };
+    const client = new RemoteMiraHostClient(store, json);
+
+    await expect(client.listRemoteTools()).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(store.load()).resolves.toMatchObject({
+      deviceId: 'device-1',
+      scopes: ['threads:read', 'tools:read'],
+    });
+  });
+
   it('lists tools through the paired-device credential', async () => {
     const store = new MemoryDeviceCredentialStore();
     await store.save({
