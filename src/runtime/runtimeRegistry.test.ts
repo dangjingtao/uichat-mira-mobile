@@ -12,6 +12,7 @@ const session = (id: string, source: 'remote-host' | 'local-provider', updatedAt
 const runtime = (kind: 'remote-host' | 'local-provider', sessions: Session[]): ConversationRuntime => ({
   kind,
   listSessions: async () => sessions,
+  deleteSession: async () => undefined,
   getMessages: async () => [],
   sendMessage: async () => (async function* (): AsyncIterable<RuntimeEvent> {})(),
   cancelActiveRun: () => undefined,
@@ -28,6 +29,34 @@ describe('RuntimeRegistry', () => {
       { id: 'local-1', source: 'local-provider' },
       { id: 'remote-1', source: 'remote-host' },
     ]);
+  });
+
+  it('queries only the requested session source', async () => {
+    let localCalls = 0;
+    let remoteCalls = 0;
+    const local = runtime('local-provider', [session('local-1', 'local-provider', '2026-09-06T02:00:00.000Z')]);
+    const remote = runtime('remote-host', [session('remote-1', 'remote-host', '2026-09-06T01:00:00.000Z')]);
+    local.listSessions = async () => {
+      localCalls += 1;
+      return [session('local-1', 'local-provider', '2026-09-06T02:00:00.000Z')];
+    };
+    remote.listSessions = async () => {
+      remoteCalls += 1;
+      return [session('remote-1', 'remote-host', '2026-09-06T01:00:00.000Z')];
+    };
+    const registry = new RuntimeRegistry(local as never, remote as never);
+
+    await expect(registry.listSessions('local-provider')).resolves.toMatchObject([
+      { id: 'local-1', source: 'local-provider' },
+    ]);
+    expect(localCalls).toBe(1);
+    expect(remoteCalls).toBe(0);
+
+    await expect(registry.listSessions('remote-host')).resolves.toMatchObject([
+      { id: 'remote-1', source: 'remote-host' },
+    ]);
+    expect(localCalls).toBe(1);
+    expect(remoteCalls).toBe(1);
   });
 
   it('routes session deletion to the matching runtime only', async () => {

@@ -115,3 +115,18 @@ The former blanket deferral is superseded only for MOB-048 by the maintainer dec
 MOB-045, MOB-046 and MOB-047 may proceed from the shared `7bc3556` base. MOB-048 must **not** run in parallel with them: it starts only after those correctness fixes are integrated into `dev`, then re-reads the latest code and limits itself to the dual-entry touched surface.
 
 Any broader cleanup batch still requires a new maintainer decision, fresh review of `dev`, and separate task cards. No repository-wide rewrite is authorized.
+
+
+## MOB-048 targeted cleanup execution — 2026-09-07
+
+MOB-048 started from the latest `dev` after MOB-045/046/047 were integrated. The cleanup remains intentionally limited to the dual-entry touched surface.
+
+The execution scope is:
+
+- remove the dead Shiyan JSX branch left by the dual-entry batch;
+- replace the newly introduced Shiyan tab border hard-coded color with the existing semantic border token;
+- make the already-existing `deleteSession` capability explicit on `ConversationRuntime`, so `RuntimeRegistry` delegates to the selected runtime instead of repeating a second kind branch;
+- strengthen executable `RuntimeRegistry` coverage for explicit Local/Remote source filtering;
+- retain source-string contract tests only where they still verify UI wiring without an existing render-level behavior harness; store/runtime behavior continues to be covered by executable tests.
+
+The broader Conversation orchestration, Host gateway, and App/navigation composition refactors remain **deferred**. MOB-048 does not authorize them.
