@@ -40,6 +40,41 @@ describe('LocalProviderRuntime', () => {
     ]);
   });
 
+  it('cancels the previous Provider client before replacing a local Agent run', async () => {
+    const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
+    await configStore.save([config]);
+    const credentialStore = new MemoryProviderCredentialStore();
+    await credentialStore.save(config.id, 'sk-test');
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const firstClient = {
+      cancelActiveRun: jest.fn(),
+      streamChat: jest.fn(),
+    };
+    const secondClient = {
+      cancelActiveRun: jest.fn(),
+      streamChat: jest.fn(),
+    };
+    const clients = [firstClient, secondClient];
+    const runtime = new LocalProviderRuntime({
+      configStore,
+      credentialStore,
+      sessionRepository: repository,
+      clientFactory: () => clients.shift() as never,
+      toolGateway: {
+        listTools: async () => [],
+        callTool: async () => ({ content: 'unused' }),
+      },
+    });
+    const firstSession = await runtime.createSession('First', config.id);
+    const secondSession = await runtime.createSession('Second', config.id);
+
+    await runtime.sendMessage(firstSession.id, 'first', { agentEnabled: true });
+    await runtime.sendMessage(secondSession.id, 'second', { agentEnabled: true });
+
+    expect(firstClient.cancelActiveRun).toHaveBeenCalledTimes(1);
+    expect(secondClient.cancelActiveRun).not.toHaveBeenCalled();
+  });
+
   it('creates a session for the selected provider', async () => {
     const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
     await configStore.save([config, { ...config, id: 'provider-b', name: 'Provider B' }]);
