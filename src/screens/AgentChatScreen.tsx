@@ -18,18 +18,6 @@ import type { RootStackParamList } from '../types/navigation';
 import { ChatScreen } from './ChatScreen';
 
 const DISCOVERY_POLL_MS = 1_500;
-const TERMINAL_AGENT_RUN_STATUSES = new Set<RemoteAgentRun['status']>([
-  'completed',
-  'failed',
-  'blocked',
-  'cancelled',
-]);
-
-const shouldDiscoverAgentRun = (
-  runId: string | null,
-  run: RemoteAgentRun | null,
-) => !runId || !run || TERMINAL_AGENT_RUN_STATUSES.has(run.status);
-
 export function AgentChatScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { sessionId, source } = route.params;
@@ -73,6 +61,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
   const syncAgentRun = useCallback(
     async (messages: readonly ChatMessage[]) => {
       const nextRunId = getStableAgentRunId(messages);
+      const previousRunId = runIdRef.current;
+      const existingRun = runRef.current;
       const sequence = requestSequenceRef.current + 1;
       requestSequenceRef.current = sequence;
 
@@ -86,6 +76,10 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
         return;
       }
 
+      if (nextRunId === previousRunId && existingRun) {
+        return;
+      }
+
       runIdRef.current = nextRunId;
       setRunId(nextRunId);
       setLoading(true);
@@ -95,6 +89,10 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
         if (requestSequenceRef.current !== sequence) return;
         runRef.current = nextRun;
         setRun(nextRun);
+        if (nextRunId === previousRunId && !existingRun) {
+          observationGenerationRef.current += 1;
+          setObservationGeneration(observationGenerationRef.current);
+        }
       } catch (syncError) {
         if (requestSequenceRef.current !== sequence) return;
         runRef.current = null;
@@ -136,9 +134,7 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
 
       const runDiscovery = async () => {
         if (!active) return;
-        if (shouldDiscoverAgentRun(runIdRef.current, runRef.current)) {
-          await refreshMessages();
-        }
+        await refreshMessages();
         if (active) {
           discoveryTimer = setTimeout(() => {
             void runDiscovery();
@@ -201,6 +197,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
           }
         } catch (observeError) {
           if (!active || controller.signal.aborted) return;
+          runRef.current = null;
+          setRun(null);
           setError(getAgentRunErrorMessage(observeError));
         }
       })();

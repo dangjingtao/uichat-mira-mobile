@@ -94,6 +94,13 @@ describe('remoteAgentApproval', () => {
         { role: 'assistant', metadata: { agent: { runId: '  run-new  ' } } },
       ]),
     ).toBe('run-new');
+
+    expect(
+      getStableAgentRunId([
+        { role: 'assistant', metadata: { agent: { runId: 'run-old' } } },
+        { role: 'assistant', metadata: {} },
+      ]),
+    ).toBeNull();
   });
 
   test('loads canonical run and rejects a run from another thread', async () => {

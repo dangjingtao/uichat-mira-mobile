@@ -28,6 +28,7 @@ export function getStableAgentRunId(
     if (typeof runId === 'string' && runId.trim().length > 0) {
       return runId.trim();
     }
+    return null;
   }
   return null;
 }
