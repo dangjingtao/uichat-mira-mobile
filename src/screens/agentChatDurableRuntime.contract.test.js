@@ -34,3 +34,11 @@ describe('MOB-043 durable discovery race guards', () => {
     );
   });
 });
+
+
+describe('MOB-043 observer ownership', () => {
+  it('prevents an old run observer from overwriting a newly discovered run', () => {
+    expect(source).toContain('runIdRef.current !== runId');
+    expect(source).toContain('runIdRef.current === runId');
+  });
+});

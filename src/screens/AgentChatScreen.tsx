@@ -76,6 +76,8 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
       }
 
       if (nextRunId === previousRunId && existingRun?.id === nextRunId) {
+        setError(null);
+        setLoading(false);
         return;
       }
 
@@ -182,7 +184,11 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
             runId,
             controller.signal,
           )) {
-            if (!active || generation !== observationGenerationRef.current) return;
+            if (
+              !active ||
+              generation !== observationGenerationRef.current ||
+              runIdRef.current !== runId
+            ) return;
             runRef.current = nextRun;
             setRun(nextRun);
             setLoading(false);
@@ -192,12 +198,13 @@ function RemoteAgentChatOverlay({ sessionId }: { sessionId: string }) {
           if (
             active &&
             !controller.signal.aborted &&
-            generation === observationGenerationRef.current
+            generation === observationGenerationRef.current &&
+            runIdRef.current === runId
           ) {
             await miraHostClient.getMessages(sessionId);
           }
         } catch (observeError) {
-          if (!active || controller.signal.aborted) return;
+          if (!active || controller.signal.aborted || runIdRef.current !== runId) return;
           runRef.current = null;
           setRun(null);
           setError(getAgentRunErrorMessage(observeError));
