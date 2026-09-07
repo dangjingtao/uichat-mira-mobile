@@ -59,12 +59,12 @@ export class MobileAgentLoop {
       const messages = [...initialMessages];
       let rounds = 0;
       while (true) {
-        if (signal?.aborted) {
-          yield { type: 'run-paused' as const, reason: 'cancelled' as const };
-          return;
-        }
         if (shouldPause()) {
           yield { type: 'run-paused' as const, reason: 'app-suspended' as const };
+          return;
+        }
+        if (signal?.aborted) {
+          yield { type: 'run-paused' as const, reason: 'cancelled' as const };
           return;
         }
         if (Date.now() >= deadline) {
@@ -109,8 +109,18 @@ export class MobileAgentLoop {
         });
 
         for (const call of pendingCalls) {
-          if (signal?.aborted || shouldPause()) {
-            yield { type: 'run-paused' as const, reason: signal?.aborted ? 'cancelled' as const : 'app-suspended' as const };
+          if (shouldPause()) {
+            yield {
+              type: 'run-paused' as const,
+              reason: 'app-suspended' as const,
+            };
+            return;
+          }
+          if (signal?.aborted) {
+            yield {
+              type: 'run-paused' as const,
+              reason: 'cancelled' as const,
+            };
             return;
           }
           validateToolCall(manifests, call);
@@ -212,13 +222,23 @@ export class MobileAgentLoop {
               let approvalResolveTimeout: ReturnType<typeof setTimeout> | null =
                 null;
               const abortApprovalFromRun = () => approvalController.abort();
-              if (signal?.aborted) {
-                approvalController.abort();
-              } else {
-                signal?.addEventListener('abort', abortApprovalFromRun, {
-                  once: true,
-                });
+              if (shouldPause()) {
+                yield {
+                  type: 'run-paused' as const,
+                  reason: 'app-suspended' as const,
+                };
+                return;
               }
+              if (signal?.aborted) {
+                yield {
+                  type: 'run-paused' as const,
+                  reason: 'cancelled' as const,
+                };
+                return;
+              }
+              signal?.addEventListener('abort', abortApprovalFromRun, {
+                once: true,
+              });
               try {
                 const remainingMs = deadline - Date.now();
                 if (remainingMs <= 0) {
