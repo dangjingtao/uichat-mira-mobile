@@ -1,4 +1,6 @@
 import { RemoteHostError } from '../api/remoteHttp';
+import { ToolGatewayError } from '../tools/toolGatewayClient';
+import { ToolPolicyError } from '../tools/toolPolicy';
 import {
   getChatHistoryErrorMessage,
   getChatSendErrorMessage,
@@ -46,6 +48,32 @@ describe('chatSessionState', () => {
     expect(
       getChatHistoryErrorMessage(new RemoteHostError('NETWORK_ERROR', 'offline')),
     ).toContain('网络');
+  });
+
+  it('distinguishes local Agent Gateway failures from Provider credential failures', () => {
+    expect(
+      getChatSendErrorMessage(
+        new RemoteHostError('REMOTE_SCOPE_REQUIRED', 'scope required', 403),
+        'local-provider',
+      ),
+    ).toContain('工具权限');
+
+    expect(
+      getChatSendErrorMessage(
+        new ToolGatewayError(
+          'TOOL_APPROVAL_UNCERTAIN',
+          'approval uncertain',
+        ),
+        'local-provider',
+      ),
+    ).toContain('审批结果暂时无法确认');
+
+    expect(
+      getChatSendErrorMessage(
+        new ToolPolicyError('Tool arguments are not valid JSON: search'),
+        'local-provider',
+      ),
+    ).toBe('工具参数无效，本轮已停止');
   });
 
   it('maps local Provider send failures to actionable messages', () => {
