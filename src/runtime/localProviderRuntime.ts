@@ -31,8 +31,10 @@ export class LocalProviderRuntime implements ConversationRuntime {
   private readonly toolGateway?: ToolGatewayClient;
   private activeClient: OpenAiCompatibleClient | null = null;
   private activeAbortController: AbortController | null = null;
+  private activeRunToken: symbol | null = null;
   private pendingApproval:
     | {
+        runToken: symbol;
         invocationId: string;
         resolve: (decision: ToolApprovalDecision) => void;
         reject: (error: Error) => void;
@@ -117,8 +119,10 @@ export class LocalProviderRuntime implements ConversationRuntime {
       options?.agentEnabled && this.toolGateway
         ? new AbortController()
         : null;
-    if (abortController) {
+    const runToken = abortController ? Symbol('local-agent-run') : null;
+    if (abortController && runToken) {
       this.activeAbortController = abortController;
+      this.activeRunToken = runToken;
     }
 
     let stream: AsyncIterable<RuntimeEvent>;
@@ -137,7 +141,7 @@ export class LocalProviderRuntime implements ConversationRuntime {
                 shouldPause: () => this.executionSuspended,
                 signal: abortController?.signal,
                 requestApproval: (approval) =>
-                  this.waitForApprovalDecision(approval),
+                  this.waitForApprovalDecision(runToken!, approval),
               },
             )
           : await client.streamChat({
@@ -146,13 +150,20 @@ export class LocalProviderRuntime implements ConversationRuntime {
             });
     } catch (error) {
       if (this.activeClient === client) this.activeClient = null;
-      if (this.activeAbortController === abortController) {
+      if (
+        this.activeAbortController === abortController &&
+        this.activeRunToken === runToken
+      ) {
         this.activeAbortController = null;
+        this.activeRunToken = null;
       }
       abortController?.abort();
-      this.rejectPendingApproval(
-        new Error('Local Agent setup failed before the run started'),
-      );
+      if (runToken) {
+        this.rejectPendingApproval(
+          new Error('Local Agent setup failed before the run started'),
+          runToken,
+        );
+      }
       throw error;
     }
     const repository = this.sessionRepository;
@@ -172,12 +183,19 @@ export class LocalProviderRuntime implements ConversationRuntime {
         }
       } finally {
         if (runtime.activeClient === client) runtime.activeClient = null;
-        if (runtime.activeAbortController === abortController) {
+        if (
+          runtime.activeAbortController === abortController &&
+          runtime.activeRunToken === runToken
+        ) {
           runtime.activeAbortController = null;
+          runtime.activeRunToken = null;
         }
-        runtime.rejectPendingApproval(
-          new Error('Local Agent run ended before approval was resolved'),
-        );
+        if (runToken) {
+          runtime.rejectPendingApproval(
+            new Error('Local Agent run ended before approval was resolved'),
+            runToken,
+          );
+        }
       }
     })();
   }
@@ -203,6 +221,7 @@ export class LocalProviderRuntime implements ConversationRuntime {
   cancelActiveRun() {
     this.activeAbortController?.abort();
     this.activeAbortController = null;
+    this.activeRunToken = null;
     this.activeClient?.cancelActiveRun();
     this.activeClient = null;
     this.rejectPendingApproval(new Error('Local Agent run was cancelled'));
@@ -217,6 +236,7 @@ export class LocalProviderRuntime implements ConversationRuntime {
   }
 
   private waitForApprovalDecision(
+    runToken: symbol,
     approval: ToolApprovalRequest,
   ): Promise<ToolApprovalDecision> {
     this.rejectPendingApproval(
@@ -225,6 +245,7 @@ export class LocalProviderRuntime implements ConversationRuntime {
 
     return new Promise<ToolApprovalDecision>((resolve, reject) => {
       this.pendingApproval = {
+        runToken,
         invocationId: approval.invocationId,
         resolve,
         reject,
@@ -232,9 +253,9 @@ export class LocalProviderRuntime implements ConversationRuntime {
     });
   }
 
-  private rejectPendingApproval(error: Error) {
+  private rejectPendingApproval(error: Error, runToken?: symbol) {
     const pending = this.pendingApproval;
-    if (!pending) return;
+    if (!pending || (runToken && pending.runToken !== runToken)) return;
     this.pendingApproval = null;
     pending.reject(error);
   }
