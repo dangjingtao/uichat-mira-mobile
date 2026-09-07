@@ -108,7 +108,6 @@ export class LocalProviderRuntime implements ConversationRuntime {
       await this.sessionRepository.appendMessages(sessionId, [userMessage]);
     }
     const client = this.clientFactory(config, apiKey);
-    this.activeClient = client;
     const requestMessages = (alreadyRecorded ? previous : [...previous, userMessage]).map<OpenAiCompatibleMessage>(
       (message) => ({
         role: message.role,
@@ -116,14 +115,16 @@ export class LocalProviderRuntime implements ConversationRuntime {
       }),
     );
     if (options?.agentEnabled && this.activeRunToken) {
+      const replacedClient = this.activeClient;
       this.activeAbortController?.abort();
-      this.activeClient?.cancelActiveRun();
+      replacedClient?.cancelActiveRun();
       this.rejectPendingApproval(
         new Error('A newer local Agent run replaced the previous run'),
       );
       this.activeAbortController = null;
       this.activeRunToken = null;
     }
+    this.activeClient = client;
 
     const abortController =
       options?.agentEnabled && this.toolGateway
