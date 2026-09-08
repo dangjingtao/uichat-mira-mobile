@@ -1,6 +1,7 @@
 import { MemoryLocalKeyValueStore } from '../storage/localKeyValueStore';
 import { LocalSessionRepository } from '../local/localSessionRepository';
 import { ProviderConfigStore, type LocalProviderConfig } from '../provider/providerConfigStore';
+import type { OpenAiCompatibleClient } from '../provider/openAiCompatibleClient';
 import { MemoryProviderCredentialStore } from '../security/providerCredentialStore';
 import { LocalProviderRuntime } from './localProviderRuntime';
 
@@ -73,6 +74,32 @@ describe('LocalProviderRuntime', () => {
 
     expect(firstClient.cancelActiveRun).toHaveBeenCalledTimes(1);
     expect(secondClient.cancelActiveRun).not.toHaveBeenCalled();
+  });
+
+  it('forwards the session id to the provider client for prompt caching headers', async () => {
+    const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
+    await configStore.save([config]);
+    const credentialStore = new MemoryProviderCredentialStore();
+    await credentialStore.save(config.id, 'sk-test');
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const factoryCalls: Array<{ apiKey: string; sessionId: string }> = [];
+    const runtime = new LocalProviderRuntime({
+      configStore,
+      credentialStore,
+      sessionRepository: repository,
+      clientFactory: (_config, apiKey, sessionId) => {
+        factoryCalls.push({ apiKey, sessionId });
+        return {
+          cancelActiveRun: jest.fn(),
+          streamChat: jest.fn(async () => (async function* () {})()),
+        } as unknown as OpenAiCompatibleClient;
+      },
+    });
+    const session = await runtime.createSession('Headers', config.id);
+
+    await runtime.sendMessage(session.id, 'hello');
+
+    expect(factoryCalls).toEqual([{ apiKey: 'sk-test', sessionId: session.id }]);
   });
 
   it('creates a session for the selected provider', async () => {

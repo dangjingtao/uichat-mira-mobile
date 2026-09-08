@@ -221,6 +221,11 @@ The first local adapter should target the common Chat Completions subset:
 - `tools`
 - `tool_choice`
 
+Every request carries an identifying `User-Agent: mira-mobile/<version>`
+header. When the runtime knows the local session id, it is forwarded as
+`x-opencode-session` so subscription gateways such as OpenCode Go can group
+requests for prompt caching.
+
 The adapter should normalize the common streaming fields:
 
 - `delta.content`

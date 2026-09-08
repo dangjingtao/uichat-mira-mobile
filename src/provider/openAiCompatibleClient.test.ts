@@ -1,4 +1,5 @@
 import type { RuntimeEvent } from '../runtime/conversationRuntime';
+import { version } from '../../package.json';
 import { OpenAiCompatibleClient } from './openAiCompatibleClient';
 
 const SSE_SEPARATOR = String.fromCharCode(10, 10);
@@ -58,10 +59,11 @@ const collect = async (stream: AsyncIterable<RuntimeEvent>) => {
   return events;
 };
 
-const createClient = (xhr: FakeXhr, baseUrl = 'https://provider.example.com') =>
+const createClient = (xhr: FakeXhr, baseUrl = 'https://provider.example.com', sessionId?: string) =>
   new OpenAiCompatibleClient({
     baseUrl,
     apiKey: 'secret',
+    sessionId,
     xhrFactory: () => xhr as unknown as XMLHttpRequest,
   });
 
@@ -102,6 +104,21 @@ describe('OpenAiCompatibleClient', () => {
     ]);
     expect(JSON.parse(xhr.requestBody ?? '{}')).toMatchObject({ model: 'model-1', stream: true });
     expect(xhr.headers.Authorization).toBe('Bearer secret');
+    expect(xhr.headers['x-opencode-session']).toBeUndefined();
+  });
+
+  it('identifies itself and forwards the session id for provider prompt caching', async () => {
+    const xhr = new FakeXhr();
+    const client = createClient(xhr, 'https://provider.example.com', 'local-session-1');
+
+    const stream = await client.streamChat({
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+
+    await collect(stream);
+    expect(xhr.headers['User-Agent']).toBe(`mira-mobile/${version}`);
+    expect(xhr.headers['x-opencode-session']).toBe('local-session-1');
   });
 
   it('keeps the legacy null finish fallback when a provider sends only [DONE]', async () => {

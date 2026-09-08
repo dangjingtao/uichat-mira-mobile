@@ -1,5 +1,10 @@
 import { RemoteHostError } from '../api/remoteHttp';
+import { version } from '../../package.json';
 import type { RuntimeEvent } from '../runtime/conversationRuntime';
+
+// Subscription gateways like OpenCode Go require clients to identify
+// themselves instead of relying on the generic OS user agent.
+const CLIENT_USER_AGENT = `mira-mobile/${version}`;
 
 export interface OpenAiCompatibleMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -34,6 +39,11 @@ export interface OpenAiCompatibleRequest {
 export interface OpenAiCompatibleClientOptions {
   baseUrl: string;
   apiKey: string;
+  /**
+   * Conversation id forwarded as x-opencode-session so subscription gateways
+   * like OpenCode Go can group requests for prompt caching.
+   */
+  sessionId?: string;
   requestTimeoutMs?: number;
   xhrFactory?: () => XMLHttpRequest;
 }
@@ -354,6 +364,10 @@ export class OpenAiCompatibleClient {
     xhr.setRequestHeader('Accept', 'text/event-stream');
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Authorization', `Bearer ${this.options.apiKey}`);
+    xhr.setRequestHeader('User-Agent', CLIENT_USER_AGENT);
+    if (this.options.sessionId) {
+      xhr.setRequestHeader('x-opencode-session', this.options.sessionId);
+    }
     xhr.onprogress = () => {
       try {
         processChunk();

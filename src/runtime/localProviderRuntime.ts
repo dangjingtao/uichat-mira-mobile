@@ -17,7 +17,11 @@ export interface LocalProviderRuntimeOptions {
   configStore?: ProviderConfigStore;
   credentialStore?: ProviderCredentialStore;
   sessionRepository?: LocalSessionRepository;
-  clientFactory?: (config: LocalProviderConfig, apiKey: string) => OpenAiCompatibleClient;
+  clientFactory?: (
+    config: LocalProviderConfig,
+    apiKey: string,
+    sessionId: string,
+  ) => OpenAiCompatibleClient;
   toolGateway?: ToolGatewayClient;
 }
 
@@ -27,7 +31,11 @@ export class LocalProviderRuntime implements ConversationRuntime {
   private readonly configStore: ProviderConfigStore;
   private readonly credentialStore: ProviderCredentialStore;
   private readonly sessionRepository: LocalSessionRepository;
-  private readonly clientFactory: (config: LocalProviderConfig, apiKey: string) => OpenAiCompatibleClient;
+  private readonly clientFactory: (
+    config: LocalProviderConfig,
+    apiKey: string,
+    sessionId: string,
+  ) => OpenAiCompatibleClient;
   private readonly toolGateway?: ToolGatewayClient;
   private activeClient: OpenAiCompatibleClient | null = null;
   private activeAbortController: AbortController | null = null;
@@ -47,7 +55,9 @@ export class LocalProviderRuntime implements ConversationRuntime {
     this.credentialStore = options.credentialStore ?? providerCredentialStore;
     this.sessionRepository = options.sessionRepository ?? new LocalSessionRepository();
     this.clientFactory =
-      options.clientFactory ?? ((config, apiKey) => new OpenAiCompatibleClient({ baseUrl: config.baseUrl, apiKey }));
+      options.clientFactory ??
+      ((config, apiKey, sessionId) =>
+        new OpenAiCompatibleClient({ baseUrl: config.baseUrl, apiKey, sessionId }));
     this.toolGateway = options.toolGateway;
     this.supportsAgent = Boolean(this.toolGateway);
   }
@@ -107,7 +117,7 @@ export class LocalProviderRuntime implements ConversationRuntime {
     if (!alreadyRecorded) {
       await this.sessionRepository.appendMessages(sessionId, [userMessage]);
     }
-    const client = this.clientFactory(config, apiKey);
+    const client = this.clientFactory(config, apiKey, sessionId);
     const requestMessages = (alreadyRecorded ? previous : [...previous, userMessage]).map<OpenAiCompatibleMessage>(
       (message) => ({
         role: message.role,
