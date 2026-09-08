@@ -102,6 +102,78 @@ describe('LocalProviderRuntime', () => {
     expect(factoryCalls).toEqual([{ apiKey: 'sk-test', sessionId: session.id }]);
   });
 
+  it('derives the session title from the first user message', async () => {
+    const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
+    await configStore.save([config]);
+    const credentialStore = new MemoryProviderCredentialStore();
+    await credentialStore.save(config.id, 'sk-test');
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const runtime = new LocalProviderRuntime({
+      configStore,
+      credentialStore,
+      sessionRepository: repository,
+      clientFactory: () => ({
+        cancelActiveRun: jest.fn(),
+        streamChat: jest.fn(async () => (async function* () {})()),
+      } as unknown as OpenAiCompatibleClient),
+    });
+    const session = await runtime.createSession(undefined, config.id);
+
+    await runtime.sendMessage(session.id, '  帮我写一个快速排序算法，并解释复杂度  ');
+
+    await expect(runtime.getSession(session.id)).resolves.toMatchObject({
+      title: '帮我写一个快速排序算法，并解释复杂度',
+    });
+  });
+
+  it('caps the derived session title at thirty characters', async () => {
+    const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
+    await configStore.save([config]);
+    const credentialStore = new MemoryProviderCredentialStore();
+    await credentialStore.save(config.id, 'sk-test');
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const runtime = new LocalProviderRuntime({
+      configStore,
+      credentialStore,
+      sessionRepository: repository,
+      clientFactory: () => ({
+        cancelActiveRun: jest.fn(),
+        streamChat: jest.fn(async () => (async function* () {})()),
+      } as unknown as OpenAiCompatibleClient),
+    });
+    const session = await runtime.createSession(undefined, config.id);
+
+    await runtime.sendMessage(session.id, `${'a'.repeat(40)}\n${'b'.repeat(20)}`);
+
+    await expect(runtime.getSession(session.id)).resolves.toMatchObject({
+      title: `${'a'.repeat(30)}…`,
+    });
+  });
+
+  it('keeps a custom session title when the first message arrives', async () => {
+    const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
+    await configStore.save([config]);
+    const credentialStore = new MemoryProviderCredentialStore();
+    await credentialStore.save(config.id, 'sk-test');
+    const repository = new LocalSessionRepository(new MemoryLocalKeyValueStore());
+    const runtime = new LocalProviderRuntime({
+      configStore,
+      credentialStore,
+      sessionRepository: repository,
+      clientFactory: () => ({
+        cancelActiveRun: jest.fn(),
+        streamChat: jest.fn(async () => (async function* () {})()),
+      } as unknown as OpenAiCompatibleClient),
+    });
+    const session = await runtime.createSession('Custom title', config.id);
+
+    await runtime.sendMessage(session.id, 'hello');
+
+    await expect(runtime.getSession(session.id)).resolves.toMatchObject({
+      title: 'Custom title',
+    });
+  });
+
   it('creates a session for the selected provider', async () => {
     const configStore = new ProviderConfigStore(new MemoryLocalKeyValueStore());
     await configStore.save([config, { ...config, id: 'provider-b', name: 'Provider B' }]);

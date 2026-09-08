@@ -2,7 +2,7 @@ import type { ChatMessage, Session } from '../types';
 import { OpenAiCompatibleClient, type OpenAiCompatibleMessage } from '../provider/openAiCompatibleClient';
 import { ProviderConfigStore, type LocalProviderConfig } from '../provider/providerConfigStore';
 import { providerCredentialStore, type ProviderCredentialStore } from '../security/providerCredentialStore';
-import { LocalSessionRepository } from '../local/localSessionRepository';
+import { LocalSessionRepository, DEFAULT_LOCAL_SESSION_TITLE } from '../local/localSessionRepository';
 import type { ConversationRuntime, RuntimeEvent } from './conversationRuntime';
 import { MobileAgentLoop } from './mobileAgentLoop';
 import type {
@@ -12,6 +12,16 @@ import type {
 } from '../tools/toolGatewayClient';
 
 const createMessageId = () => `local-message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const MAX_SESSION_TITLE_LENGTH = 30;
+
+const deriveSessionTitle = (input: string): string => {
+  const normalized = input.replace(/\s+/gu, ' ').trim();
+  if (!normalized) return DEFAULT_LOCAL_SESSION_TITLE;
+  return normalized.length > MAX_SESSION_TITLE_LENGTH
+    ? `${normalized.slice(0, MAX_SESSION_TITLE_LENGTH)}…`
+    : normalized;
+};
 
 export interface LocalProviderRuntimeOptions {
   configStore?: ProviderConfigStore;
@@ -87,6 +97,10 @@ export class LocalProviderRuntime implements ConversationRuntime {
     return this.sessionRepository.delete(sessionId);
   }
 
+  getSession(sessionId: string): Promise<Session> {
+    return this.sessionRepository.get(sessionId);
+  }
+
   getMessages(sessionId: string): Promise<ChatMessage[]> {
     return this.sessionRepository.getMessages(sessionId);
   }
@@ -116,6 +130,9 @@ export class LocalProviderRuntime implements ConversationRuntime {
     const alreadyRecorded = previous.some((message) => message.id === userMessage.id);
     if (!alreadyRecorded) {
       await this.sessionRepository.appendMessages(sessionId, [userMessage]);
+      if (previous.length === 0 && session.title === DEFAULT_LOCAL_SESSION_TITLE) {
+        await this.sessionRepository.rename(sessionId, deriveSessionTitle(input));
+      }
     }
     const client = this.clientFactory(config, apiKey, sessionId);
     const requestMessages = (alreadyRecorded ? previous : [...previous, userMessage]).map<OpenAiCompatibleMessage>(
