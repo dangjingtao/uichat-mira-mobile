@@ -80,11 +80,17 @@ const styles = StyleSheet.create({
   brandBar: { height: 4, backgroundColor: colors.primary },
 });
 
-export function ShareCardView({ model }: { model: ShareCardModel }) {
+export function ShareCardView({
+  model,
+  onLogoLoad,
+}: {
+  model: ShareCardModel;
+  onLogoLoad?: () => void;
+}) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Image source={miraLogo} style={styles.logo} />
+        <Image source={miraLogo} style={styles.logo} onLoad={onLogoLoad} />
         <View style={styles.headerText}>
           <Text style={styles.brandName}>UIChat Mira</Text>
           <Text style={styles.brandTag}>对话分享</Text>
@@ -117,7 +123,7 @@ export function ShareCardView({ model }: { model: ShareCardModel }) {
       <View style={styles.divider} />
       <View style={styles.footer}>
         <View style={styles.footerBrand}>
-          <Image source={miraLogo} style={styles.footerLogo} />
+          <Image source={miraLogo} style={styles.footerLogo} onLoad={onLogoLoad} />
           <Text style={styles.footerName}>UIChat Mira</Text>
         </View>
         <Text style={styles.footerMeta}>

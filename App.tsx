@@ -36,6 +36,7 @@ import { ShiyanOrganizeRulesScreen } from './src/shiyan/ShiyanOrganizeRulesScree
 import { ShiyanTaskDetailWithDeliveryScreen } from './src/shiyan/ShiyanTaskDetailWithDeliveryScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { TailscaleConnectivityLifecycle } from './src/connectivity/TailscaleConnectivityLifecycle';
+import { ShareCardCaptureRoot } from './src/share/ShareCardCapture';
 import { remoteMiraHostClient } from './src/api/remoteMiraHost';
 import { deviceCredentialStore } from './src/security/deviceCredentialStore';
 import { useHostStore } from './src/store/hostStore';
