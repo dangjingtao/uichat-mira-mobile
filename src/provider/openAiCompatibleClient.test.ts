@@ -107,6 +107,46 @@ describe('OpenAiCompatibleClient', () => {
     expect(xhr.headers['x-opencode-session']).toBeUndefined();
   });
 
+  it('strips think blocks that span multiple SSE frames', async () => {
+    const xhr = new FakeXhr(
+      sse(
+        { choices: [{ delta: { content: '<th' } }] },
+        { choices: [{ delta: { content: 'ink>hidden reasoning' } }] },
+        { choices: [{ delta: { content: '</thi' } }] },
+        { choices: [{ delta: { content: 'nk>\n\nvisible' } }] },
+        { choices: [{ delta: {}, finish_reason: 'stop' }] },
+        '[DONE]',
+      ),
+    );
+
+    const stream = await createClient(xhr).streamChat({
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+
+    await expect(collect(stream)).resolves.toEqual([
+      { type: 'text-delta', delta: 'visible' },
+      { type: 'finish', reason: 'stop' },
+    ]);
+  });
+
+  it('drops an unclosed think block instead of leaking it downstream', async () => {
+    const xhr = new FakeXhr(
+      sse(
+        { choices: [{ delta: { content: '<think>still reasoning' } }] },
+        { choices: [{ delta: {}, finish_reason: 'length' }] },
+        '[DONE]',
+      ),
+    );
+
+    const stream = await createClient(xhr).streamChat({
+      model: 'model-1',
+      messages: [{ role: 'user', content: 'hello' }],
+    });
+
+    await expect(collect(stream)).resolves.toEqual([{ type: 'finish', reason: 'length' }]);
+  });
+
   it('identifies itself and forwards the session id for provider prompt caching', async () => {
     const xhr = new FakeXhr();
     const client = createClient(xhr, 'https://provider.example.com', 'local-session-1');

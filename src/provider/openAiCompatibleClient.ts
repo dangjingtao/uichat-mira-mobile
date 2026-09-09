@@ -1,6 +1,7 @@
 import { RemoteHostError } from '../api/remoteHttp';
 import { version } from '../../package.json';
 import type { RuntimeEvent } from '../runtime/conversationRuntime';
+import { createThinkTagFilter, type ThinkTagFilter } from './thinkTagFilter';
 
 // Subscription gateways like OpenCode Go require clients to identify
 // themselves instead of relying on the generic OS user agent.
@@ -174,7 +175,11 @@ interface ParsedProviderFrame {
   done: boolean;
 }
 
-const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedProviderFrame => {
+const parseFrame = (
+  frame: string,
+  pendingToolCalls: PendingToolCalls,
+  thinkFilter: ThinkTagFilter,
+): ParsedProviderFrame => {
   const data = frame
     .split(/\r?\n/u)
     .filter((line) => line.startsWith('data:'))
@@ -182,7 +187,12 @@ const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedPr
     .join('\n');
   if (!data) return { events: [], done: false };
   if (data === '[DONE]') {
-    return { events: flushToolCalls(pendingToolCalls), done: true };
+    const trailing = thinkFilter.flush();
+    const events: RuntimeEvent[] = trailing
+      ? [{ type: 'text-delta', delta: trailing }]
+      : [];
+    events.push(...flushToolCalls(pendingToolCalls));
+    return { events, done: true };
   }
 
   let value: unknown;
@@ -204,7 +214,8 @@ const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedPr
   if (delta && typeof delta === 'object' && !Array.isArray(delta)) {
     const deltaRecord = delta as Record<string, unknown>;
     if (typeof deltaRecord.content === 'string' && deltaRecord.content.length > 0) {
-      events.push({ type: 'text-delta', delta: deltaRecord.content });
+      const visible = thinkFilter.push(deltaRecord.content);
+      if (visible) events.push({ type: 'text-delta', delta: visible });
     }
     if (Array.isArray(deltaRecord.tool_calls)) {
       for (const [fallbackIndex, call] of deltaRecord.tool_calls.entries()) {
@@ -238,6 +249,8 @@ const parseFrame = (frame: string, pendingToolCalls: PendingToolCalls): ParsedPr
     }
   }
   if (typeof item.finish_reason === 'string') {
+    const trailing = thinkFilter.flush();
+    if (trailing) events.push({ type: 'text-delta', delta: trailing });
     events.push(...flushToolCalls(pendingToolCalls));
     events.push({ type: 'finish', reason: item.finish_reason });
   }
@@ -301,6 +314,7 @@ export class OpenAiCompatibleClient {
     let settled = false;
     let receivedFinishReason = false;
     const pendingToolCalls: PendingToolCalls = new Map();
+    const thinkFilter = createThinkTagFilter();
 
     const fail = (error: unknown) => {
       if (settled) return;
@@ -315,7 +329,7 @@ export class OpenAiCompatibleClient {
         buffer += (xhr.responseText ?? '').slice(processedLength);
         const trailing = parseSseFrames(buffer);
         for (const frame of trailing.frames) {
-          const parsed = parseFrame(frame, pendingToolCalls);
+          const parsed = parseFrame(frame, pendingToolCalls, thinkFilter);
           parsed.events.forEach((event) => {
             if (event.type === 'finish' && event.reason !== null) receivedFinishReason = true;
             queue.push(event);
@@ -324,6 +338,8 @@ export class OpenAiCompatibleClient {
             queue.push({ type: 'finish', reason: null });
           }
         }
+        const leftover = thinkFilter.flush();
+        if (leftover) queue.push({ type: 'text-delta', delta: leftover });
         queue.close();
         cleanup();
       } catch (error) {
@@ -340,7 +356,7 @@ export class OpenAiCompatibleClient {
       const parsed = parseSseFrames(buffer);
       buffer = parsed.remainder;
       for (const frame of parsed.frames) {
-        const providerFrame = parseFrame(frame, pendingToolCalls);
+        const providerFrame = parseFrame(frame, pendingToolCalls, thinkFilter);
         providerFrame.events.forEach((event) => {
           if (event.type === 'finish' && event.reason !== null) receivedFinishReason = true;
           queue.push(event);
