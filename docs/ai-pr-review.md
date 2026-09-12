@@ -1,138 +1,80 @@
-# Mira Mobile AI PR Review
+# Mira Mobile PR Review
 
-Mira Mobile uses a project-specific OpenCode Go review loop for pull requests targeting `dev`.
+Mira Mobile 的自动 Pull Request Review 当前由 **CodeRabbit** 提供，配置来源是仓库根目录 `.coderabbit.yaml`。
 
-```text
-Builder -> PR -> Mira Mobile Reviewer -> Findings -> local Agent inbox -> Builder verify/fix/reject -> push -> review again
-```
-
-The review is advisory. It does not merge, approve, request changes, or change task-card status.
+旧的 OpenCode 自动 Review 已于 2026-09-03 停用；`.github/workflows/ai-pr-review.yml` 目前只保留一个可手工触发的 disabled tombstone，不参与正常 PR Review。
 
 ## Trigger
 
-`.github/workflows/ai-pr-review.yml` runs for non-draft, same-repository pull requests targeting `dev` on:
+CodeRabbit 自动审查面向目标分支为 `dev` 的非 Draft PR：
 
-- opened
-- synchronize
-- reopened
-- ready_for_review
+- automatic review enabled；
+- incremental review enabled；
+- Draft PR 不自动审查；
+- base branch：`dev`。
 
-Each new push cancels the older in-flight review for the same PR.
-
-## Model
-
-Default model:
+正常工作流因此是：
 
 ```text
-opencode-go/gpt-5.6-luna
+feat/* -> PR(dev) -> repository CI + CodeRabbit -> maintainer decision -> dev
 ```
 
-Repository variable `OPENCODE_REVIEW_MODEL` may override the default without editing the workflow.
+CodeRabbit Review 是审查证据，不替代 CI、真机验证、协议验证或维护者的验收决定。
 
-Required repository secret:
+## Review profile
 
-```text
-OPENCODE_API_KEY
-```
+当前 `.coderabbit.yaml` 使用：
 
-## Trust boundary
+- language: `zh-CN`
+- profile: `assertive`
+- high-level summary: enabled
+- review status: enabled
+- request-changes workflow: disabled
+- poem: disabled
 
-The PR head is the object being reviewed.
+仓库要求 Review 优先报告经过验证的 P0-P2 问题，避免低价值样式评论。
 
-The following review controls are loaded from the PR base SHA (`dev`) instead of trusting the PR copy:
+## Repository review rules
 
-- `scripts/opencode-mobile-pr-review.mjs`
-- `.opencode/skills/mira-mobile-pr-review/SKILL.md`
+CodeRabbit 被要求把以下内容作为仓库级 Review 规则：
+
 - `AGENTS.md`
-- `docs/workbench/00-work-ledger.md`
-- `docs/task-cards/README.md`
-- matching `docs/task-cards/MOB-*.md`
-- relevant Remote/build/design docs selected by the reviewer
+- `.opencode/skills/mira-mobile-pr-review/SKILL.md`
 
-This prevents a PR from weakening its own reviewer rules in the same run.
+其中 Review 重点包括：
 
-OpenCode does not start inside the raw PR worktree. The workflow creates a sanitized snapshot of the PR head for code inspection, removes PR-controlled OpenCode/Claude/Agent configuration and plugins (`.opencode`, `.claude`, `.agents`, `opencode.json*`, `CLAUDE.md`), then injects only the trusted base `AGENTS.md` and the trusted `mira-mobile-pr-review` skill. This prevents a PR from executing reviewer-side project plugins or overriding the review runtime before the model starts.
+- React Native lifecycle、异步竞态、reconnect / resume、hydration、navigation state；
+- Mira Host / Remote 合同与外部数据校验；
+- Local Provider / Remote Host 的状态与凭据边界；
+- Android / iOS parity、权限、deep link、native configuration 与 build impact；
+- credential、pairing token、signing、CI / release 安全边界；
+- Tool Gateway / Agent Runtime 的权威边界；
+- loading / empty / error / data 等交互状态。
 
-The model job has `contents: read` only. OpenCode may read/search the sanitized snapshot and load the `mira-mobile-pr-review` skill, but cannot edit files, run shell commands, launch subagents, browse the web, or ask interactive questions.
+缺少真机、Host、Cloud、Provider、签名或跨仓库验证时，默认记录为 validation gap；除非任务合同明确要求该证据作为实现条件，否则不能仅凭“尚未验证”升级成代码缺陷。
 
-GitHub comment write permission belongs only to the deterministic publish job.
+## Finding format
 
-## Mobile-specific review profile
-
-The review skill prioritizes:
-
-- React Native lifecycle, async races, reconnect/resume, hydration, and navigation state;
-- Mira Host / Remote contract boundaries and external-data validation;
-- device-local versus server-authoritative state truthfulness;
-- Android / iOS parity, permissions, deep links, native configuration, and build impact;
-- credential, pairing-token, signing, and CI security boundaries;
-- release branch and artifact behavior;
-- loading/empty/error/data interaction flows.
-
-Missing real-device or real-Host evidence is normally recorded under `Platform / validation gaps`, not promoted into a defect unless the task explicitly requires that validation as an implementation condition.
-
-## Output contract
-
-A valid review contains:
+实质性 finding 应清楚区分：
 
 ```text
-<!-- mira-mobile-ai-review:v1 -->
-<!-- mira-mobile-review-skill:v1 -->
-# Mira Mobile OpenCode PR Review
-## Verdict
-## Findings
-## Platform / validation gaps
-## Local handoff
+Observation
+Inference
+Judgment
 ```
 
-Verdict is one of:
+并说明：
 
-```text
-NO_BLOCKING_FINDINGS
-CHANGES_NEEDED
-HUMAN_CHECK_NEEDED
-```
+- 影响平台 / surface；
+- 相关代码或合同位置；
+- 风险；
+- 建议修复；
+- 可执行的验证方式。
 
-Every actionable finding separates Observation, Inference, and Judgment and identifies the affected platform/surface, location, suggested fix, and verification method.
+Task Card / work ledger 变更还必须核对状态与 Acceptance Evidence 是否一致，并尊重维护者已经明确作出的验收决定。
 
-The published comment metadata records the exact reviewed Head SHA, base SHA, and model.
+## Old OpenCode review loop
 
-## Local Agent handoff
+仓库历史上存在项目专用 OpenCode PR Review 工作流及辅助脚本。它们不再是当前自动 Review 的事实来源。
 
-On the PR branch:
-
-```bash
-npm run review:pull
-```
-
-Or explicitly:
-
-```bash
-npm run review:pull -- <PR_NUMBER>
-```
-
-The helper writes:
-
-```text
-.ai/reviews/pr-<number>.md
-.ai/reviews/latest.md
-```
-
-The directory is gitignored.
-
-The helper fails when the latest review Head SHA does not match the current PR Head SHA. A Builder must not act on a stale review as if it described the current code.
-
-Local handling rule:
-
-```text
-pull review
--> verify Head SHA / stale=no
--> inspect each finding against code + contracts
--> fix, reject with evidence, or escalate
--> push
--> wait for the next review bound to the new Head SHA
-```
-
-## Bootstrap note
-
-The workflow cannot review the bootstrap PR that introduces the workflow itself because GitHub evaluates the workflow from the target branch. After this infrastructure is merged to `dev`, create a disposable same-repository PR targeting `dev` to smoke-test the complete OpenCode -> comment -> local handoff loop.
+当前自动 Review 行为以 `.coderabbit.yaml` 为准；历史实现如需删除、归档或重新启用，应另立工作项处理，不在普通功能 PR 中顺手修改。
