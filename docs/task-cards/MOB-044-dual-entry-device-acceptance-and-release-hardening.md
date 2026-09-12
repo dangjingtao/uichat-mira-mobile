@@ -1,6 +1,6 @@
 # MOB-044：双入口真机验收与发布加固
 
-状态：**DOING**（2026-09-07 已开始总验收；先收自动化/发布链证据，Android/iOS 真机矩阵持续补齐）
+状态：**DOING**（2026-09-07 已开始总验收；先收自动化/发布链证据，Android/iOS 真机矩阵持续补齐；2026-09-12 Android 真机档位 1 基础链路（1/3/9/10/11）已 PASS，iOS 全挂）
 
 范围：Mira Mobile；Android / iOS；真实 Mira Host 与真实 OpenAI-compatible Provider
 
@@ -111,21 +111,45 @@
 以下项目必须分别在 Android 与 iOS 真实设备记录结果，CI、模拟器和 Mock 不可替代：
 
 1. Provider API Key：保存 -> 杀 App -> 重开 -> 读取状态 -> 掩码 -> 清除；确认日志/界面不出现完整 Key。
+   - ✅ Android 1-a PASS：本地 secure-store 写入、掩码回显、清除；界面/日志无完整 Key 泄漏。
+   - ❌ Android 1-b PENDING（需要真实 Provider Key 走"杀 App → 重开 → 回显"完整链路）
+   - ❌ iOS PENDING
 2. 多 Provider：至少两个真实 OpenAI-compatible Provider 配置，切换后新建会话归属正确，不串 Key / model / transcript。
+   - ❌ Android PENDING（需要至少两个真实 Provider URL）
+   - ❌ iOS PENDING
 3. 双入口 UI：Remote Host / Local Provider 来源菜单、Drawer、聊天头部、空状态与删除后状态。
+   - ✅ Android PASS
+   - ❌ iOS PENDING
 4. Local Provider 文本链路：真实流式输出、取消、超时、失败重试；弱网/断网恢复后 transcript 不重复。
+   - ❌ Android PENDING（需要真实 Provider API Key）
+   - ❌ iOS PENDING
 5. Provider 错误：真实或可控服务返回 401 / 403 / 404 / 429 / 5xx / 不兼容 SSE，UI 有可执行下一步。
+   - ❌ Android PENDING（需要真实或可控 Provider 返回错码）
+   - ❌ iOS PENDING
 6. Remote Host 回归：既有扫码配对、Direct/Relay、会话读取、流式消息保持正常。
+   - ❌ Android PENDING（需要已配对 Mira Host）
+   - ❌ iOS PENDING
 7. Real Tool Gateway：真实工具 discover -> invoke -> approval-required -> 手机批准 / 拒绝 -> 继续 / 终止；真实 cancel 生效。
+   - ❌ Android PENDING（需要 Host + Tool Gateway）
+   - ❌ iOS PENDING
 8. Durable Host：长任务运行中切后台、返回前台、杀 App / 重开后从 Host 读取同一 Run；cancel 后不继续误写终态。
+   - ❌ Android PENDING（需要 Host 持久运行时）
+   - ❌ iOS PENDING
 9. 会话生命周期：删除 Local 会话后 pin/unread 清理，最后一个该 Provider 会话删除后 Provider 可删除。
+   - ✅ Android PASS
+   - ❌ iOS PENDING
 10. 安装 / 升级：release build 覆盖安装旧版本后，Provider 配置、secure-store credential、Remote pairing 不丢失。
+    - ✅ Android PASS
+    - ❌ iOS PENDING
 11. 崩溃 / 前后台：核心路径无崩溃；后台不伪装持续执行本地 Agent；Remote durable run 可恢复解释。
+    - ✅ Android PASS（本地 Agent 前台/后台语义已验证）
+    - ❌ Android PENDING（Remote durable run 恢复解释需要 Host）
+    - ❌ iOS PENDING
 
 ### D. 当前判定
 
 - 自动化 / 静态层：**PASS**
-- Android 真机：**PENDING**
+- Android 真机：**部分 PASS**（1-a/3/9/10/11 通过，1-b/2/4/5/6/7/8 仍 PENDING）
 - iOS 真机：**PENDING**
 - 真实 Provider：**PENDING**
 - 真实 Host / Tool Gateway / Durable Run：**PENDING**
@@ -133,3 +157,17 @@
 - iPad release hygiene：**OPEN DECISION / FIX**
 
 因此 MOB-044 当前保持 **DOING**，不能升 PASS。
+
+### E. 2026-09-12 Android 真机验收记录
+
+验收基线：Mobile `dev@8c74550`（`v0.3.0-dev`）。Android 真机档位 1（无服务端凭据依赖的基础链路）由维护者实测通过。
+
+| 条目 | 结果 | 备注 |
+| --- | --- | --- |
+| 1-a Provider Key 本地写入/掩码/清除 | ✅ PASS | secure-store 读写、UI 掩码、日志无完整 Key 泄漏 |
+| 3 双入口 UI | ✅ PASS | 来源菜单、Drawer、聊天头、空状态与删除后状态 |
+| 9 会话生命周期 | ✅ PASS | Local 会话删除后 pin/unread 清理；最后一个 Provider 会话删完后 Provider 解锁删除 |
+| 10 安装/升级覆盖 | ✅ PASS | release build 覆盖安装旧版本后 secure-store credential 未丢失 |
+| 11 本地 Agent 前后台语义 | ✅ PASS | 核心路径无崩溃；App 挂起/切后台时不伪装后台执行本地 Agent |
+
+未完成项仍需真实 Provider API Key（1-b / 2 / 4 / 5）和/或已部署 Mira Host + Tool Gateway（6 / 7 / 8 / 11-Remote 部分）。iOS 全部 11 条待真机。

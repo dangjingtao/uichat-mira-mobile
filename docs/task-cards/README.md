@@ -1,8 +1,8 @@
 # Mobile 任务卡索引
 
-本目录补充 `docs/work-ledger.md` 的 Mobile / 跨仓任务。旧任务编号不改号、不重开；拾言（Shiyan）虽然跨 `uichat-mira-mobile`、`mira-shiyan-cloud`、`mira-shiyan` 三仓施工，但任务编号、状态、依赖与验收统一回写 Mobile 总台账。
+本目录补充 `docs/workbench/00-work-ledger.md` 的 Mobile / 跨仓任务。旧任务编号不改号、不重开；拾言（Shiyan）虽然跨 `uichat-mira-mobile`、`mira-shiyan-cloud`、`mira-shiyan` 三仓施工，但任务编号、状态、依赖与验收统一回写 Mobile 总台账。
 
-> `docs/work-ledger.md` 是唯一状态台账。本页只做索引与快速状态镜像。2026-08-29 夜间临时放行规则已经到期，历史文件仅供追溯。
+> `docs/workbench/00-work-ledger.md` 是唯一状态台账。本页只做索引与快速状态镜像。
 
 ## 当前状态
 
