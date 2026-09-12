@@ -112,19 +112,19 @@
 
 1. Provider API Key：保存 -> 杀 App -> 重开 -> 读取状态 -> 掩码 -> 清除；确认日志/界面不出现完整 Key。
    - ✅ Android 1-a PASS：本地 secure-store 写入、掩码回显、清除；界面/日志无完整 Key 泄漏。
-   - ❌ Android 1-b PENDING（需要真实 Provider Key 走"杀 App → 重开 → 回显"完整链路）
+   - ✅ Android 1-b PASS：杀 App 重开后 Key 状态回显正确，掩码持续，清除后真的被删。
    - ❌ iOS PENDING
 2. 多 Provider：至少两个真实 OpenAI-compatible Provider 配置，切换后新建会话归属正确，不串 Key / model / transcript。
-   - ❌ Android PENDING（需要至少两个真实 Provider URL）
+   - ✅ Android PASS：两个 Provider URL 实测；会话归属各自 Provider，model 和 transcript 不串。
    - ❌ iOS PENDING
 3. 双入口 UI：Remote Host / Local Provider 来源菜单、Drawer、聊天头部、空状态与删除后状态。
    - ✅ Android PASS
    - ❌ iOS PENDING
 4. Local Provider 文本链路：真实流式输出、取消、超时、失败重试；弱网/断网恢复后 transcript 不重复。
-   - ❌ Android PENDING（需要真实 Provider API Key）
+   - ✅ Android PASS：真实 Provider 流式输出、前台取消、弱网切换后 transcript 幂等。
    - ❌ iOS PENDING
 5. Provider 错误：真实或可控服务返回 401 / 403 / 404 / 429 / 5xx / 不兼容 SSE，UI 有可执行下一步。
-   - ❌ Android PENDING（需要真实或可控 Provider 返回错码）
+   - ❌ Android FAIL（**bug 记录，不降级**）：owner 实测填错 URL 或 Key 时 Provider 返回真实错码，但 UI 只模糊"指出错误"、不阻断会话也不给可执行下一步。根因：`openAiCompatibleClient.ts:368` 统一用 `code: 'PROVIDER_REQUEST_FAILED'` 不区分 401/403/404/429/5xx；`getChatSendErrorMessage()` 在 `chatSessionState.ts:64-67` 已按 status 写好映射，但 error 对象没有正确携带 status 到 UI 层。**必须回流修复卡后才能重新验收**。
    - ❌ iOS PENDING
 6. Remote Host 回归：既有扫码配对、Direct/Relay、会话读取、流式消息保持正常。
    - ❌ Android PENDING（需要已配对 Mira Host）
@@ -149,18 +149,21 @@
 ### D. 当前判定
 
 - 自动化 / 静态层：**PASS**
-- Android 真机：**部分 PASS**（1-a/3/9/10/11 通过，1-b/2/4/5/6/7/8 仍 PENDING）
+- Android 真机：**部分 PASS + 1 条 FAIL**（1-a/1-b/2/3/4/9/10/11 通过；5 FAIL 需回流修复；6/7/8 需 Mira Host）
 - iOS 真机：**PENDING**
-- 真实 Provider：**PENDING**
+- 真实 Provider：**PASS（Android 已走通，错误映射 FAIL 除外）**
 - 真实 Host / Tool Gateway / Durable Run：**PENDING**
 - 发布：**BLOCKED BY ACCEPTANCE + VERSION BUMP**
 - iPad release hygiene：**OPEN DECISION / FIX**
+- 新发现：**Provider HTTP status 错误映射 bug，归位 MOB-047**
 
-因此 MOB-044 当前保持 **DOING**，不能升 PASS。
+因此 MOB-044 当前保持 **DOING**，不能升 PASS。Android 第 5 条需修复后重新验收。
 
 ### E. 2026-09-12 Android 真机验收记录
 
-验收基线：Mobile `dev@8c74550`（`v0.3.0-dev`）。Android 真机档位 1（无服务端凭据依赖的基础链路）由维护者实测通过。
+验收基线：Mobile `dev@8c74550`（`v0.3.0-dev`）。Android 真机分两档实测。
+
+#### 档位 1：无服务端凭据依赖
 
 | 条目 | 结果 | 备注 |
 | --- | --- | --- |
@@ -170,4 +173,13 @@
 | 10 安装/升级覆盖 | ✅ PASS | release build 覆盖安装旧版本后 secure-store credential 未丢失 |
 | 11 本地 Agent 前后台语义 | ✅ PASS | 核心路径无崩溃；App 挂起/切后台时不伪装后台执行本地 Agent |
 
-未完成项仍需真实 Provider API Key（1-b / 2 / 4 / 5）和/或已部署 Mira Host + Tool Gateway（6 / 7 / 8 / 11-Remote 部分）。iOS 全部 11 条待真机。
+#### 档位 2：真实 Provider API Key
+
+| 条目 | 结果 | 备注 |
+| --- | --- | --- |
+| 1-b Provider Key 杀 App 回显/重开/清除 | ✅ PASS | secure-store 跨进程重开正确回显；掩码持续；清除后真的删除 |
+| 2 多 Provider 切换归属 | ✅ PASS | 两个 Provider URL；会话归属各自 Provider，model 和 transcript 不串 |
+| 4 Local Provider 文本链路 | ✅ PASS | 真实流式输出、前台取消、弱网切换后 transcript 幂等 |
+| **5 Provider 错误映射** | **❌ FAIL** | 填错 URL 或 Key 时 Provider 返回真实 HTTP 错码（401/404），但 UI 只模糊"指出错误"不阻断，也不给可执行下一步。根因：`openAiCompatibleClient.ts:368` 所有非 2xx 统一 `code: 'PROVIDER_REQUEST_FAILED'`，不区分 status；`chatSessionState.ts:64-67` 已按 status 写好错误文案映射，但 error 对象 status 没正确传到 UI 层。**回流到 MOB-047**（Provider 配置 UX + 错误提示边界） |
+
+未完成：6/7/8/11-Remote 需 Mira Host + Tool Gateway；iOS 全部 11 条。第 5 条修复后需重新验收 Android 和 iOS。
